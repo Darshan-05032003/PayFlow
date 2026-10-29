@@ -33,3 +33,38 @@ Severity scale: Critical / High / Medium / Low.
 - Scope for improvement:
   - Encrypt sensitive columns (feature 7); skip (and report) corrupt rows instead of failing the list; paging for very large
     histories (the full 100k list materialises in ~1.8 s, see the load report); `FLAG_SECURE` on payment screens (feature 7).
+
+## Feature: UPI intent flow with PSP status confirmation
+- Attacks tried:
+  - **Spoofed UPI-app responses**: `Status=SUCCESS&ApprovalRefNo=…` while the PSP says FAILED / PENDING; 10,000 concurrent
+    spoofs with odd casing, 5 KB values, `%00`, bidi overrides (`UpiIntentUseCasesTest`, `UpiIntentStressTest.tenThousandSpoofed…`).
+  - **PSP success for different details**: amount, payee VPA or `txnRef` differ from our stored payment (`…psp success for a
+    different amount, payee or ref is a mismatch`, `pspMismatchStormNeverConfirms`).
+  - **Tampered link inputs**: VPA `javascript:alert(1)@x`, Cyrillic `а`, `‮` prefix, 300-char VPAs; amounts 0 / negative /
+    > ₹1,00,000; `&`/`=`/unicode in payee name and note (parameter injection into the link); 200-char names/notes; `tr` with
+    spaces or > 35 chars (`UpiLinkBuilderTest`, `VpaValidatorTest`).
+  - **Hostile `response` extra**: null, empty, 400 KB, duplicate keys, control chars, `a=b=c&d` (`UpiResponseParserTest`,
+    `AndroidUpiAppLauncherTest` bounds it to 16 KB).
+  - **Rapid double tap** on Pay (`PayViewModelTest.rapid double tap creates exactly one payment`).
+  - **Process death while inside the UPI app**: in-flight payment id in `SavedStateHandle`; the late result is still confirmed.
+  - **Airplane mode / PSP down**: status check throws → `Unresolved`, payment stays PENDING, UI says "do not pay again".
+  - **HTTP client**: path traversal via `txnRef` (`../admin?x=1` is path-encoded), 400/401/429/5xx, connection drop, body
+    timeout, HTML instead of JSON, wrong types, unknown status, `txnRef` echo mismatch, absurd `Retry-After` (`HttpPspClientTest`).
+  - **Intent hygiene**: chooser wraps a plain `ACTION_VIEW` with no URI grants; `<queries>` declares only `VIEW upi:`;
+    no new exported components.
+- What broke:
+  - **High (fixed)**: a timeout while *reading the response body* surfaced as a raw `SocketTimeoutException` instead of
+    `PspException.Timeout`. `ConfirmPaymentUseCase` only catches `PspException`, so this would have crashed the coroutine and
+    left the payment stuck in PENDING with no UI. Regression: `HttpPspClientTest.timeout becomes a Timeout exception`.
+  - **Medium (accepted, inherent to UPI intents)**: any app registered for `upi://` can be chosen in the chooser and receives
+    the payee/amount. Mitigation: the app's answer is never trusted; only the PSP confirms.
+  - **Low (open)**: a `Mismatch` (PSP success with different details) is shown as "unresolved" but not persisted on the
+    payment; a reconciliation flag/column would help support.
+  - **Low**: transient PSP errors at *initiate* mark the payment FAILED (correct: the UPI app was never opened, no money moved),
+    but a user retry creates a second `txnRef`; fine for intents, and feature 6 adds idempotency keys for the polling path.
+- Fixed now:
+  - Body-read IO errors are mapped to typed `PspException`s (above).
+  - `UpiPayRequest` normalises and validates everything that goes into the link; `UpiResponseParser` is bounded and never throws.
+- Scope for improvement:
+  - Persist `Mismatch` on the payment; pin the PSP certificate when a real host exists (SSL pinning, with a documented
+    pin-rotation plan); feature 6 polling with backoff for PENDING results; feature 7 `FLAG_SECURE` on the pay screen.

@@ -24,5 +24,22 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
   `runOffMain` (`testutil/RobolectricFlows.kt`) instead of changing production dispatchers.
 - **Room 2.8**: `room-runtime` only (`room-ktx` is merged into runtime since 2.7); schemas exported to `app/schemas`.
 
+## Feature 2: UPI intent flow
+- **The PSP decides, never the UPI app.** `ConfirmPaymentUseCase` ignores the app's `Status` for the outcome and asks the PSP;
+  a `Success` must match `txnRef`, amount and payee VPA or it is a `Mismatch` and the payment stays PENDING. The app response is
+  only used to enrich the stored `upiTxnId` / failure reason.
+- **Initiate failure = FAILED.** If the PSP rejects/can't register the order, the UPI app is never opened, so no money can have
+  moved and FAILED is honest. After the app was opened, a PSP error is `Unresolved` (stay PENDING), never FAILED.
+- **`txnRef` format**: `PF` + 9 base-36 time chars + 12 random chars from a 32-symbol alphabet (SecureRandom), 23 chars,
+  within the 35-char UPI `tr` limit and URL-safe without encoding.
+- **Launcher as an interface.** `UpiAppLauncher` (`isUpiAppInstalled`, `chooserIntent`, `parseActivityResult`) keeps Intents out
+  of the ViewModel; the VM emits `PayEvent.LaunchUpiApp(uri)` and the route uses `rememberLauncherForActivityResult`.
+  Real apps often return `RESULT_CANCELED` with a FAILURE `response`, so a present `response` wins over the result code.
+- **Sandbox PSP REST shape** for `HttpPspClient`: `POST /v1/payments` (body txnRef/amountPaise/payeeVpa/payeeName/note,
+  `Idempotency-Key` header) and `GET /v1/payments/{txnRef}` → `{txnRef, status: PENDING|SUCCESS|FAILED, pspTxnId, upiTxnId,
+  amountPaise, payeeVpa, failureCode, failureReason}`. Selected only when `PSP_BASE_URL` is an https URL; otherwise `FakePsp`.
+- **Pay form is a single `PayUiState`** (fields + errors + phase) rather than Loading/Empty/Error/Content objects: a form has no
+  "empty" state; `Submitting`/`Confirming` are the loading states and `Done(FAILED)`/`Unresolved` the error states.
+
 ## Compromises
 _None yet._

@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.darshan.payflow.ui.PayFlowTestTags
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -39,6 +43,7 @@ import com.darshan.payflow.ui.components.PaymentRow
 data class HomeCallbacks(
     val onPaymentClick: (String) -> Unit = {},
     val onViewAll: () -> Unit = {},
+    val onPay: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
@@ -60,6 +65,14 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.history_title))
                     }
                 },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = callbacks.onPay,
+                icon = { Icon(Icons.Default.Send, contentDescription = null) },
+                text = { Text(stringResource(R.string.home_pay)) },
+                modifier = Modifier.testTag(PayFlowTestTags.HOME_PAY),
             )
         },
     ) { padding ->

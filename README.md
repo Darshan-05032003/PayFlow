@@ -15,7 +15,7 @@ realistic **sandbox PSP** (no real money moves).
 | # | Feature | Status |
 |---|---|---|
 | 1 | Home, transaction history (Room), payment state model (created → pending → success / failed → refund) | done |
-| 2 | UPI intent flow: `upi://pay` deep links, app chooser, response parsing, **PSP status confirmation** before success | planned |
+| 2 | UPI intent flow: `upi://pay` deep links, app chooser, response parsing, **PSP status confirmation** before success | done |
 | 3 | QR scan-to-pay with CameraX + ML Kit, safe payload validation, camera permission handling | planned |
 | 4 | VPA validation (format + simulated verify returning the payee name) and collect requests (approve / decline / expire) | planned |
 | 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | planned |
@@ -52,18 +52,24 @@ flowchart TB
         home["HomeRoute → HomeViewModel"]
         history["HistoryRoute → HistoryViewModel"]
         detail["PaymentDetailRoute → PaymentDetailViewModel"]
+        pay["PayRoute → PayViewModel<br/>(ActivityResult → UpiAppLauncher)"]
     end
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
         repo["PaymentRepository (interface)"]
+        usecases["PayViaUpiIntentUseCase · ConfirmPaymentUseCase<br/>UpiPayRequest · VpaValidator"]
     end
     subgraph data["data"]
         repoImpl["PaymentRepositoryImpl<br/>(compare-and-set transitions)"]
         room["Room: PayFlowDatabase · PaymentDao · PaymentEntity"]
         psp["PspClient → FakePsp (sandbox) · HttpPspClient (OkHttp)"]
+        upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher"]
     end
-    nav --> home & history & detail
+    nav --> home & history & detail & pay
     home & history & detail --> repo
+    pay --> usecases --> repo
+    usecases --> psp
+    usecases --> upi
     repo -. implemented by .-> repoImpl
     repoImpl --> room
     repoImpl --> model
@@ -124,11 +130,11 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machine, money, mappers, ViewModels, Compose screens) | 38 |
-| Integration (Room in-memory + DAO + repository + ViewModel, Compose flows, Hilt activity) | 19 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 2 |
+| Unit (state machine, money, parsers, validators, use cases, ViewModels, Compose screens) | 90 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 29 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 5 |
 
-Domain + data line coverage (Kover): **98.4 %**.
+Domain + data line coverage (Kover): **97.1 %**.
 
 No device or emulator was available during the build: camera, real UPI apps and `connectedAndroidTest` are
 compile-only and marked "not run: no device". Everything else is proven on the JVM with Robolectric and fakes.
@@ -141,6 +147,13 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
   confirmations of one payment succeed exactly once.
 - Amounts are `Long` paise bounded to 1 paisa … ₹1,00,000; history search parameters are bound and stripped of
   control / invisible characters (a leading NUL or BOM used to collapse the SQLite `LIKE` filter to match-all).
+- **The UPI app's answer is never trusted.** After the app returns, the PSP is asked; only a PSP success whose `txnRef`,
+  amount and payee match the stored payment marks it SUCCESS. 10,000 spoofed `Status=SUCCESS` responses never produced one.
+- A PSP outage after the app was opened is "unresolved" (payment stays pending; "do not pay again"), never "failed".
+- Hostile link inputs are rejected before a link is built (homoglyph/bidi VPAs, `javascript:`, amounts out of range, 35-char
+  `tr`), and the `response` extra from the UPI app is bounded and parsed defensively.
+- The HTTP client maps every failure (401, 429 + `Retry-After`, 5xx, timeouts, connection drops, malformed JSON) to typed
+  exceptions; a body-read timeout that escaped as a raw exception was found by the review and fixed.
 - `allowBackup=false`, data extraction rules exclude everything, no cleartext traffic, only the launcher activity is exported.
 
 ## Load-test highlights
@@ -150,6 +163,8 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 - **100,000 transactions in Room**: insert 550 ms; status filter 93 ms; text search 55 ms; SQL summary 26 ms; a 50-row page
   26 ms; the full un-paged list 1.8 s (recommendation: page the History screen for very large histories).
 - **1,000 concurrent payments** through the state machine with compare-and-set writes: 1.07 s, zero lost updates.
+- **1,000 concurrent UPI intent payments** against a PSP with 20 % failures, 10 % timeouts and 5 % 5xx: 418 ms, 1,916 status
+  calls, zero disagreements between Room and the PSP. **10,000 spoofed app responses**: 657 ms, payment still failed.
 
 ## Project docs
 

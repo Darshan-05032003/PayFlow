@@ -27,3 +27,27 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
   - `PaymentDao.historyPage(limit, offset)` exists (26 ms per page); recommendation: move the History screen to Paging 3 /
     page windows if real users approach tens of thousands of transactions. The home screen only ever loads 5 rows + the SQL
     summary, so it is unaffected.
+
+## Feature: UPI intent flow with PSP status confirmation
+- Scenario and scale:
+  - `UpiIntentStressTest.thousandConcurrentIntentPaymentsAgainstAFlakyPsp`: 1,000 coroutines each run
+    `PayViaUpiIntentUseCase` then `ConfirmPaymentUseCase` (up to 8 confirms) against `FakePsp` with 20 % failed outcomes,
+    10 % timeouts, 5 % 5xx and one pending poll, then every stored payment is compared with the PSP's truth.
+  - `tenThousandSpoofedAppResponsesNeverYieldSuccess`: one payment, 10,000 concurrent spoofed app responses (5 variants).
+  - `pspMismatchStormNeverConfirms`: 2,000 concurrent confirms while the PSP reports success for wrong amounts / payees.
+- Results (numbers):
+  - 1,000 intent payments: **418 ms** total, 1,916 PSP status calls, outcomes `Success=659, Failed=166, initiate-failed=175`,
+    **0 disagreements** between Room and the PSP.
+  - 10,000 spoofs: **657 ms**, final status FAILED, **9,859 PSP status calls**.
+  - 2,000 mismatch confirms: 2,000 `Mismatch` results, payment still PENDING, never confirmed.
+- What broke:
+  - Nothing incorrect, but the spoof storm shows that every `confirm` hits the PSP once until the payment is terminal: a
+    hostile or buggy caller can turn the confirm path into a PSP status-call storm (9,859 calls for one payment).
+- Failure flow (step by step):
+  1. The payment is PENDING (PSP has not settled).
+  2. The UI or an attacker triggers `confirm` repeatedly.
+  3. Each call performs a PSP status request; there is no client-side rate limit for a single payment.
+- Fix applied / recommendation:
+  - Once a payment is terminal, `confirm` returns without calling the PSP (that is why 141 of the 10,000 calls were free).
+  - Feature 6 adds a single polling loop per payment with exponential backoff + jitter and `Retry-After` support, which is the
+    right place for a per-payment in-flight guard (one status request at a time).

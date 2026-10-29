@@ -48,4 +48,32 @@
     <string name="detail_upi_txn">UPI transaction</string>
     <string name="detail_refund_id">Refund</string>
     <string name="detail_failure_reason">Reason</string>
+
+    <!-- Pay (UPI intent) -->
+    <string name="home_pay">Pay</string>
+    <string name="pay_title">Pay with UPI</string>
+    <string name="pay_vpa">Payee UPI ID</string>
+    <string name="pay_payee_name">Payee name</string>
+    <string name="pay_amount">Amount</string>
+    <string name="pay_note">Note (optional)</string>
+    <string name="pay_submit">Pay with UPI app</string>
+    <string name="pay_chooser_title">Pay with</string>
+    <string name="pay_no_upi_app">No UPI app found on this device</string>
+    <string name="pay_sandbox_note">Sandbox build: the result shown here comes from the sandbox payment provider, not from your bank.</string>
+    <string name="pay_awaiting_app">Complete the payment in your UPI app</string>
+    <string name="pay_awaiting_app_hint">When you return, PayFlow confirms the result with the payment provider.</string>
+    <string name="pay_confirming">Confirming with the payment provider…</string>
+    <string name="pay_check_status">Check status</string>
+    <string name="pay_view_payment">View payment</string>
+    <string name="pay_new_payment">New payment</string>
+    <string name="pay_done_success">Payment successful</string>
+    <string name="pay_done_pending">Payment pending</string>
+    <string name="pay_done_pending_hint">The provider has not confirmed yet. Money may still be debited; check again in a moment.</string>
+    <string name="pay_done_failed">Payment failed</string>
+    <string name="pay_unresolved">We could not reach the payment provider</string>
+    <string name="pay_unresolved_hint">Do not pay again until the status is known.</string>
+    <string name="error_required">Required</string>
+    <string name="error_invalid_vpa">Enter a UPI ID like name@bank</string>
+    <string name="error_invalid_amount">Enter a valid amount</string>
+    <string name="error_amount_too_large">Maximum is %1$s per payment</string>
 </resources>
