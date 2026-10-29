@@ -37,6 +37,7 @@ data class PaymentEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "idempotency_key") val idempotencyKey: String?,
+    @ColumnInfo(name = "mandate_id") val mandateId: String? = null,
 )
 
 /** Row shape of [PaymentDao.observeSummary]. */
@@ -69,6 +70,7 @@ fun Payment.toEntity() = PaymentEntity(
     createdAt = createdAt.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli(),
     idempotencyKey = idempotencyKey,
+    mandateId = mandateId,
 )
 
 fun PaymentEntity.toDomain() = Payment(
@@ -88,4 +90,5 @@ fun PaymentEntity.toDomain() = Payment(
     createdAt = Instant.ofEpochMilli(createdAt),
     updatedAt = Instant.ofEpochMilli(updatedAt),
     idempotencyKey = idempotencyKey,
+    mandateId = mandateId,
 )

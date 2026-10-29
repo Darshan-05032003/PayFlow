@@ -1,6 +1,7 @@
 package com.darshan.payflow.data.psp
 
 import com.darshan.payflow.domain.model.CollectStatus
+import com.darshan.payflow.domain.model.MandateStatus
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.VpaValidator
 import java.io.IOException
@@ -120,6 +121,52 @@ class HttpPspClient(
             val status = CollectStatus.entries.firstOrNull { it.name == dto.status.uppercase() } ?: throw PspException.Malformed("unknown collect status")
             PspCollectAnswer(dto.id, status, dto.pspTxnId, dto.txnRef)
         }
+    }
+
+    @Serializable
+    private data class MandateBody(val payeeVpa: String, val payeeName: String, val maxAmountPaise: Long, val frequency: String, val startDate: String, val endDate: String, val note: String)
+
+    @Serializable
+    private data class MandateDto(val umn: String, val status: String)
+
+    @Serializable
+    private data class MandateActionBody(val action: String)
+
+    @Serializable
+    private data class ExecuteBody(val txnRef: String, val amountPaise: Long)
+
+    override suspend fun createMandate(request: PspMandateRequest): PspMandate {
+        val body = json.encodeToString(MandateBody(request.payeeVpa, request.payeeName, request.maxAmountPaise, request.frequency, request.startDate, request.endDate, request.note))
+        val http = Request.Builder().url(baseUrl.newBuilder().addPathSegments("v1/mandates").build()).post(body.toRequestBody(JSON)).auth().build()
+        return execute(http) { text -> json.decodeFromString<MandateDto>(text).toMandate() }
+    }
+
+    override suspend fun updateMandate(umn: String, action: String): PspMandate {
+        val http = Request.Builder()
+            .url(baseUrl.newBuilder().addPathSegments("v1/mandates").addPathSegment(umn).build())
+            .post(json.encodeToString(MandateActionBody(action)).toRequestBody(JSON))
+            .auth()
+            .build()
+        return execute(http) { text -> json.decodeFromString<MandateDto>(text).toMandate() }
+    }
+
+    override suspend fun executeMandate(umn: String, txnRef: String, amountPaise: Long): PspInitiateResponse {
+        val http = Request.Builder()
+            .url(baseUrl.newBuilder().addPathSegments("v1/mandates").addPathSegment(umn).addPathSegment("execute").build())
+            .post(json.encodeToString(ExecuteBody(txnRef, amountPaise)).toRequestBody(JSON))
+            .header("Idempotency-Key", txnRef)
+            .auth()
+            .build()
+        return execute(http) { text ->
+            val dto = json.decodeFromString<InitiateDto>(text)
+            PspInitiateResponse(dto.pspTxnId, dto.txnRef)
+        }
+    }
+
+    private fun MandateDto.toMandate(): PspMandate {
+        val parsed = MandateStatus.entries.firstOrNull { it.name == status.uppercase() } ?: throw PspException.Malformed("unknown mandate status")
+        if (umn.isBlank()) throw PspException.Malformed("missing umn")
+        return PspMandate(umn, parsed)
     }
 
     override suspend fun getPaymentStatus(txnRef: String): PspPaymentStatus {

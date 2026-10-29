@@ -1,6 +1,9 @@
 package com.darshan.payflow.data.psp
 
 import com.darshan.payflow.domain.model.CollectStatus
+import com.darshan.payflow.domain.model.MandateAction
+import com.darshan.payflow.domain.model.MandateStateMachine
+import com.darshan.payflow.domain.model.MandateStatus
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -37,6 +40,14 @@ class FakeCollect(
     @Volatile var status: CollectStatus = CollectStatus.PENDING,
 )
 
+class FakeMandate(
+    val umn: String,
+    val payeeVpa: String,
+    val maxAmountPaise: Long,
+    val frequency: String,
+    @Volatile var status: MandateStatus = MandateStatus.ACTIVE,
+)
+
 class FakeOrder(
     val txnRef: String,
     val pspTxnId: String,
@@ -58,6 +69,7 @@ class FakePsp(
     private val mutex = Mutex()
     val orders = ConcurrentHashMap<String, FakeOrder>()
     val collectRequests = ConcurrentHashMap<String, FakeCollect>()
+    val mandates = ConcurrentHashMap<String, FakeMandate>()
     private val _initiateCalls = AtomicInteger()
     private val _statusCalls = AtomicInteger()
     private val _verifyCalls = AtomicInteger()
@@ -145,6 +157,36 @@ class FakePsp(
             request.status = CollectStatus.APPROVED
             PspCollectAnswer(requestId, CollectStatus.APPROVED, order.pspTxnId, txnRef)
         }
+    }
+
+    override suspend fun createMandate(request: PspMandateRequest): PspMandate {
+        simulateLatency()
+        injectTransientFailure()
+        if (request.maxAmountPaise !in 1..com.darshan.payflow.domain.model.Payment.MAX_AMOUNT_PAISE) throw PspException.ClientError(422, "max amount")
+        val umn = "UMN" + clock.millis().toString(36).uppercase() + mandates.size.toString().padStart(4, '0')
+        mandates[umn] = FakeMandate(umn, request.payeeVpa, request.maxAmountPaise, request.frequency)
+        return PspMandate(umn, MandateStatus.ACTIVE)
+    }
+
+    override suspend fun updateMandate(umn: String, action: String): PspMandate {
+        simulateLatency()
+        injectTransientFailure()
+        val mandate = mandates[umn] ?: throw PspException.ClientError(404, "unknown mandate")
+        val parsed = MandateAction.entries.firstOrNull { it.name == action } ?: throw PspException.ClientError(400, "unknown action")
+        return mutex.withLock {
+            val next = MandateStateMachine.transition(mandate.status, parsed) ?: throw PspException.ClientError(409, "illegal transition")
+            mandate.status = next
+            PspMandate(umn, next)
+        }
+    }
+
+    override suspend fun executeMandate(umn: String, txnRef: String, amountPaise: Long): PspInitiateResponse {
+        simulateLatency()
+        injectTransientFailure()
+        val mandate = mandates[umn] ?: throw PspException.ClientError(404, "unknown mandate")
+        if (mandate.status != MandateStatus.ACTIVE) throw PspException.ClientError(409, "mandate not active")
+        if (amountPaise !in 1..mandate.maxAmountPaise) throw PspException.ClientError(422, "amount exceeds mandate")
+        return initiatePayment(PspInitiateRequest(txnRef, amountPaise, mandate.payeeVpa, "", "mandate $umn", idempotencyKey = txnRef))
     }
 
     /** Simulates a payee sending this device a collect request. */

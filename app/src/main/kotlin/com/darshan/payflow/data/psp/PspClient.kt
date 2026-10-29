@@ -1,6 +1,7 @@
 package com.darshan.payflow.data.psp
 
 import com.darshan.payflow.domain.model.CollectStatus
+import com.darshan.payflow.domain.model.MandateStatus
 
 /** Registers a payment order with the PSP before the UPI app is opened. */
 data class PspInitiateRequest(
@@ -42,6 +43,19 @@ data class PspCollectRequest(
 
 data class PspCollectAnswer(val id: String, val status: CollectStatus, val pspTxnId: String?, val txnRef: String?)
 
+/** Mandate registration request; dates are ISO `yyyy-MM-dd`, frequency is the [com.darshan.payflow.domain.model.MandateFrequency] name. */
+data class PspMandateRequest(
+    val payeeVpa: String,
+    val payeeName: String,
+    val maxAmountPaise: Long,
+    val frequency: String,
+    val startDate: String,
+    val endDate: String,
+    val note: String,
+)
+
+data class PspMandate(val umn: String, val status: MandateStatus)
+
 /** Typed transport/API failures. `retryable` drives the backoff logic. */
 sealed class PspException(message: String, val retryable: Boolean, cause: Throwable? = null) : Exception(message, cause) {
     class Network(cause: Throwable? = null) : PspException("network error", retryable = true, cause = cause)
@@ -70,4 +84,12 @@ interface PspClient {
 
     /** Approving creates a PSP order under `txnRef` that must then be confirmed through [getPaymentStatus]. */
     suspend fun respondToCollect(requestId: String, approve: Boolean): PspCollectAnswer
+
+    suspend fun createMandate(request: PspMandateRequest): PspMandate
+
+    /** [action] is a [com.darshan.payflow.domain.model.MandateAction] name (PAUSE / RESUME / REVOKE). */
+    suspend fun updateMandate(umn: String, action: String): PspMandate
+
+    /** A debit under the mandate; creates an order under [txnRef] to be confirmed through [getPaymentStatus]. */
+    suspend fun executeMandate(umn: String, txnRef: String, amountPaise: Long): PspInitiateResponse
 }

@@ -124,3 +124,31 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: 409 mapping; registered name overrides QR/typed names; hostile collect rows dropped.
 - Scope for improvement: cache verified names per session (LRU) to cut PSP lookups; gate approvals behind the app lock
   (feature 7); first-time-payee warning; show the collect requester's verified name from the directory as well.
+
+## Feature: AutoPay mandates (create / view / pause / resume / revoke, frequency + max-amount rules)
+- Attacks tried:
+  - **Rule bypass at creation**: amounts 0 / negative / > ₹1,00,000, start in the past, end before start, 10-years-plus validity,
+    malformed and PSP-unknown payees (`MandateRulesTest`, `MandateUseCasesTest.create rejects rule violations before touching the psp`).
+  - **Debit above the cap, twice in a period, on paused / revoked / expired mandates, outside the validity window**
+    (`MandateRulesTest`, `MandateUseCasesTest`; 10,000 debit attempts in `MandateStressTest`: 1,429 over-cap rejections, exactly one
+    debit per period per mandate).
+  - **Period boundary games**: the frequency window is computed in the injected `ZoneId` (a debit at 20:30 UTC is already the next
+    IST day), ISO weeks and quarters (`period boundaries use the given time zone, not UTC`).
+  - **Double debit race**: the period is reserved with a counter compare-and-set *before* the PSP is called, so two racing debits
+    never both reach the PSP; a PSP rejection releases the slot (`psp rejecting an execution ... does not count as executed`).
+  - **Illegal lifecycle transitions**: all 16 (status, action) pairs classified; resume on ACTIVE, anything on REVOKED/EXPIRED rejected.
+  - **Racing pause / resume / revoke** (1,000 concurrent actions): see "What broke".
+  - **PSP down**: create stores nothing; update keeps the local status; execute fails the payment and gives the period back.
+  - **Process death on the create form**: fields restored from `SavedStateHandle`.
+- What broke:
+  - **High (fixed)**: `UpdateMandateUseCase` did read-local → PSP → compare-and-set without serialisation. With PAUSE and REVOKE
+    racing, the PSP applied both (ACTIVE→PAUSED→REVOKED) but the REVOKE's local CAS (expecting ACTIVE) lost, leaving the device
+    showing PAUSED for a mandate the PSP had revoked. Found by `MandateStressTest.thousandRacingLifecycleActionsStayConsistent`.
+    Fixed with a per-mandate mutex around the whole update and by mirroring the status the PSP returns; the stress test is the regression.
+  - **Low (accepted)**: `AS_PRESENTED` mandates have no period cap by design (NPCI semantics); the max-amount rule still applies and
+    the UI labels them clearly.
+  - **Low (open)**: the simulated "merchant debit" lives in the app (sandbox); a real PSP would push debit notifications and the
+    rules would run server-side as well as on the client.
+- Fixed now: the race above; rule order (validity window before status) so an ended mandate reports the precise reason.
+- Scope for improvement: gate revoke/create behind the app lock (feature 7); mandate debit notifications from the PSP (polling in
+  feature 6 can reconcile PENDING mandate payments); UMN display with copy-to-clipboard disabled for sensitive data.

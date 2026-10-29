@@ -49,6 +49,9 @@ class FakePaymentRepository(private val clock: Clock = fixedClock) : PaymentRepo
         }
     }
 
+    override fun observeByMandate(mandateId: String): Flow<List<Payment>> =
+        payments.map { map -> map.values.filter { it.mandateId == mandateId }.sortedByDescending { it.createdAt } }.failing()
+
     override fun observeSummary(): Flow<HistorySummary> =
         payments.map { map -> HistorySummary.of(map.values) }.failing()
 }

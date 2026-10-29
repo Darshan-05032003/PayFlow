@@ -5,11 +5,14 @@ import androidx.room.Room
 import com.darshan.payflow.core.DefaultDispatcherProvider
 import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.data.local.CollectDao
+import com.darshan.payflow.data.local.MandateDao
 import com.darshan.payflow.data.local.PayFlowDatabase
 import com.darshan.payflow.data.local.PaymentDao
 import com.darshan.payflow.data.repository.CollectRepositoryImpl
+import com.darshan.payflow.data.repository.MandateRepositoryImpl
 import com.darshan.payflow.data.repository.PaymentRepositoryImpl
 import com.darshan.payflow.domain.repository.CollectRepository
+import com.darshan.payflow.domain.repository.MandateRepository
 import com.darshan.payflow.domain.repository.PaymentRepository
 import dagger.Binds
 import dagger.Module
@@ -18,6 +21,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.time.Clock
+import java.time.ZoneId
 import javax.inject.Singleton
 
 @Module
@@ -25,6 +29,9 @@ import javax.inject.Singleton
 object AppModule {
     @Provides @Singleton
     fun clock(): Clock = Clock.systemUTC()
+
+    @Provides @Singleton
+    fun zoneId(): ZoneId = ZoneId.systemDefault()
 
     @Provides @Singleton
     fun dispatchers(): DispatcherProvider = DefaultDispatcherProvider()
@@ -38,6 +45,9 @@ object AppModule {
 
     @Provides
     fun collectDao(db: PayFlowDatabase): CollectDao = db.collectDao()
+
+    @Provides
+    fun mandateDao(db: PayFlowDatabase): MandateDao = db.mandateDao()
 }
 
 @Module
@@ -48,4 +58,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun collectRepository(impl: CollectRepositoryImpl): CollectRepository
+
+    @Binds @Singleton
+    abstract fun mandateRepository(impl: MandateRepositoryImpl): MandateRepository
 }

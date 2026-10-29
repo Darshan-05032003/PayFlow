@@ -164,4 +164,30 @@ class HttpPspClientTest {
         assertThat(respond.url.encodedPath).isEqualTo("/v1/collect/req-1/respond")
         assertThat(respond.body!!.utf8()).contains("\"approve\":true")
     }
+
+    // --- feature 5: mandates ---
+
+    @Test
+    fun `mandate create, update and execute endpoints`() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(201).body("""{"umn":"UMN-1","status":"ACTIVE"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"umn":"UMN-1","status":"PAUSED"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"umn":"UMN-1","status":"BANANA"}""").build())
+        server.enqueue(MockResponse.Builder().code(201).body("""{"pspTxnId":"psp-5","txnRef":"MND1","status":"PENDING"}""").build())
+        server.enqueue(MockResponse.Builder().code(422).body("""{"error":"max amount"}""").build())
+
+        val created = client.createMandate(PspMandateRequest("netflix@okbank", "Netflix", 64_900, "MONTHLY", "2026-10-29", "2027-10-29", "plan"))
+        assertThat(created).isEqualTo(PspMandate("UMN-1", com.darshan.payflow.domain.model.MandateStatus.ACTIVE))
+        assertThat(client.updateMandate("UMN-1", "PAUSE")).isEqualTo(PspMandate("UMN-1", com.darshan.payflow.domain.model.MandateStatus.PAUSED))
+        assertThat(runCatching { client.updateMandate("UMN-1", "RESUME") }.exceptionOrNull()).isInstanceOf(PspException.Malformed::class.java)
+        assertThat(client.executeMandate("UMN-1", "MND1", 500)).isEqualTo(PspInitiateResponse("psp-5", "MND1"))
+        assertThat((runCatching { client.executeMandate("UMN-1", "MND2", 999_999) }.exceptionOrNull() as PspException.ClientError).status).isEqualTo(422)
+
+        val create = server.takeRequest()
+        assertThat(create.method).isEqualTo("POST"); assertThat(create.url.encodedPath).isEqualTo("/v1/mandates")
+        assertThat(create.body!!.utf8()).contains("\"frequency\":\"MONTHLY\"")
+        val update = server.takeRequest()
+        assertThat(update.url.encodedPath).isEqualTo("/v1/mandates/UMN-1"); assertThat(update.body!!.utf8()).contains("\"action\":\"PAUSE\"")
+        server.takeRequest()
+        assertThat(server.takeRequest().url.encodedPath).isEqualTo("/v1/mandates/UMN-1/execute")
+    }
 }

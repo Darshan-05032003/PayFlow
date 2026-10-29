@@ -18,7 +18,7 @@ realistic **sandbox PSP** (no real money moves).
 | 2 | UPI intent flow: `upi://pay` deep links, app chooser, response parsing, **PSP status confirmation** before success | done |
 | 3 | QR scan-to-pay with CameraX + ML Kit, safe payload validation, camera permission handling | done (camera path compile-only: no device) |
 | 4 | VPA validation (format + simulated verify returning the payee name) and collect requests (approve / decline / expire) | done |
-| 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | planned |
+| 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | done |
 | 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | planned |
 | 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | planned |
 | 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | planned |
@@ -55,22 +55,26 @@ flowchart TB
         pay["PayRoute → PayViewModel<br/>(ActivityResult → UpiAppLauncher)"]
         scan["ScanRoute → ScanViewModel<br/>(camera permission)"]
         collect["CollectRoute → CollectViewModel"]
+        mandates["Mandates / CreateMandate / MandateDetail routes → ViewModels"]
     end
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
         repo["PaymentRepository (interface)"]
-        usecases["PayViaUpiIntentUseCase · ConfirmPaymentUseCase · VerifyVpaUseCase<br/>RefreshCollectRequestsUseCase · RespondToCollectUseCase<br/>UpiPayRequest · VpaValidator"]
+        usecases["PayViaUpiIntentUseCase · ConfirmPaymentUseCase · VerifyVpaUseCase<br/>RefreshCollectRequestsUseCase · RespondToCollectUseCase<br/>Create/Update/Execute/ExpireMandateUseCase<br/>UpiPayRequest · VpaValidator · MandateRules"]
+        mrepo["MandateRepository (interface)"]
         crepo["CollectRepository (interface)"]
     end
     subgraph data["data"]
         repoImpl["PaymentRepositoryImpl<br/>(compare-and-set transitions)"]
-        room["Room: PayFlowDatabase (v2) · PaymentDao · CollectDao"]
+        room["Room: PayFlowDatabase (v3) · PaymentDao · CollectDao · MandateDao"]
         crepoImpl["CollectRepositoryImpl"]
         psp["PspClient → FakePsp (sandbox) · HttpPspClient (OkHttp)"]
         upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher"]
         qr["UpiQrPayloadParser · CameraController → CameraXController<br/>BarcodeScanner → MlKitBarcodeScanner"]
     end
-    nav --> home & history & detail & pay & scan & collect
+    nav --> home & history & detail & pay & scan & collect & mandates
+    mandates --> usecases
+    usecases --> mrepo -. implemented by .-> room
     collect --> usecases
     usecases --> crepo
     crepo -. implemented by .-> crepoImpl --> room
@@ -140,11 +144,11 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machine, money, parsers, validators, use cases, ViewModels, Compose screens) | 149 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 36 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 11 |
+| Unit (state machines, rules, money, parsers, validators, use cases, ViewModels, Compose screens) | 177 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 42 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 13 |
 
-Domain + data line coverage (Kover): **91.8 %** (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
+Domain + data line coverage (Kover): **93.1 %** (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
 untested on the JVM).
 
 No device or emulator was available during the build: camera, real UPI apps and `connectedAndroidTest` are
@@ -170,6 +174,10 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
   QR or the user typed and cannot be edited. Unknown IDs cannot be paid; a PSP outage shows a warning instead of a fake "verified".
 - Collect requests are answered exactly once (per-request mutex + Room compare-and-set + PSP 409/410 mapping): 200 racing
   approvals produced one payment; expired requests cannot be approved; stale server rows never revert a local answer.
+- AutoPay debits are checked against pure rules (max amount, one debit per frequency period computed in the device zone, validity
+  window, status) and the period is reserved with a compare-and-set *before* the PSP is called, so racing debits cannot both go
+  through. A pause/revoke race that left the device and the PSP disagreeing was found by the stress test and fixed with a
+  per-mandate mutex.
 - The HTTP client maps every failure (401, 429 + `Retry-After`, 5xx, timeouts, connection drops, malformed JSON) to typed
   exceptions; a body-read timeout that escaped as a raw exception was found by the review and fixed.
 - `allowBackup=false`, data extraction rules exclude everything, no cleartext traffic, only the launcher activity is exported.
@@ -186,6 +194,8 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 - **10,000 VPA verifications** under 20 % 429 / 10 % 5xx: 58 ms; malformed IDs never reach the PSP.
   **1,000 collect requests answered concurrently** (5 % PSP timeouts): ~1 s, zero duplicate or orphan payments; approvals whose
   status check timed out stay pending (never "failed").
+- **10,000 AutoPay debit attempts** against 100 mandates: 658 ms, 1,429 over-cap rejections, exactly one debit per period.
+  **1,000 racing pause/resume/revoke actions**: 131 ms, local and PSP state identical (they diverged before the fix).
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
 
 ## Project docs

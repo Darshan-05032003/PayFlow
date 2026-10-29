@@ -78,4 +78,22 @@ class FakePspTest {
         val kinds2 = (1..200).map { runCatching { psp2.getPaymentStatus("PF1") }.exceptionOrNull()?.javaClass?.simpleName ?: "ok" }.groupingBy { it }.eachCount()
         assertThat(kinds2).isEqualTo(kinds)
     }
+
+    @Test
+    fun `mandate lifecycle in the sandbox`() = runTest {
+        val psp = FakePsp(fixedClock)
+        val created = psp.createMandate(PspMandateRequest("netflix@okbank", "Netflix", 64_900, "MONTHLY", "2026-10-29", "2027-10-29", ""))
+        assertThat(created.status).isEqualTo(com.darshan.payflow.domain.model.MandateStatus.ACTIVE)
+        assertThat(psp.updateMandate(created.umn, "PAUSE").status).isEqualTo(com.darshan.payflow.domain.model.MandateStatus.PAUSED)
+        val paused = runCatching { psp.executeMandate(created.umn, "MND1", 100) }.exceptionOrNull() as PspException.ClientError
+        assertThat(paused.status).isEqualTo(409)
+        psp.updateMandate(created.umn, "RESUME")
+        val tooMuch = runCatching { psp.executeMandate(created.umn, "MND1", 64_901) }.exceptionOrNull() as PspException.ClientError
+        assertThat(tooMuch.status).isEqualTo(422)
+        val ok = psp.executeMandate(created.umn, "MND1", 64_900)
+        assertThat(psp.getPaymentStatus("MND1")).isInstanceOf(PspPaymentStatus.Success::class.java)
+        assertThat(ok.txnRef).isEqualTo("MND1")
+        assertThat(runCatching { psp.updateMandate("nope", "PAUSE") }.exceptionOrNull()).isInstanceOf(PspException.ClientError::class.java)
+        assertThat(runCatching { psp.updateMandate(created.umn, "DANCE") }.exceptionOrNull()).isInstanceOf(PspException.ClientError::class.java)
+    }
 }

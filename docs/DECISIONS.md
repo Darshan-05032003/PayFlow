@@ -69,5 +69,18 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Room v2** adds `collect_requests` with an `AutoMigration(1, 2)` (schemas exported under `app/schemas`).
 - **Demo collect requests** are seeded into the sandbox `FakePsp` in `PspModule` so the screen has content; a real PSP would push them.
 
+## Feature 5: AutoPay mandates
+- **Rules are pure** (`MandateRules`): creation limits (1 paisa–₹1,00,000, start ≥ today, end ≥ start, ≤ 10 years) and per-debit
+  checks in order: amount > 0, validity window, status ACTIVE, ≤ max amount, one debit per period. Period keys are computed in the
+  injected `ZoneId` (ISO week / quarter / month / year); `AS_PRESENTED` has no period.
+- **Reserve, then debit.** `ExecuteMandateUseCase` wins the period with a counter compare-and-set before calling the PSP and
+  releases it if the PSP rejects; the payment row (method MANDATE, `mandateId`) is created before the PSP call like every payment.
+- **Per-mandate mutex for lifecycle actions** and mirror the PSP-returned status (race found by the stress test).
+- **Simulated merchant debit in the detail screen** (sandbox): the only way to demonstrate the rules without a merchant backend;
+  clearly labelled.
+- **Payee verified at creation** via the PSP directory (reuses feature 4): the stored payee name is the registered one.
+- **Room v3**: `mandates` table + `payments.mandate_id`, both via `AutoMigration(2, 3)`.
+- **Validity as months chips** (1/3/6/12/24) instead of date pickers: fewer input errors, start = today.
+
 ## Compromises
 _None yet._

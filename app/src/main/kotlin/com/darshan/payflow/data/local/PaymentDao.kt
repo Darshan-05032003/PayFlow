@@ -69,6 +69,9 @@ interface PaymentDao {
     @Query("SELECT * FROM payments ORDER BY created_at DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<PaymentEntity>>
 
+    @Query("SELECT * FROM payments WHERE mandate_id = :mandateId ORDER BY created_at DESC")
+    fun observeByMandate(mandateId: String): Flow<List<PaymentEntity>>
+
     @Query(
         """
         SELECT COUNT(*) AS total,

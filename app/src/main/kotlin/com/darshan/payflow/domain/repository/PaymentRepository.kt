@@ -23,4 +23,5 @@ interface PaymentRepository {
     suspend fun applyEvent(id: String, event: PaymentEvent): Result<Payment>
 
     fun observeSummary(): Flow<HistorySummary>
+    fun observeByMandate(mandateId: String): Flow<List<Payment>>
 }

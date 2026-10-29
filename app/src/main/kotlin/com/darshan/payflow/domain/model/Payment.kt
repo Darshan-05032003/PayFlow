@@ -23,6 +23,8 @@ data class Payment(
     val createdAt: Instant,
     val updatedAt: Instant,
     val idempotencyKey: String?,
+    /** Set when the payment is a debit under an AutoPay mandate. */
+    val mandateId: String? = null,
 ) {
     init {
         require(amountPaise in 1..MAX_AMOUNT_PAISE) { "amount out of range: $amountPaise" }

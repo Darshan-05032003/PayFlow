@@ -91,3 +91,22 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
   payment stays PENDING with the request APPROVED → feature 6 polling resolves it later.
 - Fix applied / recommendation: debounce + final-value-only verification (applied); a small per-session LRU of verified
   names (recommended); polling with backoff for PENDING collect payments (feature 6).
+
+## Feature: AutoPay mandates
+- Scenario and scale:
+  - `MandateStressTest.tenThousandDebitAttemptsNeverBreakTheRules`: 100 mandates (all six frequencies, caps ₹10–₹1,000), 10,000
+    concurrent debit attempts (every 7th above the cap), then every mandate's counter is cross-checked with the payments table.
+  - `thousandRacingLifecycleActionsStayConsistent`: 1,000 concurrent PAUSE/RESUME/REVOKE actions on one mandate, local vs PSP state.
+- Results (numbers):
+  - 10,000 debit attempts: **658 ms**; `Executed=100, Rejected.AmountExceedsMax=1429, Rejected.AlreadyExecutedThisPeriod=8471`;
+    100 SUCCESS payments, each mandate executed exactly once (fixed clock → one period), counters equal to payments.
+  - 1,000 racing actions: **131 ms** with the per-mandate mutex (28 ms before the fix, but inconsistent); final state REVOKED both locally and at the PSP.
+- What broke: the lifecycle race (see the security entry): PSP `REVOKED`, local `PAUSED`.
+- Failure flow (step by step):
+  1. Coroutine A reads ACTIVE, decides PAUSE; coroutine B reads ACTIVE, decides REVOKE.
+  2. PSP applies A (PAUSED) then B (REVOKED): both legal at the PSP.
+  3. A's local CAS (ACTIVE→PAUSED) wins; B's CAS (ACTIVE→REVOKED) fails because the row is PAUSED.
+  4. Device shows PAUSED; the PSP has REVOKED; the user can "resume" a revoked mandate locally (PSP would answer 409).
+- Fix applied / recommendation: per-mandate `Mutex` around read → PSP → write, and the status returned by the PSP is what gets
+  written. Recommendation for a real backend: version numbers on mandate updates (optimistic concurrency) and a periodic
+  reconciliation pull.

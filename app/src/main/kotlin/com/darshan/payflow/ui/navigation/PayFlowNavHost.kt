@@ -13,6 +13,9 @@ import com.darshan.payflow.ui.pay.PayViewModel
 import com.darshan.payflow.ui.scan.ScanRoute
 import com.darshan.payflow.ui.collect.CollectRoute
 import com.darshan.payflow.ui.history.HistoryRoute
+import com.darshan.payflow.ui.mandates.CreateMandateRoute
+import com.darshan.payflow.ui.mandates.MandateDetailRoute
+import com.darshan.payflow.ui.mandates.MandatesRoute
 import com.darshan.payflow.ui.pay.PayRoute
 import com.darshan.payflow.ui.history.PaymentDetailRoute
 import com.darshan.payflow.ui.home.HomeCallbacks
@@ -33,6 +36,9 @@ data class PayDestination(
 )
 @Serializable object ScanDestination
 @Serializable object CollectDestination
+@Serializable object MandatesDestination
+@Serializable object CreateMandateDestination
+@Serializable data class MandateDetailDestination(val id: String)
 
 fun UpiQrPayload.toPayDestination() = PayDestination(
     vpa = payeeVpa, name = payeeName, amountPaise = amountPaise ?: 0, note = note.takeIf { it.isNotBlank() }, source = PayViewModel.SOURCE_QR,
@@ -54,6 +60,7 @@ fun PayFlowNavHost(
                     onPay = { navController.navigate(PayDestination()) },
                     onScan = { navController.navigate(ScanDestination) },
                     onCollect = { navController.navigate(CollectDestination) },
+                    onMandates = { navController.navigate(MandatesDestination) },
                 ),
             )
         }
@@ -69,6 +76,22 @@ fun PayFlowNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) },
             )
+        }
+        composable<MandatesDestination> {
+            MandatesRoute(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate(MandateDetailDestination(it)) },
+                onCreate = { navController.navigate(CreateMandateDestination) },
+            )
+        }
+        composable<CreateMandateDestination> {
+            CreateMandateRoute(
+                onBack = { navController.popBackStack() },
+                onCreated = { id -> navController.navigate(MandateDetailDestination(id)) { popUpTo<CreateMandateDestination> { inclusive = true } } },
+            )
+        }
+        composable<MandateDetailDestination> {
+            MandateDetailRoute(onBack = { navController.popBackStack() }, onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) })
         }
         composable<CollectDestination> {
             CollectRoute(onBack = { navController.popBackStack() }, onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) })

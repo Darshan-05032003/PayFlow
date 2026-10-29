@@ -59,6 +59,9 @@ class PaymentRepositoryImpl @Inject constructor(
 
     override fun observeSummary(): Flow<HistorySummary> = dao.observeSummary().map { it.toDomain() }
 
+    override fun observeByMandate(mandateId: String): Flow<List<Payment>> =
+        dao.observeByMandate(mandateId).map { rows -> rows.map { it.toDomain() } }
+
     companion object {
         private const val MAX_CAS_ATTEMPTS = 3
 
