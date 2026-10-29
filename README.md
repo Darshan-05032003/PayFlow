@@ -19,7 +19,7 @@ realistic **sandbox PSP** (no real money moves).
 | 3 | QR scan-to-pay with CameraX + ML Kit, safe payload validation, camera permission handling | done (camera path compile-only: no device) |
 | 4 | VPA validation (format + simulated verify returning the payee name) and collect requests (approve / decline / expire) | done |
 | 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | done |
-| 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | planned |
+| 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | done |
 | 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | planned |
 | 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | planned |
 
@@ -60,7 +60,7 @@ flowchart TB
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
         repo["PaymentRepository (interface)"]
-        usecases["PayViaUpiIntentUseCase · ConfirmPaymentUseCase · VerifyVpaUseCase<br/>RefreshCollectRequestsUseCase · RespondToCollectUseCase<br/>Create/Update/Execute/ExpireMandateUseCase<br/>UpiPayRequest · VpaValidator · MandateRules"]
+        usecases["PayViaUpiIntentUseCase (idempotent) · ConfirmPaymentUseCase · VerifyVpaUseCase<br/>PollPaymentStatusUseCase (single-flight) · ReconcilePendingPaymentsUseCase<br/>RefreshCollectRequestsUseCase · RespondToCollectUseCase<br/>Create/Update/Execute/ExpireMandateUseCase<br/>UpiPayRequest · VpaValidator · MandateRules · BackoffPolicy · RetryExecutor"]
         mrepo["MandateRepository (interface)"]
         crepo["CollectRepository (interface)"]
     end
@@ -144,11 +144,11 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machines, rules, money, parsers, validators, use cases, ViewModels, Compose screens) | 177 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 42 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 13 |
+| Unit (state machines, rules, money, parsers, validators, backoff, use cases, ViewModels, Compose screens) | 202 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 44 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 16 |
 
-Domain + data line coverage (Kover): **93.1 %** (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
+Domain + data line coverage (Kover): **92.9 %** (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
 untested on the JVM).
 
 No device or emulator was available during the build: camera, real UPI apps and `connectedAndroidTest` are
@@ -178,6 +178,12 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
   window, status) and the period is reserved with a compare-and-set *before* the PSP is called, so racing debits cannot both go
   through. A pause/revoke race that left the device and the PSP disagreeing was found by the stress test and fixed with a
   per-mandate mutex.
+- **Duplicate payments are impossible**: an idempotency key is written on the payment row (unique index) *before* the PSP is
+  called; retries, double taps and relaunches after process death return the stored payment (1,000 concurrent submits → 1 row,
+  1 PSP call), a key reused with different details is a conflict, and a CREATED row left behind by a crash is completed once.
+- Pending payments are polled with exponential backoff and full jitter (10,000 simultaneous retries spread from one 10 ms
+  window to a peak of 45), `Retry-After` is honoured and capped, non-retryable errors are never retried, and a single-flight
+  poller means racing callers never multiply PSP calls. A payment that never settles stays pending, never "failed".
 - The HTTP client maps every failure (401, 429 + `Retry-After`, 5xx, timeouts, connection drops, malformed JSON) to typed
   exceptions; a body-read timeout that escaped as a raw exception was found by the review and fixed.
 - `allowBackup=false`, data extraction rules exclude everything, no cleartext traffic, only the launcher activity is exported.
@@ -196,6 +202,9 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
   status check timed out stay pending (never "failed").
 - **10,000 AutoPay debit attempts** against 100 mandates: 658 ms, 1,429 over-cap rejections, exactly one debit per period.
   **1,000 racing pause/resume/revoke actions**: 131 ms, local and PSP state identical (they diverged before the fix).
+- **Same idempotency key 1,000× concurrently**: 76 ms, exactly 1 payment and 1 PSP call. **Polling storm** (3,000 racing pollers
+  over 734 payments against a PSP with timeouts/5xx/429): 246 ms, 3,105 status calls (single-flight), 0 stuck payments.
+  **Backoff jitter**: peak retries per 10 ms window 10,000 → 45.
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
 
 ## Project docs

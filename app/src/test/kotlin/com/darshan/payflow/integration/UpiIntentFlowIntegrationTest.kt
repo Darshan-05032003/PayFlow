@@ -25,6 +25,7 @@ import com.darshan.payflow.domain.usecase.PayViaUpiIntentUseCase
 import com.darshan.payflow.domain.usecase.VerifyVpaUseCase
 import com.darshan.payflow.testutil.FakeUpiAppLauncher
 import com.darshan.payflow.testutil.fixedClock
+import com.darshan.payflow.testutil.pollerFor
 import com.darshan.payflow.testutil.runOffMain
 import com.darshan.payflow.testutil.waitUntilWithMainLooper
 import com.darshan.payflow.ui.PayFlowTestTags
@@ -69,7 +70,7 @@ class UpiIntentFlowIntegrationTest {
 
     private fun start(psp: FakePsp): PayViewModel {
         val vm = PayViewModel(
-            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp),
+            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), pollerFor(repo, psp),
             launcher, DefaultDispatcherProvider(), SavedStateHandle(),
         )
         vm.events.onEach { events += it }.launchIn(CoroutineScope(Dispatchers.Unconfined))

@@ -23,6 +23,12 @@ interface PaymentDao {
     @Query("SELECT COUNT(*) FROM payments")
     suspend fun count(): Int
 
+    @Query("SELECT * FROM payments WHERE idempotency_key = :key")
+    suspend fun getByIdempotencyKey(key: String): PaymentEntity?
+
+    @Query("SELECT * FROM payments WHERE status IN ('CREATED', 'PENDING') AND created_at <= :before ORDER BY created_at ASC LIMIT :limit")
+    suspend fun pendingOlderThan(before: Long, limit: Int): List<PaymentEntity>
+
     /** Atomic compare-and-set: the row changes only if it is still in [expectedStatus]. Returns rows updated (0 or 1). */
     @Query(
         """

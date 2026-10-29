@@ -6,6 +6,7 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentEvent
 import com.darshan.payflow.domain.model.PaymentNotFoundException
 import com.darshan.payflow.domain.model.PaymentStateMachine
+import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.repository.PaymentRepository
 import java.time.Clock
 import kotlinx.coroutines.flow.Flow
@@ -37,10 +38,19 @@ class FakePaymentRepository(private val clock: Clock = fixedClock) : PaymentRepo
 
     override suspend fun getById(id: String): Payment? = payments.value[id]
 
-    override suspend fun create(payment: Payment) {
+    private val createLock = Any()
+
+    override suspend fun create(payment: Payment) = synchronized(createLock) {
         check(payments.value[payment.id] == null) { "duplicate id" }
+        check(payments.value.values.none { it.txnRef == payment.txnRef }) { "duplicate txnRef" }
+        check(payment.idempotencyKey == null || payments.value.values.none { it.idempotencyKey == payment.idempotencyKey }) { "duplicate idempotency key" }
         payments.update { it + (payment.id to payment) }
     }
+
+    override suspend fun findByIdempotencyKey(key: String): Payment? = payments.value.values.firstOrNull { it.idempotencyKey == key }
+
+    override suspend fun pendingOlderThan(before: java.time.Instant): List<Payment> =
+        payments.value.values.filter { (it.status == PaymentStatus.CREATED || it.status == PaymentStatus.PENDING) && !it.createdAt.isAfter(before) }.sortedBy { it.createdAt }
 
     override suspend fun applyEvent(id: String, event: PaymentEvent): Result<Payment> {
         val current = payments.value[id] ?: return Result.failure(PaymentNotFoundException(id))

@@ -20,7 +20,18 @@ class HomeViewModelTest {
     @get:Rule val mainRule = MainDispatcherRule(dispatcher)
     private val repo = FakePaymentRepository()
 
-    private fun vm() = HomeViewModel(repo, TestDispatcherProvider(dispatcher))
+    private val psp = com.darshan.payflow.data.psp.FakePsp(com.darshan.payflow.testutil.fixedClock, com.darshan.payflow.data.psp.FakePspConfig(pendingPolls = 1))
+    private fun reconcile() = com.darshan.payflow.domain.usecase.ReconcilePendingPaymentsUseCase(
+        repo,
+        com.darshan.payflow.domain.usecase.PollPaymentStatusUseCase(
+            com.darshan.payflow.domain.usecase.ConfirmPaymentUseCase(repo, psp, com.darshan.payflow.testutil.fixedClock),
+            com.darshan.payflow.core.BackoffPolicy(initialDelayMillis = 10, maxDelayMillis = 100, multiplier = 2.0, jitterFactor = 0.0, maxAttempts = 2),
+            kotlin.random.Random(1),
+        ),
+        com.darshan.payflow.testutil.fixedClock,
+    )
+
+    private fun vm() = HomeViewModel(repo, reconcile(), TestDispatcherProvider(dispatcher))
 
     @Test
     fun `starts loading then shows empty when there are no payments`() = runTest(dispatcher) {
@@ -67,6 +78,19 @@ class HomeViewModelTest {
             val content = awaitItem() as HomeUiState.Content
             assertThat(content.recent).hasSize(HomeViewModel.RECENT_LIMIT)
             assertThat(content.recent.first().id).isEqualTo("p20")
+        }
+    }
+
+    @Test
+    fun `home start reconciles stale pending payments with the psp`() = runTest(dispatcher) {
+        val stale = testPayment("stale", txnRef = "STALE1", status = PaymentStatus.PENDING, createdAt = testPayment().createdAt.minusSeconds(3_600))
+        repo.seed(stale)
+        psp.initiatePayment(com.darshan.payflow.data.psp.PspInitiateRequest("STALE1", stale.amountPaise, stale.payeeVpa, stale.payeeName, "", null))
+        vm().uiState.test {
+            awaitItem()
+            awaitItem() // content with the pending row
+            val settled = awaitItem() as HomeUiState.Content
+            assertThat(settled.recent.single().status).isEqualTo(PaymentStatus.SUCCESS)
         }
     }
 }

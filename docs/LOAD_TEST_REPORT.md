@@ -110,3 +110,26 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
 - Fix applied / recommendation: per-mandate `Mutex` around read → PSP → write, and the status returned by the PSP is what gets
   written. Recommendation for a real backend: version numbers on mandate updates (optimistic concurrency) and a periodic
   reconciliation pull.
+
+## Feature: status polling, exponential-backoff retries and idempotency keys
+- Scenario and scale:
+  - `sameIdempotencyKeyThousandTimesConcurrentlyCreatesExactlyOnePayment`: 1,000 coroutines submit the same request with one key
+    against the real Room unique index.
+  - `pollingStormAgainstAFlakyPsp`: 1,000 payments registered against a PSP with 15 % timeouts, 10 % 5xx, 5 % 429, 20 % declines
+    and 2 pending polls each; then 3,000 racing pollers (3 per payment) with a real-time backoff policy (2 ms → 20 ms, full jitter, 12 attempts).
+  - `jitterPreventsAThunderingHerd`: 10,000 retry delays for attempt 3 bucketed into 10 ms windows, with and without jitter.
+- Results (numbers):
+  - Same key × 1,000: **76 ms**, **1 payment row, 1 PSP initiate call**, all 1,000 callers got the same payment id.
+  - Polling storm: 734 of 1,000 registrations succeeded against the flaky PSP (the rest failed at initiate: no retries in this
+    run); **3,000 pollers finished in 246 ms with 3,105 PSP status calls** (≈ 4.2 per payment, not 3 × 12), final state
+    589 success / 411 failed / **0 pending, 0 stuck in CREATED**.
+  - Jitter: peak retries in one 10 ms window **10,000 → 45** with full jitter.
+- What broke:
+  - Nothing failed, but the run showed that *registration* errors were not retried (266 of 1,000 initiates failed on transient
+    errors). `PayViaUpiIntentUseCase` now wraps the PSP registration in `RetryExecutor(BackoffPolicy.INITIATE)` (0.5 s → 4 s,
+    4 attempts); the registration is safe to retry because the PSP dedupes by `Idempotency-Key` / `txnRef`
+    (`IdempotencyTest.transient psp errors at registration are retried…`).
+- Failure flow (step by step): outage → N clients fail at the same time → without jitter all retry in the same 10 ms window →
+  the PSP sees the whole herd again → more 429s → repeat. With full jitter the same herd spreads over the whole backoff window.
+- Fix applied / recommendation: full jitter by default (`BackoffPolicy.DEFAULT`), `Retry-After` honoured and capped,
+  single-flight polling. Recommendation: cap concurrent reconciliation (batch of 200) — already applied in `pendingOlderThan`.

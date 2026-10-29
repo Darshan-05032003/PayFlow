@@ -2,6 +2,7 @@ package com.darshan.payflow.di
 
 import android.content.Context
 import androidx.room.Room
+import com.darshan.payflow.core.BackoffPolicy
 import com.darshan.payflow.core.DefaultDispatcherProvider
 import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.data.local.CollectDao
@@ -23,6 +24,7 @@ import dagger.hilt.components.SingletonComponent
 import java.time.Clock
 import java.time.ZoneId
 import javax.inject.Singleton
+import kotlin.random.Random
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -35,6 +37,12 @@ object AppModule {
 
     @Provides @Singleton
     fun dispatchers(): DispatcherProvider = DefaultDispatcherProvider()
+
+    @Provides @Singleton
+    fun backoffPolicy(): BackoffPolicy = BackoffPolicy.DEFAULT
+
+    @Provides @Singleton
+    fun random(): Random = Random.Default
 
     @Provides @Singleton
     fun database(@ApplicationContext context: Context): PayFlowDatabase =

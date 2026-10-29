@@ -34,6 +34,11 @@ class PayViewModelTest {
         payViaUpiIntent = PayViaUpiIntentUseCase(repo, psp, fixedClock) { "pay-${++ids}" },
         confirmPayment = ConfirmPaymentUseCase(repo, psp, fixedClock),
         verifyVpa = com.darshan.payflow.domain.usecase.VerifyVpaUseCase(psp),
+        pollPaymentStatus = com.darshan.payflow.domain.usecase.PollPaymentStatusUseCase(
+            ConfirmPaymentUseCase(repo, psp, fixedClock),
+            com.darshan.payflow.core.BackoffPolicy(initialDelayMillis = 1_000, maxDelayMillis = 4_000, multiplier = 2.0, jitterFactor = 0.0, maxAttempts = 3),
+            kotlin.random.Random(1),
+        ),
         upiAppLauncher = launcher,
         dispatchers = TestDispatcherProvider(dispatcher),
         savedState = handle,
@@ -120,14 +125,16 @@ class PayViewModelTest {
     }
 
     @Test
-    fun `cancelled app result still asks the psp, pending stays pending and check status can resolve it`() = runTest(dispatcher) {
-        val psp = FakePsp(fixedClock, FakePspConfig(pendingPolls = 1))
+    fun `cancelled app result still asks the psp and a pending answer is polled to its real outcome`() = runTest(dispatcher) {
+        val psp = FakePsp(fixedClock, FakePspConfig(pendingPolls = 2))
         val vm = vm(psp)
         vm.fillValidForm(); vm.submit(); advanceUntilIdle()
-        vm.onUpiAppResult(UpiLaunchResult.Cancelled); advanceUntilIdle()
+        vm.onUpiAppResult(UpiLaunchResult.Cancelled); dispatcher.scheduler.runCurrent()
         assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.PENDING)
-        vm.checkStatus(); advanceUntilIdle()
+        assertThat(vm.uiState.value.polling).isTrue()
+        advanceUntilIdle() // virtual backoff elapses, the poller asks again
         assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.SUCCESS)
+        assertThat(psp.statusCalls).isEqualTo(3) // confirm (pending) + poll (pending) + poll (success)
     }
 
     @Test
@@ -259,5 +266,53 @@ class PayViewModelTest {
         advanceUntilIdle()
         assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Verified("Chai Point"))
         assertThat(vm.uiState.value.name).isEqualTo("Chai Point")
+    }
+
+    // --- feature 6: idempotency key + auto polling ---
+
+    @Test
+    fun `an idempotency key is created once per attempt, saved before submit and reused on retry`() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val down = FakePsp(fixedClock, FakePspConfig(serverErrorRate = 1.0))
+        val vm = vm(down, handle)
+        vm.fillValidForm(); vm.submit(); advanceUntilIdle()
+        val key = repo.getById("pay-1")!!.idempotencyKey
+        assertThat(key).isNotNull() // written on the row before the PSP was called
+        assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.FAILED)
+        assertThat(handle.get<String>(PayViewModel.KEY_IDEMPOTENCY)).isNull() // a failed attempt's key is spent
+        // New attempt after a failure gets a fresh key
+        vm.reset(); vm.fillValidForm(); vm.submit(); advanceUntilIdle()
+        assertThat(repo.getById("pay-2")!!.idempotencyKey).isNotEqualTo(key)
+    }
+
+    @Test
+    fun `a submit that dies before the psp answers is deduped after process death`() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val psp = FakePsp(fixedClock)
+        val vm1 = vm(psp, handle)
+        vm1.fillValidForm(); vm1.submit(); advanceUntilIdle()
+        assertThat(handle.get<String>(PayViewModel.KEY_IN_FLIGHT)).isEqualTo("pay-1")
+        // Simulate the process dying right after the row was stored: a new VM sees the in-flight id and the key; a second submit is a no-op.
+        val vm2 = vm(psp, handle)
+        vm2.submit(); advanceUntilIdle()
+        assertThat(repo.getById("pay-2")).isNull()
+        assertThat(psp.initiateCalls).isEqualTo(1)
+    }
+
+    @Test
+    fun `a pending result is polled automatically with backoff until the psp settles`() = runTest(dispatcher) {
+        val psp = FakePsp(fixedClock, FakePspConfig(pendingPolls = 3))
+        val vm = vm(psp)
+        vm.fillValidForm(); vm.submit(); advanceUntilIdle()
+        vm.onUpiAppResult(UpiLaunchResult.Responded("Status=SUBMITTED")); dispatcher.scheduler.runCurrent()
+        // First confirm: pending (poll 1). The poller then waits 1 s, 2 s before the 4th status call succeeds.
+        assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.PENDING)
+        assertThat(vm.uiState.value.polling).isTrue()
+        dispatcher.scheduler.advanceTimeBy(1_001); dispatcher.scheduler.runCurrent()
+        assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.PENDING)
+        dispatcher.scheduler.advanceTimeBy(2_001); dispatcher.scheduler.runCurrent()
+        assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.SUCCESS)
+        assertThat(vm.uiState.value.polling).isFalse()
+        assertThat(psp.statusCalls).isEqualTo(4)
     }
 }

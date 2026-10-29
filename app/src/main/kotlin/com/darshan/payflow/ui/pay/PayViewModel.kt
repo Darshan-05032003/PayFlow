@@ -19,9 +19,11 @@ import com.darshan.payflow.domain.model.VpaValidator
 import com.darshan.payflow.domain.usecase.ConfirmPaymentUseCase
 import com.darshan.payflow.domain.usecase.ConfirmResult
 import com.darshan.payflow.domain.usecase.PayViaUpiIntentUseCase
+import com.darshan.payflow.domain.usecase.PollPaymentStatusUseCase
 import com.darshan.payflow.domain.usecase.VerifyVpaUseCase
 import com.darshan.payflow.domain.usecase.VpaVerifyResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -73,6 +75,8 @@ data class PayUiState(
     /** From a merchant QR with a fixed amount. */
     val amountLocked: Boolean = false,
     val verification: VpaVerificationState = VpaVerificationState.Idle,
+    /** A pending result is being polled with backoff. */
+    val polling: Boolean = false,
 ) {
     val isBusy: Boolean get() = phase is PayPhase.Submitting || phase is PayPhase.Confirming
     /** The registered name replaces whatever was typed or scanned; it cannot be edited. */
@@ -89,6 +93,7 @@ class PayViewModel @Inject constructor(
     private val payViaUpiIntent: PayViaUpiIntentUseCase,
     private val confirmPayment: ConfirmPaymentUseCase,
     private val verifyVpa: VerifyVpaUseCase,
+    private val pollPaymentStatus: PollPaymentStatusUseCase,
     private val upiAppLauncher: UpiAppLauncher,
     private val dispatchers: DispatcherProvider,
     private val savedState: SavedStateHandle,
@@ -207,12 +212,16 @@ class PayViewModel @Inject constructor(
                 note = state.note,
                 txnRef = TxnRefGenerator.next(),
             )
-            val result = withContext(dispatchers.io) { payViaUpiIntent(request, method) }
+            // One idempotency key per attempt, persisted *before* anything is sent: a retry or a relaunch after process death
+            // reuses it and can never create a second payment.
+            val idempotencyKey = savedState.get<String>(KEY_IDEMPOTENCY) ?: UUID.randomUUID().toString().also { savedState[KEY_IDEMPOTENCY] = it }
+            val result = withContext(dispatchers.io) { payViaUpiIntent(request, method, idempotencyKey) }
             result.onSuccess { launch ->
                 savedState[KEY_IN_FLIGHT] = launch.paymentId
                 _uiState.update { it.copy(phase = PayPhase.AwaitingApp(launch.paymentId)) }
                 _events.tryEmit(PayEvent.LaunchUpiApp(launch.upiUri))
             }.onFailure { e ->
+                savedState.remove<String>(KEY_IDEMPOTENCY) // this attempt is spent; the next one needs a fresh key
                 _uiState.update { it.copy(phase = PayPhase.Done("", PaymentStatus.FAILED, e.message)) }
             }
         }
@@ -241,7 +250,19 @@ class PayViewModel @Inject constructor(
         viewModelScope.launch {
             val result = withContext(dispatchers.io) { confirmPayment(paymentId, appResponse) }
             savedState.remove<String>(KEY_IN_FLIGHT)
+            savedState.remove<String>(KEY_IDEMPOTENCY)
             _uiState.update { it.copy(phase = result.toPhase(paymentId)) }
+            if (result is ConfirmResult.Pending || (result is ConfirmResult.Unresolved && result.error.retryable)) startPolling(paymentId)
+        }
+    }
+
+    /** Keeps asking the PSP with exponential backoff + jitter (single-flight in the use case) until the payment settles. */
+    private fun startPolling(paymentId: String) {
+        if (_uiState.value.polling) return
+        _uiState.update { it.copy(polling = true) }
+        viewModelScope.launch {
+            val result = withContext(dispatchers.io) { pollPaymentStatus(paymentId) }
+            _uiState.update { it.copy(phase = result.toPhase(paymentId), polling = false) }
         }
     }
 
@@ -255,6 +276,7 @@ class PayViewModel @Inject constructor(
 
     fun reset() {
         savedState.remove<String>(KEY_IN_FLIGHT)
+        savedState.remove<String>(KEY_IDEMPOTENCY)
         listOf(KEY_VPA, KEY_NAME, KEY_AMOUNT, KEY_NOTE, ARG_PREFILL_AMOUNT, ARG_SOURCE).forEach { savedState.remove<Any>(it) }
         _uiState.value = PayUiState()
     }
@@ -277,6 +299,7 @@ class PayViewModel @Inject constructor(
 
     companion object {
         const val KEY_IN_FLIGHT = "inFlightPaymentId"
+        const val KEY_IDEMPOTENCY = "idempotencyKey"
         const val KEY_VPA = "vpa"
         const val KEY_NAME = "name"
         const val KEY_AMOUNT = "amount"

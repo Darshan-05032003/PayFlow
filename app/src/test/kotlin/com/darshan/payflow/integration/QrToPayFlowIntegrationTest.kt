@@ -26,6 +26,7 @@ import com.darshan.payflow.domain.usecase.VerifyVpaUseCase
 import com.darshan.payflow.testutil.FakeCameraController
 import com.darshan.payflow.testutil.FakeUpiAppLauncher
 import com.darshan.payflow.testutil.fixedClock
+import com.darshan.payflow.testutil.pollerFor
 import com.darshan.payflow.testutil.runOffMain
 import com.darshan.payflow.testutil.waitUntilWithMainLooper
 import com.darshan.payflow.ui.PayFlowTestTags
@@ -112,7 +113,7 @@ class QrToPayFlowIntegrationTest {
 
         // Navigation would create the Pay screen with these args in its SavedStateHandle:
         val payVm = PayViewModel(
-            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), FakeUpiAppLauncher(),
+            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), pollerFor(repo, psp), FakeUpiAppLauncher(),
             DefaultDispatcherProvider(), dest.toSavedStateHandle(),
         )
         payVmHolder.value = payVm

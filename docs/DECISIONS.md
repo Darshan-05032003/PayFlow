@@ -82,5 +82,20 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Room v3**: `mandates` table + `payments.mandate_id`, both via `AutoMigration(2, 3)`.
 - **Validity as months chips** (1/3/6/12/24) instead of date pickers: fewer input errors, start = today.
 
+## Feature 6: polling, backoff, idempotency
+- **The idempotency key lives on the payment row** (`payments.idempotency_key`, unique index) rather than in a separate table:
+  the row *is* the reservation, written before the PSP call, and the unique index is the cross-process guarantee.
+- **Takeover rule**: a CREATED row found under a key (process died before the PSP answered) is completed by the caller; a
+  PENDING row is returned as-is; a settled row is a conflict (a spent key must never pretend the new tap succeeded).
+- **Per-key mutex in-process** so 1,000 racing taps register once at the PSP; PSP-side dedupe (`Idempotency-Key`/`txnRef`) covers
+  the rest.
+- **Spent keys**: the Pay screen drops the key when an attempt fails or settles; it keeps it (with the in-flight id) only while the
+  UPI app is open, which is the process-death window that matters.
+- **Full jitter by default**, `Retry-After` wins but is capped, non-retryable errors never retried, cancellation never swallowed.
+- **Single-flight poller** (`CompletableDeferred` per payment id): the screen, the detail page and the reconciler share one poller.
+- **Reconcile on Home start** (payments CREATED/PENDING for > 30 s, batch of 200) instead of WorkManager: simpler, testable with
+  virtual time, and sufficient for a sandbox; WorkManager noted as scope for improvement.
+- **Exhausted polling = still PENDING**: honesty over closure; the UI says "check again".
+
 ## Compromises
 _None yet._

@@ -33,6 +33,9 @@ class IllegalTransitionException(val from: PaymentStatus, val event: PaymentEven
 
 class PaymentNotFoundException(val id: String) : NoSuchElementException("Payment $id not found")
 
+/** An idempotency key was reused for a different request, or for an attempt that is already settled. */
+class IdempotencyConflictException(val key: String, reason: String) : IllegalStateException("Idempotency key conflict ($reason)")
+
 /** Pure transition function. Every (state, event) pair not listed here is rejected and leaves the payment untouched. */
 object PaymentStateMachine {
     fun transition(from: PaymentStatus, event: PaymentEvent): TransitionResult {

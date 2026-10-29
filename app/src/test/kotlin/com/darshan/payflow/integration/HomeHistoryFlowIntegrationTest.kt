@@ -39,6 +39,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import com.darshan.payflow.testutil.reconcileNoop
 
 /** Room (in-memory) + repository + ViewModel + Compose screen wired together. */
 @RunWith(AndroidJUnit4::class)
@@ -61,7 +62,7 @@ class HomeHistoryFlowIntegrationTest {
 
     @Test
     fun homeGoesFromEmptyToContentWhenAPaymentIsStored() {
-        val vm = HomeViewModel(repo, DefaultDispatcherProvider())
+        val vm = HomeViewModel(repo, reconcileNoop(repo), DefaultDispatcherProvider())
         rule.setContent {
             PayFlowTheme {
                 val state by vm.uiState.collectAsStateWithLifecycle()

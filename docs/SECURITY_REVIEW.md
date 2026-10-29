@@ -152,3 +152,31 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: the race above; rule order (validity window before status) so an ended mandate reports the precise reason.
 - Scope for improvement: gate revoke/create behind the app lock (feature 7); mandate debit notifications from the PSP (polling in
   feature 6 can reconcile PENDING mandate payments); UMN display with copy-to-clipboard disabled for sensitive data.
+
+## Feature: status polling, exponential-backoff retries and idempotency keys
+- Attacks tried:
+  - **Replay / double-spend with one key**: 100 (Room integration) and 1,000 (stress) concurrent submits with the same
+    idempotency key → exactly one payment row, one PSP registration (`IdempotencyRoomTest`, `PollingAndIdempotencyStressTest`).
+  - **Key reuse with different details** (amount, payee): `IdempotencyConflictException`, no second payment, no PSP call
+    (`IdempotencyTest.a key reused with a different amount or payee is a conflict`).
+  - **Key reuse after the attempt settled** (FAILED/SUCCESS): conflict, never a silent "same result" that could hide a failed debit.
+  - **Process death between "row stored" and "PSP called"**: a fresh repository/use case over the same database finds the CREATED
+    row under the key and completes the registration once (`processDeathBetweenStoreAndPspCallIsRecoveredByTheKey`); the Pay
+    screen keeps the key and the in-flight id in `SavedStateHandle`, so a relaunch cannot submit twice (`PayViewModelTest`).
+  - **Polling storms / amplification**: 3 racing pollers per payment × 1,000 payments collapse into one single-flight poller each;
+    a hostile caller hammering `poll` gets the shared result, not extra PSP calls (`concurrent polls ... single flight`).
+  - **Thundering herd after an outage**: 10,000 retries scheduled from the same instant → peak of 10,000 in one 10 ms window
+    without jitter vs **45** with full jitter (`jitterPreventsAThunderingHerd`).
+  - **Absurd `Retry-After`**: capped by `maxDelayMillis` (`BackoffPolicyTest`, `HttpPspClientTest`); negative values ignored.
+  - **Non-retryable errors** (401, 4xx, malformed): never retried; **cancellation**: no attempt after the scope is cancelled.
+  - **Marking money as lost**: a payment that exhausts polling stays PENDING ("check again"), never FAILED.
+- What broke:
+  - **Medium (fixed during build)**: a failed attempt's idempotency key stayed in `SavedStateHandle`; the next tap would have hit
+    `IdempotencyConflictException` instead of paying. The key is now spent (removed) when an attempt fails or settles.
+  - **Low (accepted)**: the per-key mutex is in-process; cross-process callers rely on the Room unique index + the takeover rule
+    (a CREATED row is completed by whoever finds it; the PSP dedupes the registration by `Idempotency-Key` / `txnRef`).
+  - **Low (open)**: reconciliation runs when the Home screen starts; a background `WorkManager` job would also cover the case
+    where the user never reopens the app.
+- Fixed now: spent-key handling; single-flight poller closes the feature 2 load finding (status-call storm per confirm).
+- Scope for improvement: WorkManager-based reconciliation; persist poll attempt counts across process death; server-side
+  idempotency TTL documented in the PSP contract.

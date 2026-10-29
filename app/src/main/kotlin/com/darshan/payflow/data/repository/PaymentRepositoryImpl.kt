@@ -59,11 +59,17 @@ class PaymentRepositoryImpl @Inject constructor(
 
     override fun observeSummary(): Flow<HistorySummary> = dao.observeSummary().map { it.toDomain() }
 
+    override suspend fun findByIdempotencyKey(key: String): Payment? = dao.getByIdempotencyKey(key)?.toDomain()
+
+    override suspend fun pendingOlderThan(before: java.time.Instant): List<Payment> =
+        dao.pendingOlderThan(before.toEpochMilli(), RECONCILE_BATCH).map { it.toDomain() }
+
     override fun observeByMandate(mandateId: String): Flow<List<Payment>> =
         dao.observeByMandate(mandateId).map { rows -> rows.map { it.toDomain() } }
 
     companion object {
         private const val MAX_CAS_ATTEMPTS = 3
+        private const val RECONCILE_BATCH = 200
 
         /**
          * A NUL byte inside a LIKE pattern makes SQLite treat it as the end of the pattern (a leading NUL turns the search into
