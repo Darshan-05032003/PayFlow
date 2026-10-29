@@ -17,6 +17,9 @@ object PayFlowTestTags {
     const val PAY_CHECK_STATUS = "payflow:pay:check"
     const val PAY_RESET = "payflow:pay:reset"
     const val HOME_PAY = "payflow:home:pay"
+    const val HOME_SCAN = "payflow:home:scan"
+    const val SCAN_PREVIEW = "payflow:scan:preview"
+    const val SCAN_PAY = "payflow:scan:pay"
     fun filterChip(filter: HistoryFilter) = "payflow:history:chip:${filter.name}"
     fun paymentRow(id: String) = "payflow:payment:$id"
 }

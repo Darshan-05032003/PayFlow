@@ -16,7 +16,7 @@ realistic **sandbox PSP** (no real money moves).
 |---|---|---|
 | 1 | Home, transaction history (Room), payment state model (created → pending → success / failed → refund) | done |
 | 2 | UPI intent flow: `upi://pay` deep links, app chooser, response parsing, **PSP status confirmation** before success | done |
-| 3 | QR scan-to-pay with CameraX + ML Kit, safe payload validation, camera permission handling | planned |
+| 3 | QR scan-to-pay with CameraX + ML Kit, safe payload validation, camera permission handling | done (camera path compile-only: no device) |
 | 4 | VPA validation (format + simulated verify returning the payee name) and collect requests (approve / decline / expire) | planned |
 | 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | planned |
 | 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | planned |
@@ -53,6 +53,7 @@ flowchart TB
         history["HistoryRoute → HistoryViewModel"]
         detail["PaymentDetailRoute → PaymentDetailViewModel"]
         pay["PayRoute → PayViewModel<br/>(ActivityResult → UpiAppLauncher)"]
+        scan["ScanRoute → ScanViewModel<br/>(camera permission)"]
     end
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
@@ -64,8 +65,11 @@ flowchart TB
         room["Room: PayFlowDatabase · PaymentDao · PaymentEntity"]
         psp["PspClient → FakePsp (sandbox) · HttpPspClient (OkHttp)"]
         upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher"]
+        qr["UpiQrPayloadParser · CameraController → CameraXController<br/>BarcodeScanner → MlKitBarcodeScanner"]
     end
-    nav --> home & history & detail & pay
+    nav --> home & history & detail & pay & scan
+    scan --> qr
+    scan -. prefilled PayDestination .-> pay
     home & history & detail --> repo
     pay --> usecases --> repo
     usecases --> psp
@@ -130,11 +134,12 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machine, money, parsers, validators, use cases, ViewModels, Compose screens) | 90 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 29 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 5 |
+| Unit (state machine, money, parsers, validators, use cases, ViewModels, Compose screens) | 119 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 30 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 8 |
 
-Domain + data line coverage (Kover): **97.1 %**.
+Domain + data line coverage (Kover): **90.1 %** (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
+untested on the JVM).
 
 No device or emulator was available during the build: camera, real UPI apps and `connectedAndroidTest` are
 compile-only and marked "not run: no device". Everything else is proven on the JVM with Robolectric and fakes.
@@ -152,6 +157,9 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
 - A PSP outage after the app was opened is "unresolved" (payment stays pending; "do not pay again"), never "failed".
 - Hostile link inputs are rejected before a link is built (homoglyph/bidi VPAs, `javascript:`, amounts out of range, 35-char
   `tr`), and the `response` extra from the UPI app is bounded and parsed defensively.
+- QR payloads are parsed by a bounded, allocation-light parser: 10,000 fuzzed payloads (homoglyph VPAs, `javascript:`, bidi
+  overrides, 100 KB inputs, `url=` extras) never threw and never produced a payable payload from hostile input; a scanned
+  payee is locked on the pay screen so it cannot be swapped by a stray tap.
 - The HTTP client maps every failure (401, 429 + `Retry-After`, 5xx, timeouts, connection drops, malformed JSON) to typed
   exceptions; a body-read timeout that escaped as a raw exception was found by the review and fixed.
 - `allowBackup=false`, data extraction rules exclude everything, no cleartext traffic, only the launcher activity is exported.
@@ -165,6 +173,7 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 - **1,000 concurrent payments** through the state machine with compare-and-set writes: 1.07 s, zero lost updates.
 - **1,000 concurrent UPI intent payments** against a PSP with 20 % failures, 10 % timeouts and 5 % 5xx: 418 ms, 1,916 status
   calls, zero disagreements between Room and the PSP. **10,000 spoofed app responses**: 657 ms, payment still failed.
+- **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
 
 ## Project docs
 

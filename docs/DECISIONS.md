@@ -41,5 +41,19 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Pay form is a single `PayUiState`** (fields + errors + phase) rather than Loading/Empty/Error/Content objects: a form has no
   "empty" state; `Submitting`/`Confirming` are the loading states and `Done(FAILED)`/`Unresolved` the error states.
 
+## Feature 3: QR scan-to-pay
+- **Scan hands off to the Pay screen** (`PayDestination(vpa, name, amountPaise, note, source="qr")`) instead of duplicating the
+  pay/confirm UI. The pay screen locks the payee (and the amount for merchant QRs) and records `PaymentMethod.QR_SCAN`.
+- **`amountPaise = 0` means "not set"** in the route: Navigation's type-safe routes don't support nullable `Long`, and a real
+  amount is always ≥ 1 paisa.
+- **Interfaces**: `BarcodeScanner.scan(image: Any)` (ML Kit `InputImage` on Android) and `CameraController.start(lifecycleOwner,
+  PreviewView?, onBarcode, onError)`. The ViewModel never sees CameraX or ML Kit; tests use `FakeCameraController`.
+- **Parser rules**: only `upi://pay`; 4 KB cap checked first; first value wins for duplicates; `+` decoded as a space (common in
+  generators even though RFC 3986 says otherwise); `url=`/`mode=`/`sign=` ignored; invalid `tr` is dropped, not fatal.
+- **Device-only code is compile-only**: `CameraXController` and `MlKitBarcodeScanner` need Play services and a camera; they
+  are covered by lint and compilation, and recorded as "not run: no device".
+- `@androidx.annotation.OptIn(ExperimentalGetImage::class)` (not Kotlin's `@OptIn`) is what Android lint accepts for CameraX's
+  Java `@RequiresOptIn` marker.
+
 ## Compromises
 _None yet._

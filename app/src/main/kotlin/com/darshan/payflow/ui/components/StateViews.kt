@@ -34,7 +34,7 @@ fun LoadingView(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun EmptyView(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
+fun EmptyView(title: String, modifier: Modifier = Modifier, subtitle: String? = null) {
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp).testTag(PayFlowTestTags.EMPTY),
         horizontalAlignment = Alignment.CenterHorizontally,

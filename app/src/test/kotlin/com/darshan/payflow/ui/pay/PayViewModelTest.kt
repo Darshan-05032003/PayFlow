@@ -173,4 +173,37 @@ class PayViewModelTest {
         vm.onAmountChange("1234567890123")
         assertThat(vm.uiState.value.amountText).isEqualTo("12.34")
     }
+
+    @Test
+    fun `qr route arguments prefill the form, lock the payee and record the QR method`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(
+            mapOf(
+                PayViewModel.ARG_PREFILL_VPA to "shop@okbank", PayViewModel.ARG_PREFILL_NAME to "Chai Point",
+                PayViewModel.ARG_PREFILL_AMOUNT to 4_500L, PayViewModel.ARG_PREFILL_NOTE to "Table 4", PayViewModel.ARG_SOURCE to "qr",
+            ),
+        )
+        val vm = vm(handle = handle)
+        val s = vm.uiState.value
+        assertThat(s.vpa).isEqualTo("shop@okbank")
+        assertThat(s.name).isEqualTo("Chai Point")
+        assertThat(s.amountText).isEqualTo("45.00")
+        assertThat(s.note).isEqualTo("Table 4")
+        assertThat(s.payeeLocked).isTrue()
+        vm.onVpaChange("mallory@evil") // locked: ignored
+        assertThat(vm.uiState.value.vpa).isEqualTo("shop@okbank")
+        vm.submit(); advanceUntilIdle()
+        assertThat(repo.getById("pay-1")!!.method).isEqualTo(com.darshan.payflow.domain.model.PaymentMethod.QR_SCAN)
+        assertThat(repo.getById("pay-1")!!.amountPaise).isEqualTo(4_500)
+    }
+
+    @Test
+    fun `qr without amount leaves the amount editable`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(mapOf(PayViewModel.ARG_PREFILL_VPA to "shop@okbank", PayViewModel.ARG_SOURCE to "qr"))
+        val vm = vm(handle = handle)
+        assertThat(vm.uiState.value.amountText).isEmpty()
+        assertThat(vm.uiState.value.amountLocked).isFalse()
+        vm.onAmountChange("10"); vm.onNameChange("x")
+        assertThat(vm.uiState.value.amountText).isEqualTo("10")
+        assertThat(vm.uiState.value.name).isEqualTo("shop@okbank") // name locked with the payee
+    }
 }

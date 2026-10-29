@@ -150,7 +150,7 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, snackbarHostState: Sna
 private fun PayForm(state: PayUiState, callbacks: PayCallbacks) {
     val busy = state.isBusy
     OutlinedTextField(
-        value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = !busy, singleLine = true,
+        value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = !busy && !state.payeeLocked, singleLine = true,
         label = { Text(stringResource(R.string.pay_vpa)) },
         isError = state.errors.vpa != null,
         supportingText = state.errors.vpa?.let { { Text(it.message()) } },
@@ -158,14 +158,14 @@ private fun PayForm(state: PayUiState, callbacks: PayCallbacks) {
         modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_VPA),
     )
     OutlinedTextField(
-        value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy, singleLine = true,
+        value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.payeeLocked, singleLine = true,
         label = { Text(stringResource(R.string.pay_payee_name)) },
         isError = state.errors.name != null,
         supportingText = state.errors.name?.let { { Text(it.message()) } },
         modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NAME),
     )
     OutlinedTextField(
-        value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = !busy, singleLine = true,
+        value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = !busy && !state.amountLocked, singleLine = true,
         label = { Text(stringResource(R.string.pay_amount)) },
         prefix = { Text("₹") },
         isError = state.errors.amount != null,

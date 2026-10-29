@@ -68,3 +68,30 @@ Severity scale: Critical / High / Medium / Low.
 - Scope for improvement:
   - Persist `Mismatch` on the payment; pin the PSP certificate when a real host exists (SSL pinning, with a documented
     pin-rotation plan); feature 6 polling with backoff for PENDING results; feature 7 `FLAG_SECURE` on the pay screen.
+
+## Feature: QR scan-to-pay (CameraX + ML Kit)
+- Attacks tried:
+  - **Hostile QR payloads** (`UpiQrPayloadParserTest`, 14 cases; `QrParserStressTest`, 10,000 fuzzed payloads): non-UPI content
+    (`https:`, `javascript:`, BharatQR/EMVCo TLV), `upi://mandate`, missing / malformed / homoglyph (Cyrillic `а`) / bidi-prefixed
+    VPAs, `javascript:alert(1)@x`, amounts `-1`, `0`, `1e5`, `100000.01`, `1.234`, Arabic-Indic digits, `NaN`, `0x10`, 19-digit
+    numbers, `cu=USD`, duplicate `pa=`/`am=` (first wins), `url=http://evil…` / `redirect=javascript:` extras (ignored, never
+    followed), NUL and `‮` inside names, 500-char notes, bad percent-escapes (`%ZZ`), 100 KB payloads.
+  - **Frame injection**: barcodes delivered before permission is granted, while a result is shown, or after an error are ignored
+    (`ScanViewModelTest`).
+  - **Permission denial**: denied with rationale, denied permanently ("open settings"), and the camera failing to start
+    (`ScanViewModelTest`, `ScanScreenTest`, `AndroidCameraPermissionTest`).
+  - **Payee swap after scan**: the pay screen locks payee VPA/name (and the amount for merchant QRs) coming from a QR
+    (`PayViewModelTest.qr route arguments prefill the form, lock the payee…`), so a tap on the wrong field cannot redirect money.
+  - **Process death with a scanned result**: the raw payload is restored from `SavedStateHandle` and re-parsed/re-validated.
+  - **Leakage**: `UpiQrPayload.toString()` omits the raw payload; frames are analysed in memory and never persisted; no logging.
+- What broke:
+  - **Medium (open until feature 4)**: the payee *name* in a QR is attacker-controlled text ("Government refund desk"). The UI
+    always shows the VPA next to it, and feature 4's PSP VPA verification will replace the QR name with the registered name.
+  - **Low**: the 4 KB raw cap (`MAX_RAW_LENGTH`) is generous (real UPI QRs are < 500 chars); fine for DoS, kept for odd generators.
+  - **Low (cosmetic)**: the torch button uses a placeholder icon from the core icon set.
+- Fixed now:
+  - Nothing broke in the parser: every hostile input above was rejected or sanitised on the first run. The parser is bounded
+    (length check before any parsing, first-value-wins, printable-only free text, strict amount regex before numeric parsing).
+- Scope for improvement:
+  - PSP VPA verification for scanned payees (feature 4); `FLAG_SECURE` on the scan/pay screens (feature 7); device run of
+    CameraX + ML Kit (`CameraXController`, `MlKitBarcodeScanner` are compile-only here: no device was available).

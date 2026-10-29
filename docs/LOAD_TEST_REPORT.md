@@ -51,3 +51,20 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
   - Once a payment is terminal, `confirm` returns without calling the PSP (that is why 141 of the 10,000 calls were free).
   - Feature 6 adds a single polling loop per payment with exponential backoff + jitter and `Retry-After` support, which is the
     right place for a per-payment in-flight guard (one status request at a time).
+
+## Feature: QR scan-to-pay (CameraX + ML Kit)
+- Scenario and scale:
+  - `QrParserStressTest.tenThousandFuzzedPayloadsNeverThrow`: 10,000 random payloads mixing valid/invalid schemes, keys, bidi, NUL
+    and bad escapes.
+  - `hundredKilobytePayloadsAreRejectedFast`: 1,000 × 100 KB payloads and 1,000 × ~4 KB payloads (just under the cap).
+  - `thousandConcurrentParses`: 1,000 parses on `Dispatchers.Default`.
+- Results (numbers):
+  - 10,000 fuzzed payloads: **75 ms**, 0 exceptions (`NOT_UPI=3361, UNSUPPORTED=3102, MISSING_VPA=2562, INVALID_VPA=971,
+    INVALID_CURRENCY=1, valid=3`).
+  - 1,000 × 100 KB: **1 ms** (length check rejects before parsing). 1,000 × 4 KB near-limit payloads: **56 ms**.
+  - 1,000 concurrent parses: **39 ms**.
+- What broke: nothing. The parser is stateless and allocation-light; camera frame rate (typically 30 fps) is the real bound
+  and `CameraXController` analyses one frame at a time with `STRATEGY_KEEP_ONLY_LATEST`, so decoding never queues stale frames.
+- Failure flow (step by step): a hostile QR that is large and valid-looking (4 KB of `tn=`) costs ~56 µs per frame; even at
+  30 fps that is < 2 ms/s of CPU. No failure path found.
+- Fix applied / recommendation: keep the 4 KB cap; on a device, verify ML Kit decode latency per frame (not run: no device).

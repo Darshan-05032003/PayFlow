@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.core.net.toUri
 import com.darshan.payflow.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -26,12 +26,12 @@ interface UpiAppLauncher {
 @Singleton
 class AndroidUpiAppLauncher @Inject constructor(@ApplicationContext private val context: Context) : UpiAppLauncher {
     override fun isUpiAppInstalled(): Boolean {
-        val probe = Intent(Intent.ACTION_VIEW, Uri.parse("upi://pay"))
+        val probe = Intent(Intent.ACTION_VIEW, "upi://pay".toUri())
         return context.packageManager.queryIntentActivities(probe, PackageManager.MATCH_DEFAULT_ONLY).isNotEmpty()
     }
 
     override fun chooserIntent(upiUri: String): Intent {
-        val view = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
+        val view = Intent(Intent.ACTION_VIEW, upiUri.toUri())
         return Intent.createChooser(view, context.getString(R.string.pay_chooser_title))
     }
 

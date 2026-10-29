@@ -76,4 +76,26 @@
     <string name="error_invalid_vpa">Enter a UPI ID like name@bank</string>
     <string name="error_invalid_amount">Enter a valid amount</string>
     <string name="error_amount_too_large">Maximum is %1$s per payment</string>
+
+    <!-- Scan QR -->
+    <string name="scan_title">Scan QR</string>
+    <string name="scan_hint">Point the camera at a UPI QR code</string>
+    <string name="scan_torch_on">Turn torch on</string>
+    <string name="scan_torch_off">Turn torch off</string>
+    <string name="scan_permission_rationale">PayFlow needs the camera to read UPI QR codes</string>
+    <string name="scan_allow_camera">Allow camera</string>
+    <string name="scan_permission_denied">Camera permission is turned off</string>
+    <string name="scan_open_settings">Open settings</string>
+    <string name="scan_camera_error">The camera could not be started</string>
+    <string name="scan_found_title">Pay to</string>
+    <string name="scan_enter_amount">Enter amount on the next screen</string>
+    <string name="scan_static_qr_hint">This QR has no amount. You will type it on the payment screen.</string>
+    <string name="scan_pay">Pay</string>
+    <string name="scan_again">Scan again</string>
+    <string name="scan_error_not_upi">This is not a UPI QR code</string>
+    <string name="scan_error_unsupported">This UPI QR type is not supported</string>
+    <string name="scan_error_too_long">This QR code is too large</string>
+    <string name="scan_error_vpa">This QR has an invalid UPI ID</string>
+    <string name="scan_error_amount">This QR has an invalid amount</string>
+    <string name="scan_error_currency">Only INR payments are supported</string>
 </resources>

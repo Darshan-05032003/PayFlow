@@ -5,6 +5,12 @@ import com.darshan.payflow.data.psp.FakePsp
 import com.darshan.payflow.data.psp.FakePspConfig
 import com.darshan.payflow.data.psp.HttpPspClient
 import com.darshan.payflow.data.psp.PspClient
+import com.darshan.payflow.data.qr.AndroidCameraPermission
+import com.darshan.payflow.data.qr.BarcodeScanner
+import com.darshan.payflow.data.qr.CameraController
+import com.darshan.payflow.data.qr.CameraPermission
+import com.darshan.payflow.data.qr.CameraXController
+import com.darshan.payflow.data.qr.MlKitBarcodeScanner
 import com.darshan.payflow.data.upi.AndroidUpiAppLauncher
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import dagger.Binds
@@ -47,4 +53,17 @@ object PspModule {
 abstract class UpiModule {
     @Binds @Singleton
     abstract fun upiAppLauncher(impl: AndroidUpiAppLauncher): UpiAppLauncher
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class CameraModule {
+    @Binds @Singleton
+    abstract fun barcodeScanner(impl: MlKitBarcodeScanner): BarcodeScanner
+
+    @Binds
+    abstract fun cameraController(impl: CameraXController): CameraController
+
+    @Binds
+    abstract fun cameraPermission(impl: AndroidCameraPermission): CameraPermission
 }

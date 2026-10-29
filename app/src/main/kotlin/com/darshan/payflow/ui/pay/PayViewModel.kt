@@ -7,6 +7,7 @@ import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.core.Money
 import com.darshan.payflow.data.upi.TxnRefGenerator
 import com.darshan.payflow.data.upi.UpiAppLauncher
+import com.darshan.payflow.data.upi.UpiLinkBuilder
 import com.darshan.payflow.data.upi.UpiLaunchResult
 import com.darshan.payflow.data.upi.UpiResponseParser
 import com.darshan.payflow.domain.model.Payment
@@ -53,6 +54,10 @@ data class PayUiState(
     val note: String = "",
     val errors: PayFormErrors = PayFormErrors(),
     val phase: PayPhase = PayPhase.Idle,
+    /** From a scanned QR: payee VPA and name cannot be edited. */
+    val payeeLocked: Boolean = false,
+    /** From a merchant QR with a fixed amount. */
+    val amountLocked: Boolean = false,
 ) {
     val isBusy: Boolean get() = phase is PayPhase.Submitting || phase is PayPhase.Confirming
 }
@@ -71,29 +76,48 @@ class PayViewModel @Inject constructor(
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
+    // Declared before _uiState: Kotlin initialises properties in order and restore() reads these.
+    private val fromQr: Boolean = savedState.get<String>(ARG_SOURCE) == SOURCE_QR
+    private val method: PaymentMethod = if (fromQr) PaymentMethod.QR_SCAN else PaymentMethod.UPI_INTENT
+
     private val _uiState = MutableStateFlow(restore())
     val uiState: StateFlow<PayUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<PayEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<PayEvent> = _events.asSharedFlow()
 
+    /** Form fields and the in-flight payment id live in [SavedStateHandle]; route arguments (QR prefill) share the same keys. */
     private fun restore(): PayUiState {
         val inFlight = savedState.get<String>(KEY_IN_FLIGHT)
+        val prefillAmount = savedState.get<Long>(ARG_PREFILL_AMOUNT)?.takeIf { it > 0 }
+        val vpa = savedState.get<String>(KEY_VPA) ?: ""
         return PayUiState(
-            vpa = savedState[KEY_VPA] ?: "",
-            name = savedState[KEY_NAME] ?: "",
-            amountText = savedState[KEY_AMOUNT] ?: "",
+            vpa = vpa,
+            name = savedState.get<String>(KEY_NAME)?.takeIf { it.isNotBlank() } ?: if (fromQr) vpa else "",
+            amountText = savedState.get<String>(KEY_AMOUNT) ?: prefillAmount?.let(UpiLinkBuilder::formatAmount) ?: "",
             note = savedState[KEY_NOTE] ?: "",
             phase = if (inFlight != null) PayPhase.AwaitingApp(inFlight) else PayPhase.Idle,
+            payeeLocked = fromQr && vpa.isNotBlank(),
+            amountLocked = fromQr && prefillAmount != null,
         )
     }
 
-    fun onVpaChange(value: String) = updateForm { copy(vpa = value.take(MAX_FIELD), errors = errors.copy(vpa = null)) }.also { savedState[KEY_VPA] = _uiState.value.vpa }
-    fun onNameChange(value: String) = updateForm { copy(name = value.take(MAX_FIELD), errors = errors.copy(name = null)) }.also { savedState[KEY_NAME] = _uiState.value.name }
+    fun onVpaChange(value: String) {
+        if (_uiState.value.payeeLocked) return
+        updateForm { copy(vpa = value.take(MAX_FIELD), errors = errors.copy(vpa = null)) }
+        savedState[KEY_VPA] = _uiState.value.vpa
+    }
+
+    fun onNameChange(value: String) {
+        if (_uiState.value.payeeLocked) return
+        updateForm { copy(name = value.take(MAX_FIELD), errors = errors.copy(name = null)) }
+        savedState[KEY_NAME] = _uiState.value.name
+    }
     fun onNoteChange(value: String) = updateForm { copy(note = value.take(UpiPayRequest.MAX_NOTE_LENGTH)) }.also { savedState[KEY_NOTE] = _uiState.value.note }
 
     /** Accepts digits with at most two decimals and at most 7 integer digits; anything else leaves the field unchanged. */
     fun onAmountChange(value: String) {
+        if (_uiState.value.amountLocked) return
         if (value.isNotEmpty() && !AMOUNT_INPUT.matches(value)) return
         updateForm { copy(amountText = value, errors = errors.copy(amount = null)) }
         savedState[KEY_AMOUNT] = value
@@ -124,7 +148,7 @@ class PayViewModel @Inject constructor(
         )
         _uiState.update { it.copy(phase = PayPhase.Submitting) }
         viewModelScope.launch {
-            val result = withContext(dispatchers.io) { payViaUpiIntent(request, PaymentMethod.UPI_INTENT) }
+            val result = withContext(dispatchers.io) { payViaUpiIntent(request, method) }
             result.onSuccess { launch ->
                 savedState[KEY_IN_FLIGHT] = launch.paymentId
                 _uiState.update { it.copy(phase = PayPhase.AwaitingApp(launch.paymentId)) }
@@ -172,7 +196,7 @@ class PayViewModel @Inject constructor(
 
     fun reset() {
         savedState.remove<String>(KEY_IN_FLIGHT)
-        listOf(KEY_VPA, KEY_NAME, KEY_AMOUNT, KEY_NOTE).forEach { savedState.remove<String>(it) }
+        listOf(KEY_VPA, KEY_NAME, KEY_AMOUNT, KEY_NOTE, ARG_PREFILL_AMOUNT, ARG_SOURCE).forEach { savedState.remove<Any>(it) }
         _uiState.value = PayUiState()
     }
 
@@ -199,6 +223,13 @@ class PayViewModel @Inject constructor(
         const val KEY_AMOUNT = "amount"
         const val KEY_NOTE = "note"
         const val MAX_FIELD = 256
+        // Route arguments of PayDestination (same keys as the form fields where they overlap).
+        const val ARG_PREFILL_VPA = KEY_VPA
+        const val ARG_PREFILL_NAME = KEY_NAME
+        const val ARG_PREFILL_AMOUNT = "amountPaise"
+        const val ARG_PREFILL_NOTE = KEY_NOTE
+        const val ARG_SOURCE = "source"
+        const val SOURCE_QR = "qr"
         private val AMOUNT_INPUT = Regex("""^\d{0,7}(\.\d{0,2})?$""")
     }
 }
