@@ -1,5 +1,8 @@
 package com.darshan.payflow.data.psp
 
+import com.darshan.payflow.domain.model.CollectStatus
+import com.darshan.payflow.domain.model.Payment
+import com.darshan.payflow.domain.model.VpaValidator
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.SocketTimeoutException
@@ -60,6 +63,62 @@ class HttpPspClient(
         return execute(http) { text ->
             val dto = json.decodeFromString<InitiateDto>(text)
             PspInitiateResponse(dto.pspTxnId, dto.txnRef)
+        }
+    }
+
+    @Serializable
+    private data class VerifyDto(val vpa: String, val valid: Boolean, val payeeName: String? = null)
+
+    @Serializable
+    private data class CollectDto(
+        val id: String,
+        val payeeVpa: String,
+        val payeeName: String,
+        val amountPaise: Long,
+        val note: String = "",
+        val createdAt: Long,
+        val expiresAt: Long,
+        val status: String,
+    )
+
+    @Serializable
+    private data class RespondBody(val approve: Boolean)
+
+    @Serializable
+    private data class AnswerDto(val id: String, val status: String, val pspTxnId: String? = null, val txnRef: String? = null)
+
+    override suspend fun verifyVpa(vpa: String): VpaVerification {
+        val normalized = vpa.trim().lowercase()
+        val http = Request.Builder().url(baseUrl.newBuilder().addPathSegments("v1/vpa").addPathSegment(normalized).build()).get().auth().build()
+        return execute(http, notFound = { VpaVerification.NotFound(normalized) }) { text ->
+            val dto = json.decodeFromString<VerifyDto>(text)
+            if (!dto.valid) VpaVerification.NotFound(normalized)
+            else VpaVerification.Verified(normalized, dto.payeeName?.takeIf { it.isNotBlank() } ?: throw PspException.Malformed("missing payeeName"))
+        }
+    }
+
+    override suspend fun listCollectRequests(): List<PspCollectRequest> {
+        val http = Request.Builder().url(baseUrl.newBuilder().addPathSegments("v1/collect").build()).get().auth().build()
+        return execute(http) { text ->
+            json.decodeFromString<List<CollectDto>>(text).mapNotNull { dto ->
+                // A hostile or corrupt row must not take the whole list down: validate and drop.
+                val status = CollectStatus.entries.firstOrNull { it.name == dto.status.uppercase() } ?: return@mapNotNull null
+                if (!VpaValidator.isValid(dto.payeeVpa) || dto.amountPaise !in 1..Payment.MAX_AMOUNT_PAISE || dto.id.isBlank()) return@mapNotNull null
+                PspCollectRequest(dto.id.take(64), dto.payeeVpa.trim().lowercase(), dto.payeeName.take(99), dto.amountPaise, dto.note.take(99), dto.createdAt, dto.expiresAt, status)
+            }
+        }
+    }
+
+    override suspend fun respondToCollect(requestId: String, approve: Boolean): PspCollectAnswer {
+        val http = Request.Builder()
+            .url(baseUrl.newBuilder().addPathSegments("v1/collect").addPathSegment(requestId).addPathSegment("respond").build())
+            .post(json.encodeToString(RespondBody(approve)).toRequestBody(JSON))
+            .auth()
+            .build()
+        return execute(http) { text ->
+            val dto = json.decodeFromString<AnswerDto>(text)
+            val status = CollectStatus.entries.firstOrNull { it.name == dto.status.uppercase() } ?: throw PspException.Malformed("unknown collect status")
+            PspCollectAnswer(dto.id, status, dto.pspTxnId, dto.txnRef)
         }
     }
 

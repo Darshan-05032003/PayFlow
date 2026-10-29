@@ -95,3 +95,32 @@ Severity scale: Critical / High / Medium / Low.
 - Scope for improvement:
   - PSP VPA verification for scanned payees (feature 4); `FLAG_SECURE` on the scan/pay screens (feature 7); device run of
     CameraX + ML Kit (`CameraXController`, `MlKitBarcodeScanner` are compile-only here: no device was available).
+
+## Feature: VPA validation (PSP verify) and collect requests
+- Attacks tried:
+  - **VPA enumeration / amplification**: malformed VPAs never reach the PSP (format check first: 2,500 of 10,000 in the stress
+    run); typing is debounced (600 ms) and only the final value is verified (`PayViewModelTest`, `CollectAndVerifyStressTest`).
+  - **Paying an unknown UPI ID**: `NotFound` blocks submit with `VPA_NOT_FOUND`; PSP outage is `Unavailable` (pay allowed with
+    the typed name plus a visible warning), never silently treated as "found".
+  - **Self-declared payee names** (QR `pn=`, typed names): the PSP-registered name replaces them and the name field locks
+    (`a qr payee is verified on open and the registered name replaces the qr text`) — closes the feature 3 Medium finding.
+  - **Hostile collect rows from the PSP**: invalid VPA, negative amounts, unknown status → dropped row by row, never a failed
+    list (`HttpPspClientTest.collect requests are listed and answered`, `RefreshCollectRequestsUseCase`).
+  - **Replay / double-answer**: the same request approved 200× concurrently → exactly one PSP answer, one payment
+    (`oneRequestAnsweredTwoHundredTimesConcurrentlyCreatesOnePayment`); approve then approve/decline again → `AlreadyAnswered`.
+  - **Stale server state**: a server row still saying PENDING cannot revert a local APPROVED/DECLINED (`CollectDaoTest`).
+  - **Expired requests**: approving after expiry is refused locally and the PSP answers 410 (`an expired request cannot be approved`).
+  - **Clock changes**: expiry derives from the injected `Clock`; a device clock moved backwards would only delay local expiry,
+    the PSP still enforces 410.
+  - **PSP down mid-approval**: request stays PENDING, the never-opened payment is FAILED, the user can retry (`Unavailable`).
+  - **Approval accepted, status unknown** (found by the stress run): the payment stays PENDING, never FAILED (25 of 572 in the run).
+  - **409 from the PSP** (answered on another device/process): mapped to `AlreadyAnswered`, not `Unavailable`.
+- What broke:
+  - **Medium (open, product-level)**: collect requests are the main UPI fraud vector ("approve to receive ₹5,000"). The UI shows
+    VPA, amount, note and received time, and approval is an explicit tap; feature 7's biometric/PIN lock should gate approvals
+    and a first-time-payee / large-amount warning is recommended.
+  - **Low (fixed)**: PSP 409 was reported as `Unavailable` (retry hint) instead of `AlreadyAnswered` — fixed with a regression test.
+  - **Low (accepted)**: the per-request mutex is in-process; cross-process double answers rely on the PSP's 409 + the Room CAS.
+- Fixed now: 409 mapping; registered name overrides QR/typed names; hostile collect rows dropped.
+- Scope for improvement: cache verified names per session (LRU) to cut PSP lookups; gate approvals behind the app lock
+  (feature 7); first-time-payee warning; show the collect requester's verified name from the directory as well.

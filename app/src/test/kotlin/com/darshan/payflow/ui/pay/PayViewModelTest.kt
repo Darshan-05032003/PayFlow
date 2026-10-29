@@ -33,6 +33,7 @@ class PayViewModelTest {
     private fun vm(psp: FakePsp = FakePsp(fixedClock), handle: SavedStateHandle = SavedStateHandle()) = PayViewModel(
         payViaUpiIntent = PayViaUpiIntentUseCase(repo, psp, fixedClock) { "pay-${++ids}" },
         confirmPayment = ConfirmPaymentUseCase(repo, psp, fixedClock),
+        verifyVpa = com.darshan.payflow.domain.usecase.VerifyVpaUseCase(psp),
         upiAppLauncher = launcher,
         dispatchers = TestDispatcherProvider(dispatcher),
         savedState = handle,
@@ -205,5 +206,58 @@ class PayViewModelTest {
         vm.onAmountChange("10"); vm.onNameChange("x")
         assertThat(vm.uiState.value.amountText).isEqualTo("10")
         assertThat(vm.uiState.value.name).isEqualTo("shop@okbank") // name locked with the payee
+    }
+
+    // --- feature 4: VPA verification ---
+
+    @Test
+    fun `typing a vpa verifies it after a debounce and fills the registered payee name`() = runTest(dispatcher) {
+        val psp = FakePsp(fixedClock)
+        val vm = vm(psp)
+        vm.onVpaChange("alice@okb"); vm.onVpaChange("alice@okbank")
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Idle)
+        dispatcher.scheduler.advanceTimeBy(PayViewModel.VERIFY_DEBOUNCE_MS + 1); dispatcher.scheduler.runCurrent()
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Verified("Alice Kumar"))
+        assertThat(vm.uiState.value.name).isEqualTo("Alice Kumar")
+        assertThat(psp.verifyCalls).isEqualTo(1) // only the final value was verified
+    }
+
+    @Test
+    fun `a vpa the psp does not know blocks submit`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onVpaChange("unknown@okbank"); vm.onNameChange("Someone"); vm.onAmountChange("10")
+        dispatcher.scheduler.advanceTimeBy(PayViewModel.VERIFY_DEBOUNCE_MS + 1); dispatcher.scheduler.runCurrent()
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.NotFound)
+        vm.submit(); advanceUntilIdle()
+        assertThat(vm.uiState.value.errors.vpa).isEqualTo(PayFieldError.VPA_NOT_FOUND)
+        assertThat(repo.getById("pay-1")).isNull()
+    }
+
+    @Test
+    fun `verification unavailable allows paying with the typed name and a warning`() = runTest(dispatcher) {
+        val psp = FakePsp(fixedClock, FakePspConfig(timeoutRate = 1.0))
+        val vm = vm(psp)
+        vm.onVpaChange("alice@okbank"); vm.onNameChange("Alice"); vm.onAmountChange("10")
+        dispatcher.scheduler.advanceTimeBy(PayViewModel.VERIFY_DEBOUNCE_MS + 1); dispatcher.scheduler.runCurrent()
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Unavailable)
+        assertThat(vm.uiState.value.name).isEqualTo("Alice")
+    }
+
+    @Test
+    fun `submit verifies first when the user never paused typing`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onVpaChange("alice@okbank"); vm.onAmountChange("10")
+        vm.submit(); advanceUntilIdle()
+        assertThat(vm.uiState.value.name).isEqualTo("Alice Kumar")
+        assertThat(repo.getById("pay-1")!!.payeeName).isEqualTo("Alice Kumar")
+    }
+
+    @Test
+    fun `a qr payee is verified on open and the registered name replaces the qr text`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(mapOf(PayViewModel.ARG_PREFILL_VPA to "shop@okbank", PayViewModel.ARG_PREFILL_NAME to "Government Refund Desk", PayViewModel.ARG_SOURCE to "qr"))
+        val vm = vm(handle = handle)
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Verified("Chai Point"))
+        assertThat(vm.uiState.value.name).isEqualTo("Chai Point")
     }
 }

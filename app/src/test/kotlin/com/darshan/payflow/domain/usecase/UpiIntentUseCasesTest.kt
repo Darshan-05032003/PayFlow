@@ -14,6 +14,7 @@ import com.darshan.payflow.domain.model.PaymentMethod
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.model.UpiPayRequest
 import com.darshan.payflow.testutil.FakePaymentRepository
+import com.darshan.payflow.testutil.StubPsp
 import com.darshan.payflow.testutil.fixedClock
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -42,7 +43,7 @@ class UpiIntentUseCasesTest {
 
     @Test
     fun `psp initiate failure marks the payment failed and never launches the app`() = runTest {
-        val psp = object : PspClient {
+        val psp = object : StubPsp() {
             override suspend fun initiatePayment(request: PspInitiateRequest) = throw PspException.Server(503)
             override suspend fun getPaymentStatus(txnRef: String) = error("not called")
         }
@@ -102,7 +103,7 @@ class UpiIntentUseCasesTest {
         )
         for (status in cases) {
             val localRepo = FakePaymentRepository()
-            val psp = object : PspClient {
+            val psp = object : StubPsp() {
                 override suspend fun initiatePayment(request: PspInitiateRequest) = PspInitiateResponse("p", request.txnRef)
                 override suspend fun getPaymentStatus(txnRef: String) = status
             }
@@ -115,7 +116,7 @@ class UpiIntentUseCasesTest {
 
     @Test
     fun `psp unreachable leaves the payment pending and reports unresolved`() = runTest {
-        val psp = object : PspClient {
+        val psp = object : StubPsp() {
             override suspend fun initiatePayment(request: PspInitiateRequest) = PspInitiateResponse("p", request.txnRef)
             override suspend fun getPaymentStatus(txnRef: String) = throw PspException.Timeout()
         }
@@ -138,7 +139,7 @@ class UpiIntentUseCasesTest {
 
     @Test
     fun `psp not found for our ref fails the payment`() = runTest {
-        val psp = object : PspClient {
+        val psp = object : StubPsp() {
             override suspend fun initiatePayment(request: PspInitiateRequest) = PspInitiateResponse("p", request.txnRef)
             override suspend fun getPaymentStatus(txnRef: String) = PspPaymentStatus.NotFound(txnRef)
         }

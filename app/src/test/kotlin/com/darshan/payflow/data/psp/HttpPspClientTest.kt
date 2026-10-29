@@ -117,4 +117,51 @@ class HttpPspClientTest {
         assertThat((runCatching { client.getPaymentStatus("PF1") }.exceptionOrNull() as PspException.RateLimited).retryAfterMillis).isEqualTo(PspException.RateLimited.MAX_RETRY_AFTER_MILLIS)
         assertThat((runCatching { client.getPaymentStatus("PF1") }.exceptionOrNull() as PspException.RateLimited).retryAfterMillis).isNull()
     }
+
+    // --- feature 4: VPA verify + collect endpoints ---
+
+    @Test
+    fun `verify vpa maps valid, invalid and errors`() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(200).body("""{"vpa":"alice@okbank","valid":true,"payeeName":"Alice Kumar"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"vpa":"nobody@okbank","valid":false}""").build())
+        server.enqueue(MockResponse.Builder().code(404).build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"vpa":"alice@okbank","valid":true}""").build())
+        server.enqueue(MockResponse.Builder().code(429).build())
+        assertThat(client.verifyVpa("alice@okbank")).isEqualTo(VpaVerification.Verified("alice@okbank", "Alice Kumar"))
+        assertThat(client.verifyVpa("nobody@okbank")).isEqualTo(VpaVerification.NotFound("nobody@okbank"))
+        assertThat(client.verifyVpa("nobody@okbank")).isEqualTo(VpaVerification.NotFound("nobody@okbank"))
+        assertThat(runCatching { client.verifyVpa("alice@okbank") }.exceptionOrNull()).isInstanceOf(PspException.Malformed::class.java)
+        assertThat(runCatching { client.verifyVpa("alice@okbank") }.exceptionOrNull()).isInstanceOf(PspException.RateLimited::class.java)
+        assertThat(server.takeRequest().url.encodedPath).isEqualTo("/v1/vpa/alice@okbank")
+    }
+
+    @Test
+    fun `collect requests are listed and answered`() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder().code(200).body(
+                """[{"id":"req-1","payeeVpa":"shop@okbank","payeeName":"Chai Point","amountPaise":4500,"note":"Table 4",
+                   "createdAt":1793268930000,"expiresAt":1793269530000,"status":"PENDING"},
+                   {"id":"bad","payeeVpa":"not a vpa","payeeName":"x","amountPaise":-5,"note":"","createdAt":1,"expiresAt":2,"status":"PENDING"}]""",
+            ).build(),
+        )
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"req-1","status":"APPROVED","pspTxnId":"psp-7","txnRef":"COLreq-1"}""").build())
+        server.enqueue(MockResponse.Builder().code(410).body("""{"error":"expired"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""not json""").build())
+
+        val list = client.listCollectRequests()
+        assertThat(list.map { it.id }).containsExactly("req-1") // the hostile row is dropped, not fatal
+        assertThat(list.single().amountPaise).isEqualTo(4_500)
+
+        val answer = client.respondToCollect("req-1", approve = true)
+        assertThat(answer).isEqualTo(PspCollectAnswer("req-1", com.darshan.payflow.domain.model.CollectStatus.APPROVED, "psp-7", "COLreq-1"))
+        val expired = runCatching { client.respondToCollect("req-1", approve = true) }.exceptionOrNull() as PspException.ClientError
+        assertThat(expired.status).isEqualTo(410)
+        assertThat(runCatching { client.respondToCollect("req-1", approve = false) }.exceptionOrNull()).isInstanceOf(PspException.Malformed::class.java)
+
+        server.takeRequest() // list
+        val respond = server.takeRequest()
+        assertThat(respond.method).isEqualTo("POST")
+        assertThat(respond.url.encodedPath).isEqualTo("/v1/collect/req-1/respond")
+        assertThat(respond.body!!.utf8()).contains("\"approve\":true")
+    }
 }

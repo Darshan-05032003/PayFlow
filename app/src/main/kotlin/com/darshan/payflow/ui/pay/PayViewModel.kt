@@ -19,9 +19,13 @@ import com.darshan.payflow.domain.model.VpaValidator
 import com.darshan.payflow.domain.usecase.ConfirmPaymentUseCase
 import com.darshan.payflow.domain.usecase.ConfirmResult
 import com.darshan.payflow.domain.usecase.PayViaUpiIntentUseCase
+import com.darshan.payflow.domain.usecase.VerifyVpaUseCase
+import com.darshan.payflow.domain.usecase.VpaVerifyResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -32,7 +36,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class PayFieldError { REQUIRED, INVALID_VPA, INVALID_AMOUNT, AMOUNT_TOO_LARGE }
+enum class PayFieldError { REQUIRED, INVALID_VPA, VPA_NOT_FOUND, INVALID_AMOUNT, AMOUNT_TOO_LARGE }
+
+/** Result of the PSP directory lookup for the typed VPA. */
+sealed interface VpaVerificationState {
+    data object Idle : VpaVerificationState
+    data object Verifying : VpaVerificationState
+    data class Verified(val payeeName: String) : VpaVerificationState
+    data object NotFound : VpaVerificationState
+    /** PSP unreachable: paying is allowed with the typed name, with a warning. */
+    data object Unavailable : VpaVerificationState
+}
 
 data class PayFormErrors(val vpa: PayFieldError? = null, val name: PayFieldError? = null, val amount: PayFieldError? = null) {
     val hasErrors: Boolean get() = vpa != null || name != null || amount != null
@@ -58,8 +72,11 @@ data class PayUiState(
     val payeeLocked: Boolean = false,
     /** From a merchant QR with a fixed amount. */
     val amountLocked: Boolean = false,
+    val verification: VpaVerificationState = VpaVerificationState.Idle,
 ) {
     val isBusy: Boolean get() = phase is PayPhase.Submitting || phase is PayPhase.Confirming
+    /** The registered name replaces whatever was typed or scanned; it cannot be edited. */
+    val nameLocked: Boolean get() = payeeLocked || verification is VpaVerificationState.Verified
 }
 
 sealed interface PayEvent {
@@ -71,6 +88,7 @@ sealed interface PayEvent {
 class PayViewModel @Inject constructor(
     private val payViaUpiIntent: PayViaUpiIntentUseCase,
     private val confirmPayment: ConfirmPaymentUseCase,
+    private val verifyVpa: VerifyVpaUseCase,
     private val upiAppLauncher: UpiAppLauncher,
     private val dispatchers: DispatcherProvider,
     private val savedState: SavedStateHandle,
@@ -85,6 +103,13 @@ class PayViewModel @Inject constructor(
 
     private val _events = MutableSharedFlow<PayEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<PayEvent> = _events.asSharedFlow()
+
+    private var verifyJob: Job? = null
+
+    init {
+        // A scanned payee is verified immediately so the registered name replaces the QR's self-declared text.
+        if (fromQr && _uiState.value.vpa.isNotBlank() && _uiState.value.phase == PayPhase.Idle) verifyJob = viewModelScope.launch { runVerification() }
+    }
 
     /** Form fields and the in-flight payment id live in [SavedStateHandle]; route arguments (QR prefill) share the same keys. */
     private fun restore(): PayUiState {
@@ -104,12 +129,39 @@ class PayViewModel @Inject constructor(
 
     fun onVpaChange(value: String) {
         if (_uiState.value.payeeLocked) return
-        updateForm { copy(vpa = value.take(MAX_FIELD), errors = errors.copy(vpa = null)) }
+        verifyJob?.cancel()
+        updateForm { copy(vpa = value.take(MAX_FIELD), errors = errors.copy(vpa = null), verification = VpaVerificationState.Idle) }
         savedState[KEY_VPA] = _uiState.value.vpa
+        if (VpaValidator.isValid(value)) {
+            verifyJob = viewModelScope.launch {
+                delay(VERIFY_DEBOUNCE_MS)
+                runVerification()
+            }
+        }
+    }
+
+    /** Looks the VPA up at the PSP and applies the result to the form (registered name wins). */
+    private suspend fun runVerification(): VpaVerificationState {
+        val vpa = _uiState.value.vpa
+        _uiState.update { it.copy(verification = VpaVerificationState.Verifying) }
+        val result = withContext(dispatchers.io) { verifyVpa(vpa) }
+        if (_uiState.value.vpa != vpa) return _uiState.value.verification // user kept typing; a newer job owns the field
+        val state = when (result) {
+            is VpaVerifyResult.Verified -> VpaVerificationState.Verified(result.payeeName)
+            is VpaVerifyResult.NotFound -> VpaVerificationState.NotFound
+            is VpaVerifyResult.Unavailable -> VpaVerificationState.Unavailable
+            is VpaVerifyResult.InvalidFormat -> VpaVerificationState.Idle
+        }
+        _uiState.update {
+            if (state is VpaVerificationState.Verified) it.copy(verification = state, name = state.payeeName, errors = it.errors.copy(name = null, vpa = null))
+            else it.copy(verification = state)
+        }
+        if (state is VpaVerificationState.Verified) savedState[KEY_NAME] = state.payeeName
+        return state
     }
 
     fun onNameChange(value: String) {
-        if (_uiState.value.payeeLocked) return
+        if (_uiState.value.nameLocked) return
         updateForm { copy(name = value.take(MAX_FIELD), errors = errors.copy(name = null)) }
         savedState[KEY_NAME] = _uiState.value.name
     }
@@ -128,26 +180,33 @@ class PayViewModel @Inject constructor(
     }
 
     fun submit() {
-        val state = _uiState.value
-        if (state.phase != PayPhase.Idle) return // double tap / already in flight
-        val errors = validate(state)
-        if (errors.hasErrors) {
-            _uiState.update { it.copy(errors = errors) }
-            return
-        }
-        if (!upiAppLauncher.isUpiAppInstalled()) {
-            _events.tryEmit(PayEvent.NoUpiApp)
-            return
-        }
-        val request = UpiPayRequest(
-            payeeVpa = (VpaValidator.validate(state.vpa) as VpaValidation.Valid).normalized,
-            payeeName = state.name,
-            amountPaise = Money.parseInrToPaise(state.amountText)!!,
-            note = state.note,
-            txnRef = TxnRefGenerator.next(),
-        )
+        if (_uiState.value.phase != PayPhase.Idle) return // double tap / already in flight
         _uiState.update { it.copy(phase = PayPhase.Submitting) }
         viewModelScope.launch {
+            // Make sure the payee has been looked up before money moves (the debounce may not have fired yet).
+            val vpaOk = VpaValidator.isValid(_uiState.value.vpa)
+            if (vpaOk && _uiState.value.verification.let { it is VpaVerificationState.Idle || it is VpaVerificationState.Verifying }) {
+                verifyJob?.cancel()
+                runVerification()
+            }
+            val state = _uiState.value
+            val errors = validate(state)
+            if (errors.hasErrors) {
+                _uiState.update { it.copy(errors = errors, phase = PayPhase.Idle) }
+                return@launch
+            }
+            if (!upiAppLauncher.isUpiAppInstalled()) {
+                _uiState.update { it.copy(phase = PayPhase.Idle) }
+                _events.tryEmit(PayEvent.NoUpiApp)
+                return@launch
+            }
+            val request = UpiPayRequest(
+                payeeVpa = (VpaValidator.validate(state.vpa) as VpaValidation.Valid).normalized,
+                payeeName = state.name,
+                amountPaise = Money.parseInrToPaise(state.amountText)!!,
+                note = state.note,
+                txnRef = TxnRefGenerator.next(),
+            )
             val result = withContext(dispatchers.io) { payViaUpiIntent(request, method) }
             result.onSuccess { launch ->
                 savedState[KEY_IN_FLIGHT] = launch.paymentId
@@ -202,7 +261,7 @@ class PayViewModel @Inject constructor(
 
     private fun validate(state: PayUiState): PayFormErrors {
         val vpaError = when (VpaValidator.validate(state.vpa)) {
-            is VpaValidation.Valid -> null
+            is VpaValidation.Valid -> if (state.verification is VpaVerificationState.NotFound) PayFieldError.VPA_NOT_FOUND else null
             is VpaValidation.Invalid -> if (state.vpa.isBlank()) PayFieldError.REQUIRED else PayFieldError.INVALID_VPA
         }
         val nameError = if (state.name.isBlank()) PayFieldError.REQUIRED else null
@@ -230,6 +289,7 @@ class PayViewModel @Inject constructor(
         const val ARG_PREFILL_NOTE = KEY_NOTE
         const val ARG_SOURCE = "source"
         const val SOURCE_QR = "qr"
+        const val VERIFY_DEBOUNCE_MS = 600L
         private val AMOUNT_INPUT = Regex("""^\d{0,7}(\.\d{0,2})?$""")
     }
 }

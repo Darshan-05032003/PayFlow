@@ -4,9 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import com.darshan.payflow.core.DefaultDispatcherProvider
 import com.darshan.payflow.core.DispatcherProvider
+import com.darshan.payflow.data.local.CollectDao
 import com.darshan.payflow.data.local.PayFlowDatabase
 import com.darshan.payflow.data.local.PaymentDao
+import com.darshan.payflow.data.repository.CollectRepositoryImpl
 import com.darshan.payflow.data.repository.PaymentRepositoryImpl
+import com.darshan.payflow.domain.repository.CollectRepository
 import com.darshan.payflow.domain.repository.PaymentRepository
 import dagger.Binds
 import dagger.Module
@@ -32,6 +35,9 @@ object AppModule {
 
     @Provides
     fun paymentDao(db: PayFlowDatabase): PaymentDao = db.paymentDao()
+
+    @Provides
+    fun collectDao(db: PayFlowDatabase): CollectDao = db.collectDao()
 }
 
 @Module
@@ -39,4 +45,7 @@ object AppModule {
 abstract class RepositoryModule {
     @Binds @Singleton
     abstract fun paymentRepository(impl: PaymentRepositoryImpl): PaymentRepository
+
+    @Binds @Singleton
+    abstract fun collectRepository(impl: CollectRepositoryImpl): CollectRepository
 }

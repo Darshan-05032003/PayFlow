@@ -22,6 +22,7 @@ import com.darshan.payflow.data.upi.UpiLaunchResult
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.usecase.ConfirmPaymentUseCase
 import com.darshan.payflow.domain.usecase.PayViaUpiIntentUseCase
+import com.darshan.payflow.domain.usecase.VerifyVpaUseCase
 import com.darshan.payflow.testutil.FakeUpiAppLauncher
 import com.darshan.payflow.testutil.fixedClock
 import com.darshan.payflow.testutil.runOffMain
@@ -68,7 +69,7 @@ class UpiIntentFlowIntegrationTest {
 
     private fun start(psp: FakePsp): PayViewModel {
         val vm = PayViewModel(
-            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock),
+            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp),
             launcher, DefaultDispatcherProvider(), SavedStateHandle(),
         )
         vm.events.onEach { events += it }.launchIn(CoroutineScope(Dispatchers.Unconfined))
@@ -97,7 +98,7 @@ class UpiIntentFlowIntegrationTest {
         val psp = FakePsp(fixedClock)
         val vm = start(psp)
         val uri = (events.single() as PayEvent.LaunchUpiApp).upiUri
-        assertThat(uri).startsWith("upi://pay?pa=alice%40okbank&pn=Alice&am=1.00&cu=INR&tr=")
+        assertThat(uri).startsWith("upi://pay?pa=alice%40okbank&pn=Alice%20Kumar&am=1.00&cu=INR&tr=") // PSP-registered name wins
         rule.onNodeWithText("Complete the payment in your UPI app").assertIsDisplayed()
 
         val txnRef = runOffMain { repo.observeRecent(1).first() }.single().txnRef

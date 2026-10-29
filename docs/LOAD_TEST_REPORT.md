@@ -68,3 +68,26 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
 - Failure flow (step by step): a hostile QR that is large and valid-looking (4 KB of `tn=`) costs ~56 µs per frame; even at
   30 fps that is < 2 ms/s of CPU. No failure path found.
 - Fix applied / recommendation: keep the 4 KB cap; on a device, verify ML Kit decode latency per frame (not run: no device).
+
+## Feature: VPA validation (PSP verify) and collect requests
+- Scenario and scale:
+  - `CollectAndVerifyStressTest.tenThousandVpaVerificationsUnderRateLimiting`: 10,000 concurrent verifications (25 % malformed,
+    25 % unknown) against a PSP returning 20 % 429 and 10 % 5xx.
+  - `thousandCollectRequestsAnsweredConcurrently`: 1,000 incoming requests (10 % already expired), answered concurrently
+    (2/3 approve, 1/3 decline) against a PSP with 5 % timeouts; then every request is cross-checked against the payments table.
+  - `oneRequestAnsweredTwoHundredTimesConcurrentlyCreatesOnePayment`: 200 racing answers for one request.
+- Results (numbers):
+  - 10,000 verifications: **58 ms**; `InvalidFormat=2500` never hit the PSP, 7,500 PSP calls: `Verified=3473, NotFound=1733,
+    Unavailable=2294` (429/5xx surfaced as "could not verify", never as "not found").
+  - 1,000 collect answers: **~0.9–1.0 s** (3 Room writes + 2 PSP calls each); `Approved=572 (547 SUCCESS + 25 PENDING),
+    Declined=286, Expired=100, Unavailable=42`; 0 approved requests without a payment, 0 duplicate payments.
+  - 200 racing answers: 1 answered, 199 `AlreadyAnswered`, exactly 1 payment row.
+- What broke:
+  - The first version of the test expected `approved == successful payments`; 25 approvals had been accepted by the PSP but
+    the follow-up status check timed out. The code was right (payment PENDING, not FAILED), the expectation was wrong; the
+    test now asserts `approved == success + pending`.
+  - Verification load scales with typing pauses: without the debounce, 10 keystrokes = 10 PSP lookups.
+- Failure flow (step by step): user approves → payment CREATED → PSP accepts → `Initiate` → status check times out →
+  payment stays PENDING with the request APPROVED → feature 6 polling resolves it later.
+- Fix applied / recommendation: debounce + final-value-only verification (applied); a small per-session LRU of verified
+  names (recommended); polling with backoff for PENDING collect payments (feature 6).

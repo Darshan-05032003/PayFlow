@@ -112,7 +112,7 @@ class UpiIntentStressTest {
 
     @Test
     fun pspMismatchStormNeverConfirms() = runBlocking {
-        val psp = object : com.darshan.payflow.data.psp.PspClient {
+        val psp = object : com.darshan.payflow.testutil.StubPsp() {
             val calls = AtomicInteger()
             override suspend fun initiatePayment(request: com.darshan.payflow.data.psp.PspInitiateRequest) = com.darshan.payflow.data.psp.PspInitiateResponse("p", request.txnRef)
             override suspend fun getPaymentStatus(txnRef: String): PspPaymentStatus {

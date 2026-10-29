@@ -55,5 +55,19 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - `@androidx.annotation.OptIn(ExperimentalGetImage::class)` (not Kotlin's `@OptIn`) is what Android lint accepts for CameraX's
   Java `@RequiresOptIn` marker.
 
+## Feature 4: VPA verification + collect requests
+- **Format first, then the PSP.** `VerifyVpaUseCase` rejects malformed VPAs offline so hostile input never reaches the network;
+  the result is `Verified(name)`, `NotFound`, `Unavailable(error)` or `InvalidFormat`.
+- **Registered name wins and locks the name field.** It replaces QR `pn=` text and typed names; `NotFound` blocks payment;
+  `Unavailable` allows paying with the typed name plus a warning (an outage must not make the app unusable).
+- **Debounce 600 ms, final value only**; `submit()` verifies first if the debounce never fired.
+- **Approving a collect = a normal payment.** `RespondToCollectUseCase` creates a COLLECT payment (CREATED) before the PSP call,
+  answers the PSP, `Initiate`s, marks the request APPROVED with the payment id and confirms through the same status check as the
+  intent flow. `txnRef = "COL" + requestId` is the shared convention with the sandbox.
+- **Exactly-once answers**: per-request `Mutex` (in-process) + Room compare-and-set + PSP 409/410 mapping.
+- **Server rows never revert local answers** (`CollectDao.merge`): a stale PENDING from the PSP cannot undo an APPROVED/DECLINED.
+- **Room v2** adds `collect_requests` with an `AutoMigration(1, 2)` (schemas exported under `app/schemas`).
+- **Demo collect requests** are seeded into the sandbox `FakePsp` in `PspModule` so the screen has content; a real PSP would push them.
+
 ## Compromises
 _None yet._

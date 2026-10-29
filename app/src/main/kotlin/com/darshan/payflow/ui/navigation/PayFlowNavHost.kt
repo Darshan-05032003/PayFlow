@@ -11,6 +11,7 @@ import com.darshan.payflow.data.qr.UpiQrPayload
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.ui.pay.PayViewModel
 import com.darshan.payflow.ui.scan.ScanRoute
+import com.darshan.payflow.ui.collect.CollectRoute
 import com.darshan.payflow.ui.history.HistoryRoute
 import com.darshan.payflow.ui.pay.PayRoute
 import com.darshan.payflow.ui.history.PaymentDetailRoute
@@ -31,6 +32,7 @@ data class PayDestination(
     val source: String? = null,
 )
 @Serializable object ScanDestination
+@Serializable object CollectDestination
 
 fun UpiQrPayload.toPayDestination() = PayDestination(
     vpa = payeeVpa, name = payeeName, amountPaise = amountPaise ?: 0, note = note.takeIf { it.isNotBlank() }, source = PayViewModel.SOURCE_QR,
@@ -51,6 +53,7 @@ fun PayFlowNavHost(
                     onViewAll = { navController.navigate(HistoryDestination) },
                     onPay = { navController.navigate(PayDestination()) },
                     onScan = { navController.navigate(ScanDestination) },
+                    onCollect = { navController.navigate(CollectDestination) },
                 ),
             )
         }
@@ -66,6 +69,9 @@ fun PayFlowNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) },
             )
+        }
+        composable<CollectDestination> {
+            CollectRoute(onBack = { navController.popBackStack() }, onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) })
         }
         composable<ScanDestination> {
             ScanRoute(

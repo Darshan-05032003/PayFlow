@@ -98,4 +98,29 @@
     <string name="scan_error_vpa">This QR has an invalid UPI ID</string>
     <string name="scan_error_amount">This QR has an invalid amount</string>
     <string name="scan_error_currency">Only INR payments are supported</string>
+
+    <!-- VPA verification -->
+    <string name="pay_verifying">Checking UPI ID…</string>
+    <string name="pay_verified">Verified: %1$s</string>
+    <string name="pay_verify_unavailable">Could not verify this UPI ID right now. The name shown is what you typed.</string>
+    <string name="error_vpa_not_found">This UPI ID was not found</string>
+
+    <!-- Collect requests -->
+    <string name="collect_title">Payment requests</string>
+    <string name="collect_refresh">Refresh</string>
+    <string name="collect_empty">No payment requests</string>
+    <string name="collect_empty_hint">Requests to pay someone will appear here.</string>
+    <string name="collect_received">Received %1$s</string>
+    <string name="collect_approve">Approve</string>
+    <string name="collect_decline">Decline</string>
+    <string name="collect_status_pending">Pending</string>
+    <string name="collect_status_approved">Approved</string>
+    <string name="collect_status_declined">Declined</string>
+    <string name="collect_status_expired">Expired</string>
+    <string name="collect_msg_approved">Request approved and paid</string>
+    <string name="collect_msg_declined">Request declined</string>
+    <string name="collect_msg_expired">This request has expired</string>
+    <string name="collect_msg_already">This request was already answered</string>
+    <string name="collect_msg_unavailable">Could not reach the payment provider. Try again.</string>
+    <string name="collect_msg_refresh_failed">Could not refresh requests</string>
 </resources>

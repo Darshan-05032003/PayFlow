@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -46,6 +47,7 @@ data class HomeCallbacks(
     val onViewAll: () -> Unit = {},
     val onPay: () -> Unit = {},
     val onScan: () -> Unit = {},
+    val onCollect: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
@@ -63,6 +65,9 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks) {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = callbacks.onCollect, modifier = Modifier.testTag(PayFlowTestTags.HOME_COLLECT)) {
+                        Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.collect_title))
+                    }
                     IconButton(onClick = callbacks.onScan, modifier = Modifier.testTag(PayFlowTestTags.HOME_SCAN)) {
                         Icon(Icons.Default.Search, contentDescription = stringResource(R.string.scan_title))
                     }

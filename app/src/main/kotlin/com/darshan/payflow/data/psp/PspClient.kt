@@ -1,5 +1,7 @@
 package com.darshan.payflow.data.psp
 
+import com.darshan.payflow.domain.model.CollectStatus
+
 /** Registers a payment order with the PSP before the UPI app is opened. */
 data class PspInitiateRequest(
     val txnRef: String,
@@ -19,6 +21,26 @@ sealed interface PspPaymentStatus {
     data class Failed(val txnRef: String, val code: String, val reason: String) : PspPaymentStatus
     data class NotFound(val txnRef: String) : PspPaymentStatus
 }
+
+/** Result of asking the PSP who owns a VPA. */
+sealed interface VpaVerification {
+    data class Verified(val vpa: String, val payeeName: String) : VpaVerification
+    data class NotFound(val vpa: String) : VpaVerification
+}
+
+/** An incoming collect ("pay me") request as the PSP relays it. */
+data class PspCollectRequest(
+    val id: String,
+    val payeeVpa: String,
+    val payeeName: String,
+    val amountPaise: Long,
+    val note: String,
+    val createdAtMillis: Long,
+    val expiresAtMillis: Long,
+    val status: CollectStatus,
+)
+
+data class PspCollectAnswer(val id: String, val status: CollectStatus, val pspTxnId: String?, val txnRef: String?)
 
 /** Typed transport/API failures. `retryable` drives the backoff logic. */
 sealed class PspException(message: String, val retryable: Boolean, cause: Throwable? = null) : Exception(message, cause) {
@@ -40,4 +62,12 @@ sealed class PspException(message: String, val retryable: Boolean, cause: Throwa
 interface PspClient {
     suspend fun initiatePayment(request: PspInitiateRequest): PspInitiateResponse
     suspend fun getPaymentStatus(txnRef: String): PspPaymentStatus
+
+    /** Looks a VPA up in the PSP directory and returns the registered payee name. */
+    suspend fun verifyVpa(vpa: String): VpaVerification
+
+    suspend fun listCollectRequests(): List<PspCollectRequest>
+
+    /** Approving creates a PSP order under `txnRef` that must then be confirmed through [getPaymentStatus]. */
+    suspend fun respondToCollect(requestId: String, approve: Boolean): PspCollectAnswer
 }

@@ -99,6 +99,7 @@ fun PayRoute(
 fun PayFieldError.message(): String = when (this) {
     PayFieldError.REQUIRED -> stringResource(R.string.error_required)
     PayFieldError.INVALID_VPA -> stringResource(R.string.error_invalid_vpa)
+    PayFieldError.VPA_NOT_FOUND -> stringResource(R.string.error_vpa_not_found)
     PayFieldError.INVALID_AMOUNT -> stringResource(R.string.error_invalid_amount)
     PayFieldError.AMOUNT_TOO_LARGE -> stringResource(R.string.error_amount_too_large, Money.formatInr(Payment.MAX_AMOUNT_PAISE))
 }
@@ -153,12 +154,22 @@ private fun PayForm(state: PayUiState, callbacks: PayCallbacks) {
         value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = !busy && !state.payeeLocked, singleLine = true,
         label = { Text(stringResource(R.string.pay_vpa)) },
         isError = state.errors.vpa != null,
-        supportingText = state.errors.vpa?.let { { Text(it.message()) } },
+        supportingText = {
+            val error = state.errors.vpa
+            when {
+                error != null -> Text(error.message())
+                state.verification is VpaVerificationState.Verifying -> Text(stringResource(R.string.pay_verifying))
+                state.verification is VpaVerificationState.Verified -> Text(stringResource(R.string.pay_verified, state.verification.payeeName), modifier = Modifier.testTag(PayFlowTestTags.PAY_VERIFIED))
+                state.verification is VpaVerificationState.NotFound -> Text(stringResource(R.string.error_vpa_not_found), color = MaterialTheme.colorScheme.error)
+                state.verification is VpaVerificationState.Unavailable -> Text(stringResource(R.string.pay_verify_unavailable), color = MaterialTheme.colorScheme.tertiary)
+                else -> Unit
+            }
+        },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_VPA),
     )
     OutlinedTextField(
-        value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.payeeLocked, singleLine = true,
+        value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.nameLocked, singleLine = true,
         label = { Text(stringResource(R.string.pay_payee_name)) },
         isError = state.errors.name != null,
         supportingText = state.errors.name?.let { { Text(it.message()) } },
