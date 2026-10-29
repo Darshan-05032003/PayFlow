@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.PayFlow" parent="android:Theme.Material.NoActionBar" />
+</resources>

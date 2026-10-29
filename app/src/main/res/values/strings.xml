@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PayFlow</string>
+    <string name="welcome">Welcome to PayFlow</string>
+</resources>
