@@ -10,5 +10,19 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **compileSdk / targetSdk 37** (latest stable platform installed), **minSdk 26**.
 - Robolectric tests pin `@Config(sdk = [35])` because Robolectric 4.17 doesn't ship an SDK 37 runtime yet.
 
+## Feature 1: model, Room, home/history
+- **Payment state model**: `CREATED → PENDING → SUCCESS | FAILED`, `SUCCESS → REFUND_PENDING → REFUNDED | SUCCESS`. `SUCCESS` is
+  deliberately not terminal (a refund can start from it); `FAILED` and `REFUNDED` are. `CREATED → SUCCESS` is illegal: a
+  payment must have been handed to the PSP/UPI app first, so a success can only ever come from a status confirmation.
+- **Compare-and-set in SQL** (`UPDATE … WHERE id = ? AND status = ?`) instead of a Kotlin mutex: it also protects against a
+  second process/WorkManager writer, and it is what makes "1,000 concurrent confirmations → exactly one success" hold.
+- **Amount bound**: 1 paisa to ₹1,00,000 (`Payment.MAX_AMOUNT_PAISE`), the NPCI per-transaction cap for most categories.
+- **Search sanitising**: control and Unicode FORMAT characters are stripped from history searches (see SECURITY_REVIEW).
+- **History spinner only on first load/retry**, not on chip changes (no flicker); `reload` counter drives it.
+- **Robolectric + ViewModels**: Compose's `waitUntil` does not drain Robolectric's main looper, so `viewModelScope`
+  continuations never ran in UI integration tests. Tests use `waitUntilWithMainLooper` / `awaitFlowValue` /
+  `runOffMain` (`testutil/RobolectricFlows.kt`) instead of changing production dispatchers.
+- **Room 2.8**: `room-runtime` only (`room-ktx` is merged into runtime since 2.7); schemas exported to `app/schemas`.
+
 ## Compromises
 _None yet._

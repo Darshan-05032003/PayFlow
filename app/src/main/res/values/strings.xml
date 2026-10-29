@@ -1,4 +1,51 @@
 <resources>
     <string name="app_name">PayFlow</string>
-    <string name="welcome">Welcome to PayFlow</string>
+    <string name="loading">Loading</string>
+    <string name="retry">Retry</string>
+    <string name="back">Back</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+
+    <!-- Home -->
+    <string name="home_empty_title">No payments yet</string>
+    <string name="home_empty_subtitle">Your UPI payments will show up here.</string>
+    <string name="home_recent">Recent</string>
+    <string name="home_view_all">View all</string>
+    <string name="home_sent">Sent (successful)</string>
+    <string name="home_summary_line">%1$d successful · %2$d pending · %3$d failed</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_search">Search payee or UPI ID</string>
+    <string name="history_empty_filter">No %1$s payments</string>
+    <string name="history_empty_search">No payments match “%1$s”</string>
+    <string name="filter_all">All</string>
+    <string name="filter_success">Success</string>
+    <string name="filter_pending">Pending</string>
+    <string name="filter_failed">Failed</string>
+    <string name="filter_refunded">Refunded</string>
+
+    <!-- Payment status -->
+    <string name="status_created">Created</string>
+    <string name="status_pending">Pending</string>
+    <string name="status_success">Success</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_refund_pending">Refund pending</string>
+    <string name="status_refunded">Refunded</string>
+    <string name="payment_to">Payment to</string>
+    <string name="payment_from">Payment from</string>
+    <string name="payment_row_description">%1$s %2$s, %3$s, %4$s</string>
+
+    <!-- Payment detail -->
+    <string name="payment_detail_title">Payment</string>
+    <string name="payment_not_found">Payment not found</string>
+    <string name="detail_payee">Payee</string>
+    <string name="detail_vpa">UPI ID</string>
+    <string name="detail_note">Note</string>
+    <string name="detail_method">Method</string>
+    <string name="detail_created">Created</string>
+    <string name="detail_txn_ref">Reference</string>
+    <string name="detail_psp_txn">PSP transaction</string>
+    <string name="detail_upi_txn">UPI transaction</string>
+    <string name="detail_refund_id">Refund</string>
+    <string name="detail_failure_reason">Reason</string>
 </resources>
