@@ -20,7 +20,7 @@ realistic **sandbox PSP** (no real money moves).
 | 4 | VPA validation (format + simulated verify returning the payee name) and collect requests (approve / decline / expire) | done |
 | 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | done |
 | 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | done |
-| 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | planned |
+| 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | done (Keystore / BiometricPrompt / Play Integrity request are device-only) |
 | 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | planned |
 
 ## Screenshots
@@ -56,6 +56,8 @@ flowchart TB
         scan["ScanRoute → ScanViewModel<br/>(camera permission)"]
         collect["CollectRoute → CollectViewModel"]
         mandates["Mandates / CreateMandate / MandateDetail routes → ViewModels"]
+        lock["AppRoot → AppLockViewModel → LockScreen (FLAG_SECURE)"]
+        security["SecurityRoute → SecurityViewModel"]
     end
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
@@ -71,8 +73,12 @@ flowchart TB
         psp["PspClient → FakePsp (sandbox) · HttpPspClient (OkHttp)"]
         upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher"]
         qr["UpiQrPayloadParser · CameraController → CameraXController<br/>BarcodeScanner → MlKitBarcodeScanner"]
+        sec["CryptoBox → KeystoreCryptoBox (AES-GCM) · EncryptedSecureStore<br/>PinManager (PBKDF2 + lockout) · AppLock · BiometricAuthenticator<br/>DeviceBindingManager · TamperDetector · IntegrityGate → PlayIntegrityChecker<br/>PaymentGuard"]
     end
-    nav --> home & history & detail & pay & scan & collect & mandates
+    lock --> sec
+    security --> sec
+    pay --> sec
+    nav --> home & history & detail & pay & scan & collect & mandates & security
     mandates --> usecases
     usecases --> mrepo -. implemented by .-> room
     collect --> usecases
@@ -122,7 +128,8 @@ git clone https://github.com/Darshan-05032003/PayFlow.git && cd PayFlow
 | Key | Required | Purpose |
 |---|---|---|
 | `sdk.dir` | yes | Android SDK path |
-| `PLAY_INTEGRITY_CLOUD_PROJECT` | no (default `0`) | Google Cloud project **number** for the Play Integrity request (feature 7). An identifier, not a secret; server-side token verification is out of scope. |
+| `PLAY_INTEGRITY_CLOUD_PROJECT` | no (default `0`) | Google Cloud project **number** for the Play Integrity request. An identifier, not a secret. The token is requested for real through `StandardIntegrityManager`; **verifying** it requires a server calling Google's `decodeIntegrityToken`, which this sandbox replaces with `FakeIntegrityVerifier` (labelled in the UI). |
+| `EXPECTED_SIGNING_SHA256` | no | SHA-256 of the signing certificate; when set, the tamper detector flags a repackaged APK (`SIGNATURE_MISMATCH` blocks payments). |
 | `PSP_BASE_URL` | no | Base URL of a PSP REST sandbox for `HttpPspClient`. When empty the app uses the in-memory `FakePsp`. |
 
 ### Real UPI apps
@@ -144,11 +151,12 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machines, rules, money, parsers, validators, backoff, use cases, ViewModels, Compose screens) | 202 |
+| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, use cases, ViewModels, Compose screens) | 249 |
 | Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 44 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 16 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 19 |
 
-Domain + data line coverage (Kover): **92.9 %** (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
+Domain + data line coverage (Kover): **87.5 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
+`PlayIntegrityChecker`, `AndroidTamperProbe`, `CameraXController` and `MlKitBarcodeScanner` are counted and untested on the JVM). (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
 untested on the JVM).
 
 No device or emulator was available during the build: camera, real UPI apps and `connectedAndroidTest` are
@@ -184,6 +192,16 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
 - Pending payments are polled with exponential backoff and full jitter (10,000 simultaneous retries spread from one 10 ms
   window to a peak of 45), `Retry-After` is honoured and capped, non-retryable errors are never retried, and a single-flight
   poller means racing callers never multiply PSP calls. A payment that never settles stays pending, never "failed".
+- **Local secrets are AES-256-GCM encrypted with an Android Keystore key** (`CryptoBox`); the PIN record and the device binding
+  never touch disk in clear, every ciphertext is bound to its key name (AAD), and any flipped bit is detected.
+- **App lock**: BiometricPrompt (strong/weak biometrics with device-credential fallback) or a 6-digit PIN hashed with
+  PBKDF2-HmacSHA256 (150k iterations, random salt, constant-time compare); 5 wrong attempts lock for 30 s, doubling to an hour,
+  checked before any hashing, immune to clock rollback and process death. Relocks after 60 s in the background.
+- **Simulated device binding**: SHA-256 device fingerprint + phone number verified by a 6-digit OTP (3 attempts, 5-minute TTL);
+  the binding breaks if the data moves to another device. OTP delivery is simulated in-app (no SMS gateway).
+- **Root / tamper detection** (su, Magisk, test-keys, Frida ports and libraries, debugger, signing-certificate mismatch) and a real
+  **Play Integrity** token request gate every payment: root, hooking or a repackaged build block it, warnings are shown otherwise.
+- **`FLAG_SECURE`** on every payment screen and the lock screen, `filterTouchesWhenObscured` app-wide (tapjacking).
 - The HTTP client maps every failure (401, 429 + `Retry-After`, 5xx, timeouts, connection drops, malformed JSON) to typed
   exceptions; a body-read timeout that escaped as a raw exception was found by the review and fixed.
 - `allowBackup=false`, data extraction rules exclude everything, no cleartext traffic, only the launcher activity is exported.
@@ -205,6 +223,8 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 - **Same idempotency key 1,000× concurrently**: 76 ms, exactly 1 payment and 1 PSP call. **Polling storm** (3,000 racing pollers
   over 734 payments against a PSP with timeouts/5xx/429): 246 ms, 3,105 status calls (single-flight), 0 stuck payments.
   **Backoff jitter**: peak retries per 10 ms window 10,000 → 45.
+- **PIN brute force**: 1,000 guesses in 332 ms total, 997 refused by the lockout before any hashing (one PBKDF2 verify ≈ 97 ms).
+  **AES-GCM**: 10,000 × 1 KB round trips in 120 ms.
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
 
 ## Project docs

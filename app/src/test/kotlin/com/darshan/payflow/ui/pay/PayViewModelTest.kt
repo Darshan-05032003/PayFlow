@@ -28,6 +28,7 @@ class PayViewModelTest {
     @get:Rule val mainRule = MainDispatcherRule(dispatcher)
     private val repo = FakePaymentRepository()
     private val launcher = FakeUpiAppLauncher()
+    private var guard: com.darshan.payflow.data.security.PaymentGuard = com.darshan.payflow.data.security.AllowAllPaymentGuard()
     private var ids = 0
 
     private fun vm(psp: FakePsp = FakePsp(fixedClock), handle: SavedStateHandle = SavedStateHandle()) = PayViewModel(
@@ -39,6 +40,7 @@ class PayViewModelTest {
             com.darshan.payflow.core.BackoffPolicy(initialDelayMillis = 1_000, maxDelayMillis = 4_000, multiplier = 2.0, jitterFactor = 0.0, maxAttempts = 3),
             kotlin.random.Random(1),
         ),
+        paymentGuard = guard,
         upiAppLauncher = launcher,
         dispatchers = TestDispatcherProvider(dispatcher),
         savedState = handle,
@@ -314,5 +316,36 @@ class PayViewModelTest {
         assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.SUCCESS)
         assertThat(vm.uiState.value.polling).isFalse()
         assertThat(psp.statusCalls).isEqualTo(4)
+    }
+
+    // --- feature 7: device checks gate the payment ---
+
+    @Test
+    fun `a blocked device cannot pay and a warning still pays`() = runTest(dispatcher) {
+        guard = object : com.darshan.payflow.data.security.PaymentGuard {
+            override suspend fun evaluate(paymentId: String, amountPaise: Long, payeeVpa: String) =
+                com.darshan.payflow.data.security.GuardDecision.Block(listOf(com.darshan.payflow.data.security.GuardReason.ROOTED))
+        }
+        val vm = vm()
+        vm.fillValidForm()
+        vm.events.test {
+            vm.submit()
+            assertThat(awaitItem()).isEqualTo(PayEvent.Blocked(listOf(com.darshan.payflow.data.security.GuardReason.ROOTED)))
+        }
+        assertThat(vm.uiState.value.phase).isEqualTo(PayPhase.Idle)
+        assertThat(repo.getById("pay-1")).isNull()
+
+        guard = object : com.darshan.payflow.data.security.PaymentGuard {
+            override suspend fun evaluate(paymentId: String, amountPaise: Long, payeeVpa: String) =
+                com.darshan.payflow.data.security.GuardDecision.Warn(listOf(com.darshan.payflow.data.security.GuardReason.DEVICE_NOT_BOUND))
+        }
+        val vm2 = vm()
+        vm2.fillValidForm()
+        vm2.events.test {
+            vm2.submit()
+            assertThat(awaitItem()).isInstanceOf(PayEvent.Warning::class.java)
+            assertThat(awaitItem()).isInstanceOf(PayEvent.LaunchUpiApp::class.java)
+        }
+        assertThat(repo.getById("pay-1")).isNotNull()
     }
 }

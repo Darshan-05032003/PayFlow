@@ -180,3 +180,44 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: spent-key handling; single-flight poller closes the feature 2 load finding (status-call storm per confirm).
 - Scope for improvement: WorkManager-based reconciliation; persist poll attempt counts across process death; server-side
   idempotency TTL documented in the PSP contract.
+
+## Feature: Security (Keystore AES-GCM, biometric/PIN lock, device binding, root/tamper, Play Integrity, FLAG_SECURE)
+- Attacks tried:
+  - **Ciphertext tampering**: every flipped bit in `iv || ct || tag` → `AEADBadTagException`; AAD mismatch (moving a value to another
+    key) → rejected; foreign key → rejected; empty / 1 MB payloads (`AesGcmCipherTest`, `SecureStoreTest`).
+  - **Secrets at rest**: the PIN record and the device binding (phone number) never appear in clear in the store; a tampered or
+    foreign ciphertext reads as *missing*, never as a different value (`SecureStoreTest`, `PinManagerTest`, `DeviceBindingTest`).
+  - **PIN brute force**: 1,000 attempts → 5 hashed attempts, 995+ refused *before* PBKDF2 (locked-out path is ~free); lockout grows
+    30 s → 60 s → … → 1 h cap; the correct PIN is refused while locked; clock moved back cannot shorten a lockout; lockout state
+    survives process death (`PinManagerTest`, `SecurityStressTest.bruteForceHitsLockoutAndStopsHashing`).
+  - **Weak PINs**: 111111, 123456, 654321, 121212, non-ASCII digits rejected. Constant-time compare (`MessageDigest.isEqual`).
+  - **OTP guessing**: 3 attempts then the code is burned, 5-minute TTL from the injected clock, codes from `SecureRandom`
+    (`DeviceBindingTest`); the binding breaks when the device fingerprint changes (cloned data / restored backup).
+  - **Root / hooking / repackaging**: su paths, Magisk paths, `test-keys`, Frida default ports parsed field-by-field from
+    `/proc/net/tcp(6)` (hex `69A2`/`69A3` in LISTEN state, not a substring match), Frida libraries in `/proc/self/maps`, attached
+    debugger, debuggable flag, signing-certificate SHA-256 mismatch; probe failures never crash the scan (`TamperChecksTest`).
+    Payments are blocked on root / Frida / signature mismatch, warned on debugger (`PayViewModelTest.a blocked device cannot pay`).
+  - **Play Integrity**: the request hash binds the token to `paymentId|amount|payee`; a FAILED verdict blocks, UNEVALUATED or a
+    Play-services error warns (never blocks: availability is not a user fault), unconfigured project → skipped (`IntegrityGateTest`).
+  - **Screenshots / overlays**: `FLAG_SECURE` on lock, pay, scan, collect, mandate and security screens (reference-counted, cleared
+    on dispose), `filterTouchesWhenObscured` on the decor view app-wide (`LockScreenTest.lockScreenIsSecureAndFiltersObscuredTouches`).
+  - **Lock bypass**: the lock screen covers the whole NavHost; relock after > 60 s in background; biometric failure falls back to PIN;
+    digits never leave the ViewModel (`AppLockViewModelTest`).
+- What broke:
+  - **Medium (fixed)**: a burned OTP (3 wrong codes) was deleted, so the next attempt said "nothing pending" instead of "expired"
+    and the UI could have offered verification against nothing. The record is now kept with zero attempts and answered `Expired`.
+  - **Medium (accepted, documented)**: Play Integrity tokens are *verified by a fake* (`FakeIntegrityVerifier`): a client can't verify
+    its own token; real verification needs a server calling Google's `decodeIntegrityToken`. The UI labels the verdict as sandbox.
+  - **Medium (accepted, documented)**: SMS OTP delivery is simulated (`FakeOtpSender` shows the code in-app). The flow (TTL, attempts,
+    masking, encrypted record, fingerprint check) is real; the transport is not.
+  - **Low (accepted)**: `BuildConfig` values (`PLAY_INTEGRITY_CLOUD_PROJECT`, `EXPECTED_SIGNING_SHA256`) are extractable from the APK;
+    neither is a secret (a project *number* and a public certificate hash). No API keys live in the APK.
+  - **Low (open)**: root detection is heuristic and bypassable by a determined attacker (Magisk DenyList, Frida on a non-default
+    port); Play Integrity (server-verified) is the real control. Room columns stay plaintext (sandbox; `allowBackup=false`); SQLCipher
+    or field-level encryption with `CryptoBox` is the next step.
+  - **Low (open)**: Keystore key invalidation on new biometric enrollment is not used because the key protects data, not the
+    unlock (the unlock is BiometricPrompt + PIN). A per-unlock key with `setUserAuthenticationRequired(true)` would bind decryption
+    to a fresh biometric.
+- Fixed now: burned-OTP semantics; API-28 guard on signing-info lookup; locale-independent OTP formatting.
+- Scope for improvement: SQLCipher / column encryption; WorkManager relock; biometric-bound Keystore key; server-side integrity
+  verification; gate collect approvals and mandate revokes behind a fresh unlock.

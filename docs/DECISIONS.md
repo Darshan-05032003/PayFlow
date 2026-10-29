@@ -97,5 +97,26 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
   virtual time, and sufficient for a sandbox; WorkManager noted as scope for improvement.
 - **Exhausted polling = still PENDING**: honesty over closure; the UI says "check again".
 
+## Feature 7: security
+- **One cipher, two key sources.** `AesGcmCipher` (AES-256-GCM, 96-bit random IV, 128-bit tag, AAD) is the only crypto code; the
+  production key comes from the Android Keystore (`KeystoreCryptoBox`), tests use an in-memory key (`InMemoryCryptoBox`). Robolectric
+  has no `AndroidKeyStore`, so the Keystore class is device-only and the cipher is what gets tested.
+- **AAD = key name** in `EncryptedSecureStore`, so a ciphertext cannot be copied from one preference to another.
+- **PBKDF2-HmacSHA256, 150k iterations, 16-byte salt**, stored with the record so the cost can be tuned later. Lockout: 5 attempts,
+  30 s doubling to a 1 h cap, absolute `lockoutUntil` (clock moved back cannot shorten it), checked before hashing.
+- **Lock is optional in the sandbox** (banner on Home until a PIN is set) so the app stays usable for reviewers; once set, the lock
+  screen covers the NavHost and relocks after 60 s in the background. `MainActivity` is a `FragmentActivity` (BiometricPrompt).
+- **No ticker in the lock ViewModel**: the screen asks for a recount once a second while locked out; the ViewModel stays
+  virtual-time friendly.
+- **Device binding is simulated at the transport only**: OTP generation, TTL, attempt limit, masking, encrypted record and the
+  fingerprint comparison are real; `FakeOtpSender` shows the code in-app because there is no SMS gateway.
+- **Play Integrity**: the token request is real (`StandardIntegrityManager`, cloud project number from `local.properties`);
+  verification is `FakeIntegrityVerifier` because decoding needs server credentials. Request hash = SHA-256(paymentId|amount|payee).
+- **Tamper checks are pure** over a `TamperProbe`; `/proc/net/tcp` is parsed by field (local port hex + LISTEN state) to avoid false
+  positives; a check that cannot run is not a finding. Root/Frida/signature mismatch block payments, debugger only warns.
+- **Hilt test module** (`FakeSecurityModule`, `@TestInstallIn`) swaps Keystore/Biometric/Integrity for fakes in Robolectric Hilt tests.
+- `EXPECTED_SIGNING_SHA256` is optional in `local.properties`; without it the signature check is skipped (debug builds differ per machine).
+
 ## Compromises
-_None yet._
+- Play Integrity token **verification** is a fake (no server). SMS OTP **delivery** is simulated (no gateway). Both are labelled in
+  the UI and README; the surrounding logic is real and tested.

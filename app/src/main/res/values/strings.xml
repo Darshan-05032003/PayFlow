@@ -172,4 +172,72 @@
     <string name="mandate_msg_illegal">That action is not possible in the current state</string>
     <string name="mandate_msg_executed">Debit completed</string>
     <string name="mandate_msg_rejected">Debit rejected by the mandate rules</string>
+
+    <!-- App lock -->
+    <string name="lock_title">PayFlow is locked</string>
+    <string name="lock_enter_pin">Enter your 6-digit PIN</string>
+    <string name="lock_wrong_pin">Wrong PIN. %1$d attempts left</string>
+    <string name="lock_locked_out">Too many attempts. Try again in %1$d s</string>
+    <string name="lock_use_biometric">Use fingerprint or face</string>
+    <string name="lock_digits_entered">%1$d of %2$d digits entered</string>
+    <string name="lock_setup_enter">Choose a 6-digit PIN</string>
+    <string name="lock_setup_confirm">Confirm your PIN</string>
+    <string name="lock_setup_hint">You will need it every time you open PayFlow.</string>
+    <string name="lock_setup_later">Not now</string>
+    <string name="lock_rule_ok">OK</string>
+    <string name="lock_rule_length">The PIN must be exactly 6 digits</string>
+    <string name="lock_rule_digits">Use digits 0–9 only</string>
+    <string name="lock_rule_simple">That PIN is too easy to guess</string>
+    <string name="lock_rule_mismatch">The PINs did not match. Start again.</string>
+    <string name="home_lock_banner">Your payments are not protected by an app lock yet.</string>
+    <string name="home_lock_setup">Set up</string>
+
+    <!-- Pay guard -->
+    <string name="pay_blocked">Payment blocked: this device failed the security checks (root, hooking tools or a modified app).</string>
+    <string name="pay_guard_warning">Security warning: device not fully verified. Proceeding in sandbox mode.</string>
+
+    <!-- Security screen -->
+    <string name="security_title">Security</string>
+    <string name="security_pin_title">App lock</string>
+    <string name="security_pin_on">PIN and biometric lock are on.</string>
+    <string name="security_pin_off">No app lock set.</string>
+    <string name="security_pin_setup">Set up PIN</string>
+    <string name="security_pin_remove">Remove PIN</string>
+    <string name="security_binding_title">Device binding</string>
+    <string name="security_unbound">Link this device to your phone number (sandbox: the OTP is shown here instead of an SMS).</string>
+    <string name="security_phone">Mobile number</string>
+    <string name="security_phone_invalid">Enter a valid Indian mobile number</string>
+    <string name="security_send_otp">Send OTP</string>
+    <string name="security_otp_sent">OTP sent to %1$s</string>
+    <string name="security_sandbox_otp">Sandbox OTP: %1$s</string>
+    <string name="security_otp">6-digit OTP</string>
+    <string name="security_otp_wrong">Wrong code</string>
+    <string name="security_otp_expired">Code expired. Request a new one.</string>
+    <string name="security_verify">Verify</string>
+    <string name="security_resend">Resend</string>
+    <string name="security_bound">This device is bound to %1$s.</string>
+    <string name="security_unbind">Unbind</string>
+    <string name="security_binding_mismatch">Your data was bound to a different device (%1$s). Re-verify to continue.</string>
+    <string name="security_rebind">Re-verify</string>
+    <string name="security_tamper_title">Device integrity</string>
+    <string name="security_tamper_clean">No root, hooking or tampering detected.</string>
+    <string name="security_tamper_blocked">Payments are blocked on this device.</string>
+    <string name="security_rescan">Scan again</string>
+    <string name="tamper_su">Root access (su binary) found</string>
+    <string name="tamper_magisk">Magisk detected</string>
+    <string name="tamper_test_keys">Build signed with test keys</string>
+    <string name="tamper_frida">Frida / hooking framework detected</string>
+    <string name="tamper_debugger">A debugger is attached</string>
+    <string name="tamper_debuggable">Debuggable build</string>
+    <string name="tamper_signature">App signature does not match (repackaged)</string>
+    <string name="tamper_signature_unreadable">Could not read the app signature</string>
+    <string name="security_integrity_title">Play Integrity</string>
+    <string name="security_integrity_not_checked">Not checked yet.</string>
+    <string name="security_integrity_not_configured">Not configured: add PLAY_INTEGRITY_CLOUD_PROJECT to local.properties.</string>
+    <string name="security_integrity_error">Request failed: %1$s</string>
+    <string name="security_integrity_ok">Device meets integrity requirements.</string>
+    <string name="security_integrity_failed">Device failed the integrity check.</string>
+    <string name="security_integrity_unevaluated">Integrity could not be evaluated.</string>
+    <string name="security_integrity_sandbox">(verified by the sandbox verifier; real verification needs a server)</string>
+    <string name="security_integrity_check">Request token</string>
 </resources>

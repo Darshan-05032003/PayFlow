@@ -113,7 +113,7 @@ class QrToPayFlowIntegrationTest {
 
         // Navigation would create the Pay screen with these args in its SavedStateHandle:
         val payVm = PayViewModel(
-            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), pollerFor(repo, psp), FakeUpiAppLauncher(),
+            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), pollerFor(repo, psp), com.darshan.payflow.data.security.AllowAllPaymentGuard(), FakeUpiAppLauncher(),
             DefaultDispatcherProvider(), dest.toSavedStateHandle(),
         )
         payVmHolder.value = payVm

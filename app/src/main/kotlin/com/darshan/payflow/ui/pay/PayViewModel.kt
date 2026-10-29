@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.core.Money
+import com.darshan.payflow.data.security.GuardDecision
+import com.darshan.payflow.data.security.GuardReason
+import com.darshan.payflow.data.security.PaymentGuard
 import com.darshan.payflow.data.upi.TxnRefGenerator
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.data.upi.UpiLinkBuilder
@@ -86,6 +89,9 @@ data class PayUiState(
 sealed interface PayEvent {
     data class LaunchUpiApp(val upiUri: String) : PayEvent
     data object NoUpiApp : PayEvent
+    /** Device checks (root / hooking / tampered build / integrity) refused the payment. */
+    data class Blocked(val reasons: List<GuardReason>) : PayEvent
+    data class Warning(val reasons: List<GuardReason>) : PayEvent
 }
 
 @HiltViewModel
@@ -94,6 +100,7 @@ class PayViewModel @Inject constructor(
     private val confirmPayment: ConfirmPaymentUseCase,
     private val verifyVpa: VerifyVpaUseCase,
     private val pollPaymentStatus: PollPaymentStatusUseCase,
+    private val paymentGuard: PaymentGuard,
     private val upiAppLauncher: UpiAppLauncher,
     private val dispatchers: DispatcherProvider,
     private val savedState: SavedStateHandle,
@@ -215,6 +222,16 @@ class PayViewModel @Inject constructor(
             // One idempotency key per attempt, persisted *before* anything is sent: a retry or a relaunch after process death
             // reuses it and can never create a second payment.
             val idempotencyKey = savedState.get<String>(KEY_IDEMPOTENCY) ?: UUID.randomUUID().toString().also { savedState[KEY_IDEMPOTENCY] = it }
+            // Device checks before any money moves: a rooted / hooked / tampered device cannot pay; warnings are shown, not fatal.
+            when (val guard = withContext(dispatchers.io) { paymentGuard.evaluate(idempotencyKey, request.amountPaise, request.payeeVpa) }) {
+                is GuardDecision.Block -> {
+                    _uiState.update { it.copy(phase = PayPhase.Idle) }
+                    _events.tryEmit(PayEvent.Blocked(guard.reasons))
+                    return@launch
+                }
+                is GuardDecision.Warn -> _events.tryEmit(PayEvent.Warning(guard.reasons))
+                GuardDecision.Allow -> Unit
+            }
             val result = withContext(dispatchers.io) { payViaUpiIntent(request, method, idempotencyKey) }
             result.onSuccess { launch ->
                 savedState[KEY_IN_FLIGHT] = launch.paymentId

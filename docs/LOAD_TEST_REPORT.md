@@ -133,3 +133,20 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
   the PSP sees the whole herd again → more 429s → repeat. With full jitter the same herd spreads over the whole backoff window.
 - Fix applied / recommendation: full jitter by default (`BackoffPolicy.DEFAULT`), `Retry-After` honoured and capped,
   single-flight polling. Recommendation: cap concurrent reconciliation (batch of 200) — already applied in `pendingOlderThan`.
+
+## Feature: Security
+- Scenario and scale:
+  - `SecurityStressTest.bruteForceHitsLockoutAndStopsHashing`: 1,000 sequential PIN guesses against production PBKDF2 parameters.
+  - `tenThousandAesGcmRoundTrips`: 10,000 concurrent 1 KB encrypt+decrypt operations.
+  - `hundredConcurrentPinVerificationsAreConsistent`: 100 racing verifications (half right, half wrong) with 10k iterations.
+- Results (numbers):
+  - One PBKDF2-HmacSHA256 verification at **150,000 iterations: ~97 ms** on the build laptop (slower on phones: deliberate).
+    1,000 guesses finished in **332 ms** total: 4 hashed attempts, **997 refused by the lockout without hashing**.
+  - 10,000 AES-GCM round trips of 1 KB: **120 ms** (**0.012 ms per operation**).
+  - 100 concurrent verifications: 50 ok / 50 wrong, consistent counters (mutex-serialised).
+- What broke: nothing. The brute-force test confirms the lockout short-circuits before any CPU-heavy work, so an attacker
+  cannot use the PIN check as a DoS vector either.
+- Failure flow (step by step): attacker scripts PIN entry → 5 attempts cost ~0.5 s of hashing → lockout 30 s → each further
+  attempt costs a store read and is refused → with doubling lockouts the 6-digit space (1,000,000) would take years.
+- Fix applied / recommendation: keep 150k iterations (OWASP ≥ 100k); on low-end devices consider measuring and tuning the
+  iteration count at setup time (store it in the record, as already done).

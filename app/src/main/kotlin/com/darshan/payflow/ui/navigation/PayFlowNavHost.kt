@@ -1,6 +1,15 @@
 package com.darshan.payflow.ui.navigation
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.darshan.payflow.ui.lock.AppLockViewModel
+import com.darshan.payflow.ui.lock.LockCallbacks
+import com.darshan.payflow.ui.lock.LockScreen
+import com.darshan.payflow.ui.lock.LockUiState
+import com.darshan.payflow.ui.security.SecurityRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,6 +45,7 @@ data class PayDestination(
 )
 @Serializable object ScanDestination
 @Serializable object CollectDestination
+@Serializable object SecurityDestination
 @Serializable object MandatesDestination
 @Serializable object CreateMandateDestination
 @Serializable data class MandateDetailDestination(val id: String)
@@ -44,11 +54,39 @@ fun UpiQrPayload.toPayDestination() = PayDestination(
     vpa = payeeVpa, name = payeeName, amountPaise = amountPaise ?: 0, note = note.takeIf { it.isNotBlank() }, source = PayViewModel.SOURCE_QR,
 )
 
+/** Root of the UI: the lock screen covers everything while the app is locked or a PIN is being set up. */
+@Composable
+fun AppRoot(
+    upiAppLauncher: UpiAppLauncher,
+    cameraController: CameraController,
+    cameraPermission: CameraPermission,
+    lockViewModel: AppLockViewModel = hiltViewModel(),
+) {
+    val lockState by lockViewModel.uiState.collectAsStateWithLifecycle()
+    lockViewModel.host = LocalActivity.current
+    when (lockState) {
+        is LockUiState.Unlocked -> PayFlowNavHost(
+            upiAppLauncher, cameraController, cameraPermission,
+            pinConfigured = (lockState as LockUiState.Unlocked).pinConfigured,
+            onSetupPin = lockViewModel::startSetup,
+        )
+        else -> LockScreen(
+            lockState,
+            LockCallbacks(
+                onDigit = lockViewModel::onPinDigit, onBackspace = lockViewModel::onPinBackspace, onBiometric = lockViewModel::onBiometricRequested,
+                onTick = lockViewModel::onTick, onSetupPin = lockViewModel::onSetupPin, onCancelSetup = lockViewModel::cancelSetup,
+            ),
+        )
+    }
+}
+
 @Composable
 fun PayFlowNavHost(
     upiAppLauncher: UpiAppLauncher,
     cameraController: CameraController,
     cameraPermission: CameraPermission,
+    pinConfigured: Boolean = true,
+    onSetupPin: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
 ) {
     NavHost(navController = navController, startDestination = HomeDestination) {
@@ -61,7 +99,10 @@ fun PayFlowNavHost(
                     onScan = { navController.navigate(ScanDestination) },
                     onCollect = { navController.navigate(CollectDestination) },
                     onMandates = { navController.navigate(MandatesDestination) },
+                    onSecurity = { navController.navigate(SecurityDestination) },
+                    onSetupPin = onSetupPin,
                 ),
+                pinConfigured = pinConfigured,
             )
         }
         composable<HistoryDestination> {
@@ -76,6 +117,9 @@ fun PayFlowNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) },
             )
+        }
+        composable<SecurityDestination> {
+            SecurityRoute(onBack = { navController.popBackStack() }, onSetupPin = onSetupPin)
         }
         composable<MandatesDestination> {
             MandatesRoute(

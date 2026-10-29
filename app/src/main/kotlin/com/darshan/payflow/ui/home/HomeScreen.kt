@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
@@ -50,23 +52,28 @@ data class HomeCallbacks(
     val onScan: () -> Unit = {},
     val onCollect: () -> Unit = {},
     val onMandates: () -> Unit = {},
+    val onSecurity: () -> Unit = {},
+    val onSetupPin: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
 @Composable
-fun HomeRoute(callbacks: HomeCallbacks, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(callbacks: HomeCallbacks, pinConfigured: Boolean = true, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    HomeScreen(state = state, callbacks = callbacks.copy(onRetry = viewModel::retry))
+    HomeScreen(state = state, callbacks = callbacks.copy(onRetry = viewModel::retry), pinConfigured = pinConfigured)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks) {
+fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Boolean = true) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = callbacks.onSecurity, modifier = Modifier.testTag(PayFlowTestTags.HOME_SECURITY)) {
+                        Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.security_title))
+                    }
                     IconButton(onClick = callbacks.onMandates, modifier = Modifier.testTag(PayFlowTestTags.HOME_MANDATES)) {
                         Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.mandates_title))
                     }
@@ -91,6 +98,27 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks) {
             )
         },
     ) { padding ->
+        Column(Modifier.padding(padding)) {
+            if (!pinConfigured) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag(PayFlowTestTags.HOME_LOCK_BANNER),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.home_lock_banner), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = callbacks.onSetupPin) { Text(stringResource(R.string.home_lock_setup)) }
+                    }
+                }
+            }
+            HomeBody(state, callbacks)
+        }
+    }
+}
+
+@Composable
+private fun HomeBody(state: HomeUiState, callbacks: HomeCallbacks) {
+    val padding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+    run {
         when (state) {
             HomeUiState.Loading -> LoadingView(Modifier.padding(padding))
             HomeUiState.Empty -> EmptyView(

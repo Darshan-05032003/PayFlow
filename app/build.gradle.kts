@@ -20,6 +20,8 @@ fun localProperty(name: String): String? =
     (localProperties.getProperty(name) ?: System.getenv(name))?.trim()?.trim('"', '\'')?.takeIf { it.isNotEmpty() }
 val playIntegrityCloudProject: Long = localProperty("PLAY_INTEGRITY_CLOUD_PROJECT")?.toLongOrNull() ?: 0L
 val pspBaseUrl: String = localProperty("PSP_BASE_URL") ?: ""
+// Optional: SHA-256 of the release signing certificate; when set, the tamper detector flags a repackaged APK.
+val expectedSigningSha256: String = localProperty("EXPECTED_SIGNING_SHA256") ?: ""
 
 android {
     namespace = "com.darshan.payflow"
@@ -34,6 +36,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("long", "PLAY_INTEGRITY_CLOUD_PROJECT", "${playIntegrityCloudProject}L")
         buildConfigField("String", "PSP_BASE_URL", "\"$pspBaseUrl\"")
+        buildConfigField("String", "EXPECTED_SIGNING_SHA256", "\"$expectedSigningSha256\"")
     }
 
     buildTypes {
@@ -89,6 +92,8 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.androidx.biometric)
+    implementation(libs.play.integrity)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)

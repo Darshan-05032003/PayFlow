@@ -43,6 +43,7 @@ import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.components.EmptyView
 import com.darshan.payflow.ui.components.ErrorView
 import com.darshan.payflow.ui.components.LoadingView
+import com.darshan.payflow.ui.components.SecureWindow
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -105,6 +106,7 @@ fun CollectStatus.label(): String = stringResource(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectScreen(state: CollectUiState, callbacks: CollectCallbacks, snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }) {
+    SecureWindow()
     Scaffold(
         topBar = {
             TopAppBar(

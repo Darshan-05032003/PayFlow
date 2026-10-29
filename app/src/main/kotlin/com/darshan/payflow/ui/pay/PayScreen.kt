@@ -44,6 +44,7 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.components.LoadingView
+import com.darshan.payflow.ui.components.SecureWindow
 
 data class PayCallbacks(
     val onBack: () -> Unit = {},
@@ -70,11 +71,15 @@ fun PayRoute(
     val activityLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         viewModel.onUpiAppResult(upiAppLauncher.parseActivityResult(result.resultCode, result.data))
     }
+    val blocked = stringResource(R.string.pay_blocked)
+    val warning = stringResource(R.string.pay_guard_warning)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is PayEvent.LaunchUpiApp -> activityLauncher.launch(upiAppLauncher.chooserIntent(event.upiUri))
                 PayEvent.NoUpiApp -> snackbar.showSnackbar(noUpiApp)
+                is PayEvent.Blocked -> snackbar.showSnackbar(blocked)
+                is PayEvent.Warning -> snackbar.showSnackbar(warning)
             }
         }
     }
@@ -107,6 +112,7 @@ fun PayFieldError.message(): String = when (this) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PayScreen(state: PayUiState, callbacks: PayCallbacks, snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }) {
+    SecureWindow()
     Scaffold(
         topBar = {
             TopAppBar(

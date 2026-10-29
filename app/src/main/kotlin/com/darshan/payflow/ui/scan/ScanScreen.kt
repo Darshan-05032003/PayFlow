@@ -56,6 +56,7 @@ import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.components.EmptyView
 import com.darshan.payflow.ui.components.ErrorView
 import com.darshan.payflow.ui.components.LoadingView
+import com.darshan.payflow.ui.components.SecureWindow
 
 data class ScanCallbacks(
     val onBack: () -> Unit = {},
@@ -126,6 +127,7 @@ fun QrError.message(): String = stringResource(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanScreen(state: ScanUiState, callbacks: ScanCallbacks, cameraController: CameraController) {
+    SecureWindow()
     Scaffold(
         topBar = {
             TopAppBar(

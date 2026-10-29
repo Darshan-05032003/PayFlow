@@ -57,6 +57,7 @@ import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.components.EmptyView
 import com.darshan.payflow.ui.components.ErrorView
 import com.darshan.payflow.ui.components.LoadingView
+import com.darshan.payflow.ui.components.SecureWindow
 import com.darshan.payflow.ui.components.PaymentRow
 import com.darshan.payflow.ui.pay.message
 
@@ -208,6 +209,7 @@ fun CreateMandateRoute(onBack: () -> Unit, onCreated: (String) -> Unit, viewMode
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateMandateScreen(state: CreateMandateUiState, callbacks: CreateMandateCallbacks, snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }) {
+    SecureWindow()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -310,6 +312,7 @@ private data class DetailTexts(val updated: String, val illegal: String, val una
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MandateDetailScreen(state: MandateDetailUiState, callbacks: MandateDetailCallbacks, snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }) {
+    SecureWindow()
     Scaffold(
         topBar = {
             TopAppBar(

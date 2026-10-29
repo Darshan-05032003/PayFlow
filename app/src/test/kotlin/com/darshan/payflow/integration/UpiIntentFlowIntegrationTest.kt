@@ -70,7 +70,7 @@ class UpiIntentFlowIntegrationTest {
 
     private fun start(psp: FakePsp): PayViewModel {
         val vm = PayViewModel(
-            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), pollerFor(repo, psp),
+            PayViaUpiIntentUseCase(repo, psp, fixedClock), ConfirmPaymentUseCase(repo, psp, fixedClock), VerifyVpaUseCase(psp), pollerFor(repo, psp), com.darshan.payflow.data.security.AllowAllPaymentGuard(),
             launcher, DefaultDispatcherProvider(), SavedStateHandle(),
         )
         vm.events.onEach { events += it }.launchIn(CoroutineScope(Dispatchers.Unconfined))
