@@ -182,3 +182,14 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
 - Failure flow (step by step): user pays in GPay → returns → PayFlow records the response (one CAS) → a stale second delivery or a
   tap on "I paid" after the fact hits a settled row → refused, status unchanged.
 - Fix applied / recommendation: none needed. On a device the cost is dominated by the app switch, not by PayFlow.
+
+## Feature: Scan a UPI QR from a gallery image
+- Scenario and scale: `GalleryQrStressTest.thousandGalleryDecodes`: 1,000 generated images through the zxing fallback decoder and the
+  result mapping: 400 valid UPI QRs at 2–5 px per module, 200 URL QRs, 200 hostile `javascript:` UPI QRs with up to 800 chars of `tn`,
+  200 random-noise images (320 × 320).
+- Results (numbers): **1,351 ms** total (**1.35 ms per image**), `Found=400, NotUpi=400, NoQrFound=200`, 0 `Unreadable`, 0 exceptions;
+  heap peak **+33 MB** over the run.
+- What broke: nothing. On a device ML Kit runs first and zxing only when ML Kit finds nothing.
+- Failure flow (step by step): user picks a 50 MP photo → bounds read (no pixels) → decoded at 1/4 scale (≈ 2,040 × 1,530, ~12 MB ARGB)
+  → ML Kit → (zxing) → result; peak memory is bounded by the 2,048 px cap, not by the photo.
+- Fix applied / recommendation: keep the cap; the decode runs on the IO dispatcher so the UI shows a progress state, not jank.

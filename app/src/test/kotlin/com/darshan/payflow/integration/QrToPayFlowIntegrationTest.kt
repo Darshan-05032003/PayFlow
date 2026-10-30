@@ -78,7 +78,7 @@ class QrToPayFlowIntegrationTest {
 
     @Test
     fun scannedQrFlowsIntoAPrefilledPaymentThatIsConfirmedAndStoredAsQrScan() {
-        val scanVm = ScanViewModel(SavedStateHandle())
+        val scanVm = ScanViewModel(com.darshan.payflow.ui.scan.ScanViewModelTest.FakeImageQrDecoder(), DefaultDispatcherProvider(), SavedStateHandle())
         val events = Collections.synchronizedList(mutableListOf<ScanEvent>())
         scanVm.events.onEach { events += it }.launchIn(CoroutineScope(Dispatchers.Unconfined))
         var destination: PayDestination? = null

@@ -293,3 +293,27 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: mode-aware verification; duplicate accessibility label.
 - Scope for improvement: ask the user to re-authenticate (biometric) before switching to UPI-apps mode; a real PSP/backend would
   replace manual marking; show the UPI app's `txnId` on the History row for support.
+
+## Feature: Scan a UPI QR from a gallery image (Photo Picker)
+- Attacks tried:
+  - **Hostile QR contents in an image**: non-UPI QRs (URL, Wi-Fi), `upi://mandate`, `javascript:` / bidi / homoglyph VPAs, negative
+    amounts, `cu=USD`, a 1.5 KB payload with `url=http://evil…` → every one goes through the same `UpiQrPayloadParser` as a camera scan;
+    non-payable codes become "This image has a QR code, but it isn't a UPI payment QR", free text is capped, `url=` is ignored
+    (`ImageQrDecodingTest`, `GalleryQrStressTest`).
+  - **Several QRs in one screenshot**: all are decoded; only valid UPI ones count; the first in reading order (left→right, top→bottom)
+    is used, a non-UPI code next to it can never be picked (`two qrs in one image…`).
+  - **Corrupt / missing / non-image files, non-content URIs**: `Unreadable`, never a crash (`AndroidImageQrDecoderTest`, real
+    `BitmapFactory` in Robolectric native graphics mode). Only `content:` and `file:` URIs are opened.
+  - **Decompression bomb / 50 MP photo**: bounds are read first and the bitmap is decoded with `inSampleSize` so its longest side is at
+    most 2,048 px before any decoder sees it (`ImageSampling.sampleSize`, tested down to a 100,000 × 100,000 header → 1/64).
+  - **Frame/pick races**: while an image decodes, camera frames and a second pick are ignored, so a stale camera frame cannot replace the
+    gallery result (`ScanViewModelTest`).
+  - **Privacy**: no storage permission (Photo Picker grants one image); the image is read through the content resolver only, never
+    copied into app storage, and neither the URI nor the payload is logged or persisted (the URI is not put in `SavedStateHandle`;
+    only the decoded payload is, exactly as for a camera scan).
+- What broke: nothing in the decoder. **Low (fixed during build)**: the first draft let a rotation's permission re-check overwrite an
+  image error / a gallery result found without camera permission; `onPermissionResult` now keeps decode and error states and restores a
+  found payload regardless of the camera grant.
+- Fixed now: rotation/permission interplay above.
+- Scope for improvement: show a thumbnail of the picked image next to the result; run ML Kit on a cropped region when a screenshot has
+  many codes.

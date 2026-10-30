@@ -52,6 +52,8 @@ object PayFlowTestTags {
     fun collectDecline(id: String) = "payflow:collect:decline:$id"
     const val SCAN_PREVIEW = "payflow:scan:preview"
     const val SCAN_PAY = "payflow:scan:pay"
+    const val SCAN_GALLERY = "payflow:scan:gallery"
+    const val SCAN_TRY_ANOTHER = "payflow:scan:tryAnother"
     fun filterChip(filter: HistoryFilter) = "payflow:history:chip:${filter.name}"
     fun paymentRow(id: String) = "payflow:payment:$id"
     const val SANDBOX_BADGE = "payflow:sandboxBadge"

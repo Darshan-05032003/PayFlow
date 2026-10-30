@@ -171,3 +171,14 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
   mode only changes how a `Pay` / QR / link payment is executed. The Sandbox badge appears in top bars whenever sandbox is active.
 - **No bottom navigation.** The dashboard grid (two rows of four) plus the Pay FAB already makes every screen one tap away; a bottom
   bar would have duplicated Home / Scan / History and cost vertical space on the Pay form.
+
+## Scan from a gallery image
+- **Photo Picker, no permission.** `ActivityResultContracts.PickVisualMedia(ImageOnly)`; no `READ_MEDIA_IMAGES` / storage permission.
+  The action is on the camera overlay *and* on both camera-permission states, so a user who refuses the camera can pay from a screenshot.
+- **Decoder behind an interface** (`ImageQrDecoder.decode(uri) → ImageQrResult`: Found / MultipleFound / NotUpi / NoQrFound /
+  Unreadable). `AndroidImageQrDecoder` loads the image downsampled (longest side ≤ 2,048 px, EXIF rotation applied) and hands that
+  bitmap to ML Kit via `InputImage.fromBitmap`, not `fromFilePath`, because `fromFilePath` decodes at full size (a 50 MP photo could OOM);
+  zxing-core (`QRCodeMultiReader`, then `MultiFormatReader` with `TRY_HARDER`) is the fallback when ML Kit finds nothing.
+- **Same path as a camera scan.** Decoded texts go through `UpiQrPayloadParser`; the payload is saved in `SavedStateHandle` like a scan
+  and navigates with `source = "qr"` (method `QR_SCAN`, payee and amount locked). The URI itself is never persisted.
+

@@ -71,4 +71,7 @@ abstract class CameraModule {
 
     @Binds
     abstract fun cameraPermission(impl: AndroidCameraPermission): CameraPermission
+
+    @Binds
+    abstract fun imageQrDecoder(impl: com.darshan.payflow.data.qr.AndroidImageQrDecoder): com.darshan.payflow.data.qr.ImageQrDecoder
 }

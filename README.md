@@ -17,7 +17,7 @@ Pay through the UPI apps installed on the phone (GPay, PhonePe, Paytm, BHIM) or 
 |---|---|---|
 | 1 | Home, transaction history (Room), payment state model (created → pending → success / failed → refund) | done |
 | 2 | UPI intent flow: `upi://pay` deep links, app chooser, response parsing, **PSP status confirmation** before success | done |
-| 3 | QR scan-to-pay with CameraX + ML Kit, safe payload validation, camera permission handling | done (camera path compile-only: no device) |
+| 3 | QR scan-to-pay with CameraX + ML Kit, **or from a gallery image** (Photo Picker, no storage permission; ML Kit + zxing fallback, downsampled), safe payload validation, camera permission handling | done |
 | 4 | VPA validation (format + simulated verify returning the payee name) and collect requests (approve / decline / expire) | done |
 | 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | done |
 | 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | done |
@@ -227,6 +227,8 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
   deliveries / manual marks settle a payment exactly once.
 - **Incoming `upi://` links** go through the same bounded parser as scanned QRs (10,000 hostile links, 0 exceptions, only
   well-formed `upi://pay` reaches the Pay screen with payee and amount locked); the link is consumed once and only while unlocked.
+- **QR from a gallery image**: Photo Picker (no storage permission), image read via the content resolver only (never copied or logged),
+  decoded downsampled (≤ 2,048 px) so a 50 MP photo cannot exhaust memory, then the same parser and locked Pay screen as a camera scan.
 - **Receive QR**: the profile is AES-GCM encrypted at rest; name and VPA are percent-encoded so nothing can inject a parameter.
 - **Payment mode** can only be changed on the Security screen (behind the app lock) and UPI-apps mode needs an installed handler.
 - A PSP outage after the app was opened is "unresolved" (payment stays pending; "do not pay again"), never "failed".
@@ -288,6 +290,7 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
   settlements (app success / failure / user marks) in 289 ms → exactly 1; 10,000 hostile incoming links in 72 ms, 0 exceptions.
 - **1,000 concurrent CheckoutKit sessions** through the gateway adapter against a flaky PSP: 915 ms, 1,000 history rows, 1,000
   distinct orders despite 1,225 PSP initiate calls (SDK retries deduped by key), every success matched to a captured order.
+- **Gallery QR**: 1,000 generated images (valid, non-UPI, hostile, noise) decoded in 1.35 s (1.35 ms each), heap peak +33 MB.
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
 
 ## Project docs

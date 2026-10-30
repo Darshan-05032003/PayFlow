@@ -87,4 +87,34 @@ class ScanScreenTest {
         rule.onNodeWithText("Retry").performClick()
         assertThat(retried).isTrue()
     }
+
+    @Test
+    fun galleryActionIsOfferedOnTheCameraAndOnBothPermissionStates() {
+        var picks = 0
+        show(ScanUiState.Scanning(torchOn = false, hint = null), ScanCallbacks(onPickImage = { picks++ }))
+        rule.onNodeWithContentDescription("Upload a QR code image from your gallery").assertIsDisplayed().performClick()
+        holder.value = ScanUiState.PermissionRequired(showRationale = true)
+        rule.onNodeWithTag(PayFlowTestTags.SCAN_GALLERY).assertIsDisplayed().performClick()
+        holder.value = ScanUiState.PermissionDenied
+        rule.onNodeWithText("Upload from gallery").assertIsDisplayed().performClick()
+        assertThat(picks).isEqualTo(3)
+    }
+
+    @Test
+    fun decodingAndImageErrorStates() {
+        var picks = 0; var dismissed = false
+        show(ScanUiState.DecodingImage, ScanCallbacks(onPickImage = { picks++ }, onDismissImageError = { dismissed = true }))
+        rule.onNodeWithText("Reading the QR code…").assertIsDisplayed()
+        holder.value = ScanUiState.ImageFailed(ImageError.NOT_UPI, cameraAvailable = true)
+        rule.onNodeWithText("This image has a QR code, but it isn't a UPI payment QR").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.SCAN_TRY_ANOTHER).performClick()
+        assertThat(picks).isEqualTo(1)
+        rule.onNodeWithText("Scan with camera").performClick()
+        assertThat(dismissed).isTrue()
+        holder.value = ScanUiState.ImageFailed(ImageError.NO_QR, cameraAvailable = false)
+        rule.onNodeWithText("No QR code found in this image").assertIsDisplayed()
+        rule.onNodeWithText("Back").assertIsDisplayed() // no camera to go back to: plain back instead
+        holder.value = ScanUiState.ImageFailed(ImageError.UNREADABLE, cameraAvailable = false)
+        rule.onNodeWithText("This image could not be read. Try a screenshot or a clearer photo.").assertIsDisplayed()
+    }
 }

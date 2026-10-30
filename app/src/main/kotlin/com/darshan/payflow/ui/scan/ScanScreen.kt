@@ -20,6 +20,11 @@ import androidx.compose.material.icons.outlined.FlashlightOn
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NoPhotography
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.ImageNotSupported
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.geometry.Offset
@@ -88,6 +93,9 @@ data class ScanCallbacks(
     val onToggleTorch: () -> Unit = {},
     val onRescan: () -> Unit = {},
     val onPay: () -> Unit = {},
+    /** Opens the Photo Picker (images only, no storage permission). */
+    val onPickImage: () -> Unit = {},
+    val onDismissImageError: () -> Unit = {},
 )
 
 @Composable
@@ -113,6 +121,8 @@ fun ScanRoute(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event -> if (event is ScanEvent.PayloadReady) onPay(event.payload) }
     }
+    // Android Photo Picker: the user grants this one image to PayFlow; no READ_MEDIA_IMAGES / storage permission is involved.
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> viewModel.onImagePicked(uri?.toString()) }
     ScanScreen(
         state = state,
         callbacks = ScanCallbacks(
@@ -128,6 +138,8 @@ fun ScanRoute(
             onToggleTorch = viewModel::toggleTorch,
             onRescan = viewModel::rescan,
             onPay = { (state as? ScanUiState.Found)?.let { onPay(it.payload) } },
+            onPickImage = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onDismissImageError = viewModel::dismissImageError,
         ),
         cameraController = cameraController,
     )
@@ -178,6 +190,7 @@ fun ScanScreen(state: ScanUiState, callbacks: ScanCallbacks, cameraController: C
                     hint = stringResource(R.string.scan_permission_hint),
                     button = stringResource(R.string.scan_allow_camera),
                     onClick = callbacks.onRequestPermission,
+                    onPickImage = callbacks.onPickImage,
                 )
                 ScanUiState.PermissionDenied -> PermissionBlock(
                     title = stringResource(R.string.scan_permission_denied),
@@ -185,22 +198,69 @@ fun ScanScreen(state: ScanUiState, callbacks: ScanCallbacks, cameraController: C
                     button = stringResource(R.string.scan_open_settings),
                     onClick = callbacks.onOpenSettings,
                     icon = Icons.Outlined.NoPhotography,
+                    onPickImage = callbacks.onPickImage,
                 )
                 is ScanUiState.Scanning -> CameraPreview(state, callbacks, cameraController)
                 is ScanUiState.Found -> FoundCard(state.payload, callbacks)
                 is ScanUiState.Error -> ErrorView(stringResource(R.string.scan_camera_error), onRetry = callbacks.onRescan)
+                ScanUiState.DecodingImage -> Column(
+                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(56.dp))
+                    Text(stringResource(R.string.scan_decoding), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+                }
+                is ScanUiState.ImageFailed -> ImageFailedBlock(state, callbacks)
             }
         }
     }
 }
 
 @Composable
-private fun PermissionBlock(title: String, hint: String, button: String, onClick: () -> Unit, icon: ImageVector = Icons.Outlined.CameraAlt) {
+private fun PermissionBlock(title: String, hint: String, button: String, onClick: () -> Unit, icon: ImageVector = Icons.Outlined.CameraAlt, onPickImage: () -> Unit = {}) {
     Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         StateIcon(icon)
         Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp))
         Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
         Button(onClick = onClick, modifier = Modifier.padding(top = 20.dp)) { Text(button) }
+        // Users who refuse the camera can still pay from a screenshot.
+        Text(stringResource(R.string.scan_gallery_or), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp))
+        GalleryButton(onPickImage, Modifier.padding(top = 8.dp))
+    }
+}
+
+/** "Upload from gallery": icon + text, with a fuller content description for screen readers. */
+@Composable
+private fun GalleryButton(onClick: () -> Unit, modifier: Modifier = Modifier, filled: Boolean = false) {
+    val description = stringResource(R.string.scan_gallery_description)
+    val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
+        Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+        Text(stringResource(R.string.scan_gallery), modifier = Modifier.padding(start = 8.dp))
+    }
+    val tagged = modifier.testTag(PayFlowTestTags.SCAN_GALLERY).semantics { contentDescription = description }
+    if (filled) FilledTonalButton(onClick = onClick, modifier = tagged, content = content) else OutlinedButton(onClick = onClick, modifier = tagged, content = content)
+}
+
+@Composable
+private fun ImageFailedBlock(state: ScanUiState.ImageFailed, callbacks: ScanCallbacks) {
+    val message = stringResource(
+        when (state.error) {
+            ImageError.NO_QR -> R.string.scan_image_no_qr
+            ImageError.NOT_UPI -> R.string.scan_image_not_upi
+            ImageError.UNREADABLE -> R.string.scan_image_unreadable
+        },
+    )
+    Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        StateIcon(Icons.Outlined.ImageNotSupported, container = MaterialTheme.colorScheme.errorContainer, tint = MaterialTheme.colorScheme.onErrorContainer)
+        Text(message, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp))
+        Button(onClick = callbacks.onPickImage, modifier = Modifier.padding(top = 20.dp).testTag(PayFlowTestTags.SCAN_TRY_ANOTHER)) {
+            Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(stringResource(R.string.scan_try_another), modifier = Modifier.padding(start = 8.dp))
+        }
+        OutlinedButton(onClick = callbacks.onDismissImageError, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(if (state.cameraAvailable) R.string.scan_use_camera else R.string.back))
+        }
     }
 }
 
@@ -217,8 +277,9 @@ private fun CameraPreview(state: ScanUiState.Scanning, callbacks: ScanCallbacks,
         LaunchedEffect(state.torchOn) { controller.setTorch(state.torchOn) }
         ViewfinderFrame(Modifier.align(Alignment.Center))
         val hint = state.hint?.message()
+        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        GalleryButton(callbacks.onPickImage, Modifier.padding(bottom = 12.dp), filled = true)
         Card(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (hint != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 contentColor = if (hint != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
@@ -228,6 +289,7 @@ private fun CameraPreview(state: ScanUiState.Scanning, callbacks: ScanCallbacks,
                 Icon(if (hint != null) Icons.Outlined.ErrorOutline else Icons.Outlined.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(hint ?: stringResource(R.string.scan_hint), modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium)
             }
+        }
         }
     }
 }

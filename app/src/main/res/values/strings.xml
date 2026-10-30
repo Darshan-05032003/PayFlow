@@ -190,6 +190,15 @@
     <string name="scan_error_vpa">This QR has an invalid UPI ID</string>
     <string name="scan_error_amount">This QR has an invalid amount</string>
     <string name="scan_error_currency">Only INR payments are supported</string>
+    <string name="scan_gallery">Upload from gallery</string>
+    <string name="scan_gallery_description">Upload a QR code image from your gallery</string>
+    <string name="scan_gallery_or">Or pay from a screenshot</string>
+    <string name="scan_decoding">Reading the QR code…</string>
+    <string name="scan_image_no_qr">No QR code found in this image</string>
+    <string name="scan_image_not_upi">This image has a QR code, but it isn\'t a UPI payment QR</string>
+    <string name="scan_image_unreadable">This image could not be read. Try a screenshot or a clearer photo.</string>
+    <string name="scan_try_another">Try another image</string>
+    <string name="scan_use_camera">Scan with camera</string>
 
     <!-- VPA verification -->
     <string name="pay_verifying">Checking UPI ID…</string>
