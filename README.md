@@ -27,11 +27,20 @@ Pay through the UPI apps installed on the phone (GPay, PhonePe, Paytm, BHIM) or 
 
 ## Screenshots
 
-_Placeholder: screenshots will be added from a real device._
+Debug build on a Pixel 7 emulator (API 37) in UPI-apps mode. The UPI app here is the debug-only **Sandbox UPI** test app
+(see [Testing without a real UPI app](#testing-without-a-real-upi-app)); on a phone the same sheet lists GPay, PhonePe, Paytm and BHIM.
 
-| Home | History | Payment detail | Pay | Scan QR |
-|---|---|---|---|---|
-| _todo_ | _todo_ | _todo_ | _todo_ | _todo_ |
+| Home | Pay | Choose a UPI app | Result (reported by the app) |
+|---|---|---|---|
+| ![Home](docs/screenshots/home.png) | ![Pay](docs/screenshots/pay.png) | ![UPI app sheet](docs/screenshots/upi-app-sheet.png) | ![Result](docs/screenshots/result-reported.png) |
+
+| Pending: mark by hand | History | Receive QR | Scan |
+|---|---|---|---|
+| ![Pending](docs/screenshots/pending-manual-mark.png) | ![History](docs/screenshots/history.png) | ![Receive](docs/screenshots/receive-qr.png) | ![Scan](docs/screenshots/scan.png) |
+
+| QR from a gallery image | Incoming `upi://pay` link | Payment mode | Sandbox UPI (debug only) |
+|---|---|---|---|
+| ![Gallery QR](docs/screenshots/gallery-qr-pay.png) | ![Incoming link](docs/screenshots/incoming-link.png) | ![Security](docs/screenshots/security-mode.png) | ![Sandbox UPI](docs/screenshots/sandbox-upi-debug.png) |
 
 ## Tech stack
 
@@ -185,6 +194,15 @@ user's own mark, *is* the stored outcome. The mitigations are structural (pinned
 default, status source persisted and shown) rather than cryptographic; a real deployment replaces manual marking with a PSP
 status API. Test with ₹1 to your own VPA.
 
+### Testing without a real UPI app
+
+Debug builds ship a fake UPI app, **Sandbox UPI (debug)** (`app/src/debug/.../SandboxUpiActivity`), so the whole UPI-apps path can run
+on an emulator: it appears in PayFlow's app sheet and in Android's "Open with" dialog, shows the payee, amount and `tr` it received,
+and answers with the standard UPI `response` extra for **Success**, **Failure**, **Pending (SUBMITTED)**, **Cancel** (no response) or
+**Tamper** (success for a different `txnRef`, which PayFlow refuses). It is declared only in the debug manifest; the release merged
+manifest has no such component. Test incoming links with remote-shell quoting so the device shell does not split the URI at `&`:
+`adb shell "am start -a android.intent.action.VIEW -d 'upi://pay?pa=test@upi&pn=Test&am=1.00&cu=INR'"`.
+
 PayFlow also registers as a handler for `upi://pay` links (`VIEW` + `BROWSABLE`): a UPI link from a browser, chat app or another QR
 reader opens the Pay screen prefilled and locked, after the same hostile-input-safe parser that checks scanned QRs. The Receive
 screen stores your own name + UPI ID encrypted (Keystore AES-GCM) and renders a `upi://pay?pa=&pn=[&am=]` QR (zxing) that any UPI
@@ -201,16 +219,19 @@ app can scan; copy the ID or share the link / PNG. PayFlow cannot see incoming m
 
 | Suite | Count |
 |---|---|
-| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, use cases, ViewModels, Compose screens) | 328 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity incl. an incoming `upi://` link, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet) | 56 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 23 |
+| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, QR image decoding, use cases, ViewModels, Compose screens) | 347 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity incl. an incoming `upi://` link, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet) | 57 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 24 |
 
-Domain + data line coverage (Kover): **88.8 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
+Domain + data line coverage (Kover): **89.0 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
 `PlayIntegrityChecker`, `AndroidTamperProbe`, `CameraXController` and `MlKitBarcodeScanner` are counted and untested on the JVM). (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
 untested on the JVM).
 
-Everything is proven on the JVM with Robolectric and fakes (installed UPI apps are faked through the `UpiAppLauncher` interface).
-`connectedAndroidTest` and the camera path remain compile-only.
+Everything is proven on the JVM with Robolectric and fakes (installed UPI apps are faked through the `UpiAppLauncher` interface). On
+top of that, every flow was walked on a Pixel 7 emulator (API 37) in light and dark: the UPI-app sheet → Sandbox UPI → success,
+failure, pending + manual marking, cancel and a tampered `txnRef`; sandbox mode; incoming `upi://pay` links (cold and warm start);
+Receive QR (the on-screen QR was decoded back to the exact link); camera scan screen and gallery QR (valid, non-UPI); History refresh.
+The walkthrough found and fixed four bugs that unit tests had missed (see SECURITY_REVIEW). `connectedAndroidTest` is not used.
 
 ## Security highlights
 
@@ -288,6 +309,8 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
   **AES-GCM**: 10,000 × 1 KB round trips in 120 ms.
 - **UPI-apps mode**: 10,000 spoofed app responses for other references in 757 ms, payment still pending; 1,000 racing
   settlements (app success / failure / user marks) in 289 ms → exactly 1; 10,000 hostile incoming links in 72 ms, 0 exceptions.
+- **UPI-apps mode on a device**: a pending UPI-app payment survives app restarts and History refresh (it was being failed by the
+  sandbox reconciler before the fix); PayFlow never offers itself in the system chooser.
 - **1,000 concurrent CheckoutKit sessions** through the gateway adapter against a flaky PSP: 915 ms, 1,000 history rows, 1,000
   distinct orders despite 1,225 PSP initiate calls (SDK retries deduped by key), every success matched to a captured order.
 - **Gallery QR**: 1,000 generated images (valid, non-UPI, hostile, noise) decoded in 1.35 s (1.35 ms each), heap peak +33 MB.

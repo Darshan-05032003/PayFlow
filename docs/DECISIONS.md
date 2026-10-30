@@ -182,3 +182,15 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Same path as a camera scan.** Decoded texts go through `UpiQrPayloadParser`; the payload is saved in `SavedStateHandle` like a scan
   and navigates with `source = "qr"` (method `QR_SCAN`, payee and amount locked). The URI itself is never persisted.
 
+## Emulator testing and fixes from the walkthrough
+- **Debug-only fake UPI app** (`app/src/debug`, `SandboxUpiActivity`, label "Sandbox UPI (debug)") instead of mocking at the launcher:
+  it exercises the real path (package query → PayFlow's sheet → pinned intent → activity result → response parsing) on an emulator.
+  Because it lives in PayFlow's own package, the launcher now excludes only `MainActivity` (PayFlow's link handler), and targeted
+  launches resolve to an explicit component.
+- **UPI-apps payments are invisible to the sandbox PSP.** Every one carries a handler marker (`Payment.VIA_SYSTEM_CHOOSER` when the app
+  is unknown); the reconciler's query and `ConfirmPaymentUseCase` skip them. Found on the emulator, where the reconciler had failed a
+  pending real payment.
+- **ML Kit waits are not cancellable**: the frame / bitmap / client are released only after ML Kit's native task completes (a SIGSEGV
+  on the emulator when the camera stopped mid-frame).
+- **The system chooser excludes PayFlow itself** (`EXTRA_EXCLUDE_COMPONENTS`).
+

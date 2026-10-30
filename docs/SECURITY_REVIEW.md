@@ -329,3 +329,8 @@ Severity scale: Critical / High / Medium / Low.
 - **High (fixed)**: gallery decoding rejected every real image (bounds-only decode treated as unreadable), and stopping the camera
   mid-frame closed the `ImageProxy` under ML Kit's native recognizer (SIGSEGV). See commit "release ML Kit frames only after
   recognition completes".
+- **Medium (fixed)**: registering for `upi://pay` made PayFlow appear in its own system chooser (sandbox mode / chooser fallback);
+  choosing it would send the payment link back into PayFlow. `chooserIntent` now passes `EXTRA_EXCLUDE_COMPONENTS` with PayFlow's
+  `MainActivity` (`AndroidUpiAppLauncherTest`), verified on the emulator (Android then opens the only real handler directly).
+- **Test-harness note**: `adb shell am start -d "upi://pay?pa=…&pn=…&am=…"` loses everything after the first `&` because the device
+  shell splits the command; the app correctly showed a payee-only link. Quote for the remote shell when testing.
