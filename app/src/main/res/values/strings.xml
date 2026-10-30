@@ -121,7 +121,7 @@
     <string name="pay_vpa_placeholder">name@bank</string>
     <string name="pay_vpa_hint">The registered name is checked before you pay.</string>
     <string name="pay_vpa_hint_real">Your UPI app shows the registered name before you confirm.</string>
-    <string name="pay_field_locked">Filled from the QR code</string>
+    <string name="pay_field_locked">Filled from the payment QR or link</string>
     <string name="pay_amount_hint">Up to %1$s per payment</string>
     <string name="pay_confirming_hint">This usually takes a few seconds. Please keep the app open.</string>
     <string name="pay_done_success_hint">Confirmed by the payment provider.</string>
@@ -151,7 +151,7 @@
     <string name="pay_source_unconfirmed">Not confirmed yet. Check in %1$s.</string>
     <string name="pay_source_pending_psp">The provider has not confirmed yet.</string>
     <string name="pay_source_psp">Confirmed by the sandbox payment provider.</string>
-    <string name="detail_paid_via">Paid via</string>
+    <string name="detail_paid_via">Handled by</string>
     <string name="detail_mark_title">Did this payment go through?</string>
     <string name="detail_mark_hint">PayFlow could not read a result from %1$s. Open that app, check the transaction, then record it here.</string>
     <string name="detail_mark_paid">Mark as paid</string>

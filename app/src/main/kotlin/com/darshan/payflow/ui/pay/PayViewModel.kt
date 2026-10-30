@@ -352,7 +352,7 @@ class PayViewModel @Inject constructor(
             is PayPhase.AwaitingApp -> phase.paymentId
             else -> null
         } ?: return
-        if ((_uiState.value.phase as? PayPhase.Done)?.payment?.handlerPackage != null) return
+        if ((_uiState.value.phase as? PayPhase.Done)?.payment?.isUpiAppPayment == true) return
         _uiState.update { it.copy(phase = PayPhase.Confirming(paymentId)) }
         viewModelScope.launch { confirmNow(paymentId, null) }
     }
@@ -427,7 +427,7 @@ class PayViewModel @Inject constructor(
 
     private suspend fun UpiAppResult.toPhase(paymentId: String): PayPhase {
         val payment = this.payment ?: return PayPhase.Done(paymentId, PaymentStatus.FAILED, null)
-        val label = payment.handlerPackage?.let { pkg -> withContext(dispatchers.io) { upiAppLauncher.appLabel(pkg) } }
+        val label = payment.knownHandlerPackage?.let { pkg -> withContext(dispatchers.io) { upiAppLauncher.appLabel(pkg) } }
         return when (this) {
             is UpiAppResult.ReportedSuccess, is UpiAppResult.ReportedFailure, is UpiAppResult.AlreadySettled, is UpiAppResult.Unknown ->
                 PayPhase.Done(paymentId, payment.status, payment.failureReason, payment, label)
@@ -491,9 +491,9 @@ class PayViewModel @Inject constructor(
             append("Amount: ").append(Money.formatInr(payment.amountPaise)).append('\n')
             append("Status: ").append(payment.status.name.lowercase().replaceFirstChar(Char::uppercase))
             when (payment.statusSource) {
-                com.darshan.payflow.domain.model.StatusSource.UPI_APP -> append(" (reported by ").append(handlerLabel ?: payment.handlerPackage ?: "UPI app").append(")")
+                com.darshan.payflow.domain.model.StatusSource.UPI_APP -> append(" (reported by ").append(handlerLabel ?: payment.knownHandlerPackage ?: "UPI app").append(")")
                 com.darshan.payflow.domain.model.StatusSource.USER -> append(" (marked by you)")
-                com.darshan.payflow.domain.model.StatusSource.PSP -> if (payment.handlerPackage == null && payment.status != PaymentStatus.PENDING) append(" (sandbox provider)")
+                com.darshan.payflow.domain.model.StatusSource.PSP -> if (!payment.isUpiAppPayment && payment.status != PaymentStatus.PENDING) append(" (sandbox provider)")
             }
             append('\n')
             append("Reference: ").append(payment.txnRef).append('\n')

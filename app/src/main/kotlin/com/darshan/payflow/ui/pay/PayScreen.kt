@@ -439,10 +439,10 @@ private fun StatusBlock(
 /** Who established the status, in words the user can act on. Never says "verified" for an app-reported or user-marked result. */
 @Composable
 fun statusSourceLabel(payment: Payment, handlerLabel: String?): String {
-    val app = handlerLabel ?: payment.handlerPackage ?: stringResource(R.string.pay_source_app_generic)
+    val app = handlerLabel ?: payment.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)
     val pending = payment.status == PaymentStatus.PENDING || payment.status == PaymentStatus.CREATED
     return when {
-        pending && payment.handlerPackage != null -> stringResource(R.string.pay_source_unconfirmed, app)
+        pending && payment.isUpiAppPayment -> stringResource(R.string.pay_source_unconfirmed, app)
         pending -> stringResource(R.string.pay_source_pending_psp)
         payment.statusSource == StatusSource.UPI_APP -> stringResource(R.string.pay_source_reported_by, app)
         payment.statusSource == StatusSource.USER -> stringResource(R.string.pay_source_marked_by_user)
@@ -461,7 +461,7 @@ private fun ResultBlock(phase: PayPhase.Done, mode: PaymentMode?, callbacks: Pay
     val pending = phase.status == PaymentStatus.PENDING || phase.status == PaymentStatus.CREATED
     val success = phase.status == PaymentStatus.SUCCESS || phase.status == PaymentStatus.REFUND_PENDING || phase.status == PaymentStatus.REFUNDED
     val payment = phase.payment
-    val realPayment = payment?.handlerPackage != null
+    val realPayment = payment?.isUpiAppPayment == true
     val (icon, colors) = when {
         success -> Icons.Outlined.CheckCircle to PayFlowTheme.status.success
         pending -> Icons.Outlined.Schedule to PayFlowTheme.status.pending
@@ -497,7 +497,7 @@ private fun ResultBlock(phase: PayPhase.Done, mode: PaymentMode?, callbacks: Pay
                 }
                 phase.reason?.let { reason -> Text(reason, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium) }
                 if (pending && realPayment) {
-                    InfoBanner(stringResource(R.string.pay_pending_real_hint, phase.handlerLabel ?: payment!!.handlerPackage!!), icon = Icons.Outlined.Info, tone = BannerTone.Warning)
+                    InfoBanner(stringResource(R.string.pay_pending_real_hint, phase.handlerLabel ?: payment?.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)), icon = Icons.Outlined.Info, tone = BannerTone.Warning)
                 }
                 if (payment != null) {
                     Card(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {

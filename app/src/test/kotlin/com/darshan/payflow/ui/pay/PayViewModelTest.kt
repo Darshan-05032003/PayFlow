@@ -494,7 +494,8 @@ class PayViewModelTest {
             val event = awaitItem() as PayEvent.LaunchUpiApp
             assertThat(event.packageName).isNull()
         }
-        assertThat(repo.getById("pay-1")!!.handlerPackage).isNull()
+        // Still a UPI-apps payment (never handed to the sandbox PSP), just without a known app.
+        assertThat(repo.getById("pay-1")!!.handlerPackage).isEqualTo(com.darshan.payflow.domain.model.Payment.VIA_SYSTEM_CHOOSER)
         assertThat(repo.getById("pay-1")!!.status).isEqualTo(PaymentStatus.PENDING)
 
         launcher.installed = false

@@ -51,7 +51,7 @@ class FakePaymentRepository(private val clock: Clock = fixedClock) : PaymentRepo
     override suspend fun findByIdempotencyKey(key: String): Payment? = payments.value.values.firstOrNull { it.idempotencyKey == key }
 
     override suspend fun pendingOlderThan(before: java.time.Instant): List<Payment> =
-        payments.value.values.filter { (it.status == PaymentStatus.CREATED || it.status == PaymentStatus.PENDING) && !it.createdAt.isAfter(before) }.sortedBy { it.createdAt }
+        payments.value.values.filter { (it.status == PaymentStatus.CREATED || it.status == PaymentStatus.PENDING) && !it.isUpiAppPayment && !it.createdAt.isAfter(before) }.sortedBy { it.createdAt }
 
     override suspend fun applyEvent(id: String, event: PaymentEvent): Result<Payment> {
         val current = payments.value[id] ?: return Result.failure(PaymentNotFoundException(id))

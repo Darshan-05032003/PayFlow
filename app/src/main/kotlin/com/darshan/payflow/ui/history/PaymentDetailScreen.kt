@@ -154,7 +154,7 @@ private fun PaymentDetailContent(state: PaymentDetailUiState.Content, callbacks:
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.detail_mark_title), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.detail_mark_hint, state.handlerLabel ?: payment.handlerPackage.orEmpty()), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.detail_mark_hint, state.handlerLabel ?: payment.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)), style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = callbacks.onMarkPaid, enabled = !state.marking, modifier = Modifier.testTag(PayFlowTestTags.DETAIL_MARK_PAID)) { Text(stringResource(R.string.detail_mark_paid)) }
                         OutlinedButton(onClick = callbacks.onMarkNotPaid, enabled = !state.marking, modifier = Modifier.testTag(PayFlowTestTags.DETAIL_MARK_NOT_PAID)) { Text(stringResource(R.string.detail_mark_not_paid)) }

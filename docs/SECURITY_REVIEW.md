@@ -317,3 +317,15 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: rotation/permission interplay above.
 - Scope for improvement: show a thumbnail of the picked image next to the result; run ML Kit on a cropped region when a screenshot has
   many codes.
+
+### Follow-up found on the emulator walkthrough (UPI-apps mode)
+- **High (fixed)**: the Home-start reconciler polled *every* stale pending payment against the sandbox PSP, including UPI-apps
+  payments the PSP has never seen. Its "not found" marked a pending real payment (money possibly moved) as FAILED, and the detail
+  screen then read "Confirmed by the sandbox payment provider". Payments launched through the system-chooser fallback had no marker
+  at all. Fix: every UPI-apps payment now carries a handler marker (`Payment.VIA_SYSTEM_CHOOSER` when the app is unknown), the
+  reconciler's SQL excludes `handler_package IS NOT NULL`, and `ConfirmPaymentUseCase` refuses to ask the PSP about such a payment.
+  Regressions: `UpiAppUseCasesTest.the psp status check and the reconciler never touch a pending upi app payment`,
+  `PaymentDaoTest.stale pending lookups for the reconciler skip upi app payments`.
+- **High (fixed)**: gallery decoding rejected every real image (bounds-only decode treated as unreadable), and stopping the camera
+  mid-frame closed the `ImageProxy` under ML Kit's native recognizer (SIGSEGV). See commit "release ML Kit frames only after
+  recognition completes".

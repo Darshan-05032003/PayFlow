@@ -26,7 +26,8 @@ interface PaymentDao {
     @Query("SELECT * FROM payments WHERE idempotency_key = :key")
     suspend fun getByIdempotencyKey(key: String): PaymentEntity?
 
-    @Query("SELECT * FROM payments WHERE status IN ('CREATED', 'PENDING') AND created_at <= :before ORDER BY created_at ASC LIMIT :limit")
+    /** Stale sandbox payments for the reconciler. UPI-apps payments (handler set) have no PSP to ask and are left to the user. */
+    @Query("SELECT * FROM payments WHERE status IN ('CREATED', 'PENDING') AND handler_package IS NULL AND created_at <= :before ORDER BY created_at ASC LIMIT :limit")
     suspend fun pendingOlderThan(before: Long, limit: Int): List<PaymentEntity>
 
     /** Atomic compare-and-set: the row changes only if it is still in [expectedStatus]. Returns rows updated (0 or 1). */

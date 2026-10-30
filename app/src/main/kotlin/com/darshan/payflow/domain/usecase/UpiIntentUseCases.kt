@@ -65,7 +65,9 @@ class PayViaUpiIntentUseCase(
         mode: PaymentMode = PaymentMode.SANDBOX,
         handlerPackage: String? = null,
     ): Result<UpiLaunch> {
-        val target = handlerPackage?.takeIf { mode == PaymentMode.UPI_APPS }
+        // Every UPI-apps payment carries a handler marker (the sentinel when the system chooser picks the app) so the sandbox PSP
+        // status check and the reconciler can never settle it.
+        val target = if (mode == PaymentMode.UPI_APPS) handlerPackage ?: Payment.VIA_SYSTEM_CHOOSER else null
         if (idempotencyKey == null) return submit(request, method, null, mode, target)
         return keyLocks.getOrPut(idempotencyKey) { Mutex() }.withLock {
             repository.findByIdempotencyKey(idempotencyKey)?.let { return reuse(it, request, idempotencyKey, mode) }
@@ -80,9 +82,9 @@ class PayViaUpiIntentUseCase(
         }
         val link = UpiLinkBuilder.build(UpiPayRequest(existing.payeeVpa, existing.payeeName, existing.amountPaise, existing.note, existing.txnRef))
         return when (existing.status) {
-            PaymentStatus.PENDING -> Result.success(UpiLaunch(existing.id, link, existing.handlerPackage))
+            PaymentStatus.PENDING -> Result.success(UpiLaunch(existing.id, link, existing.knownHandlerPackage))
             // Stored but the PSP was never reached (process died in between): take over and finish the registration.
-            PaymentStatus.CREATED -> register(existing, key, mode).map { UpiLaunch(existing.id, link, existing.handlerPackage) }
+            PaymentStatus.CREATED -> register(existing, key, mode).map { UpiLaunch(existing.id, link, existing.knownHandlerPackage) }
             PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.REFUND_PENDING, PaymentStatus.REFUNDED ->
                 Result.failure(IdempotencyConflictException(key, "attempt already settled as ${existing.status}"))
         }
@@ -116,7 +118,7 @@ class PayViaUpiIntentUseCase(
             val existing = idempotencyKey?.let { repository.findByIdempotencyKey(it) } ?: return Result.failure(e)
             return reuse(existing, request, idempotencyKey, mode)
         }
-        return register(payment, idempotencyKey, mode).map { UpiLaunch(payment.id, UpiLinkBuilder.build(request), handlerPackage) }
+        return register(payment, idempotencyKey, mode).map { UpiLaunch(payment.id, UpiLinkBuilder.build(request), payment.knownHandlerPackage) }
     }
 
     /**
@@ -166,6 +168,8 @@ class ConfirmPaymentUseCase @Inject constructor(
     suspend operator fun invoke(paymentId: String, appResponse: UpiAppResponse?): ConfirmResult {
         val payment = repository.getById(paymentId) ?: return ConfirmResult.NotFound
         if (payment.status.isTerminal || payment.status == PaymentStatus.SUCCESS) return terminal(payment)
+        // A UPI-apps payment was never registered with the sandbox PSP: its "not found" would fail a payment that may have gone through.
+        if (payment.isUpiAppPayment) return terminal(payment)
 
         val status = try {
             psp.getPaymentStatus(payment.txnRef)

@@ -148,4 +148,34 @@ class UpiAppUseCasesTest {
         assertThat(repo.getById(id)!!.status).isEqualTo(PaymentStatus.SUCCESS)
         assertThat(mark("missing", paid = true)).isEqualTo(ManualMarkResult.NotFound)
     }
+
+    // --- UPI-apps payments must never be settled by the sandbox PSP (found on the emulator) ---
+
+    @Test
+    fun `a system chooser launch is still marked as a upi app payment and launches without a pinned package`() = runTest {
+        val launch = pay(request, PaymentMethod.UPI_INTENT, "k-chooser", PaymentMode.UPI_APPS, handlerPackage = null).getOrThrow()
+        assertThat(launch.packageName).isNull() // the system chooser is used
+        val stored = repo.getById(launch.paymentId)!!
+        assertThat(stored.handlerPackage).isEqualTo(com.darshan.payflow.domain.model.Payment.VIA_SYSTEM_CHOOSER)
+        assertThat(stored.isUpiAppPayment).isTrue()
+        assertThat(stored.knownHandlerPackage).isNull()
+        assertThat(stored.canBeMarkedManually).isTrue()
+    }
+
+    @Test
+    fun `the psp status check and the reconciler never touch a pending upi app payment`() = runTest {
+        val viaApp = launched()
+        val viaChooser = pay(request.copy(txnRef = "PFCHOOSER1"), PaymentMethod.UPI_INTENT, "k-c", PaymentMode.UPI_APPS, null).getOrThrow().paymentId
+        // The sandbox PSP has never heard of these references: asking it would answer NotFound and fail real payments.
+        val confirm = ConfirmPaymentUseCase(repo, psp, fixedClock)
+        assertThat(confirm(viaApp, null)).isInstanceOf(ConfirmResult.Pending::class.java)
+        assertThat(confirm(viaChooser, null)).isInstanceOf(ConfirmResult.Pending::class.java)
+        assertThat(psp.statusCalls).isEqualTo(0)
+        val later = java.time.Clock.offset(fixedClock, java.time.Duration.ofHours(1))
+        val reconcile = ReconcilePendingPaymentsUseCase(repo, com.darshan.payflow.testutil.pollerFor(repo, psp), later)
+        assertThat(reconcile().checked).isEqualTo(0)
+        assertThat(repo.getById(viaApp)!!.status).isEqualTo(PaymentStatus.PENDING)
+        assertThat(repo.getById(viaChooser)!!.status).isEqualTo(PaymentStatus.PENDING)
+        assertThat(psp.statusCalls).isEqualTo(0)
+    }
 }

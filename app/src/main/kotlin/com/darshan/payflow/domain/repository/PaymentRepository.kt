@@ -32,7 +32,7 @@ interface PaymentRepository {
     /** The payment stored under an idempotency key, if any (the key is written before the PSP is called). */
     suspend fun findByIdempotencyKey(key: String): Payment?
 
-    /** CREATED / PENDING payments created at or before [before], oldest first. */
+    /** CREATED / PENDING sandbox payments (no UPI-app handler) created at or before [before], oldest first. */
     suspend fun pendingOlderThan(before: java.time.Instant): List<Payment>
     fun observeByMandate(mandateId: String): Flow<List<Payment>>
 

@@ -98,7 +98,7 @@ class HistoryScreenTest {
         assertThat(paid).isTrue()
         rule.onNodeWithTag(PayFlowTestTags.DETAIL_MARK_NOT_PAID).performScrollTo().performClick()
         assertThat(paid).isFalse()
-        rule.onNodeWithText("GPay").performScrollTo().assertIsDisplayed() // "Paid via"
+        rule.onNodeWithText("GPay").performScrollTo().assertIsDisplayed() // "Handled by"
     }
 
     @Test

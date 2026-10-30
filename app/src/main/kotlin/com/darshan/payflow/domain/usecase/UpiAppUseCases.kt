@@ -43,7 +43,7 @@ class RecordUpiAppResultUseCase @Inject constructor(private val repository: Paym
         }
         val echoedRef = response.txnRef
         if (echoedRef != null && !echoedRef.equals(payment.txnRef, ignoreCase = true)) return UpiAppResult.Mismatch(payment, echoedRef)
-        val who = appLabel ?: payment.handlerPackage ?: "the UPI app"
+        val who = appLabel ?: payment.knownHandlerPackage ?: "the UPI app"
         return when (response.status) {
             UpiAppStatus.SUCCESS -> {
                 val event = PaymentEvent.Confirm(pspTxnId = null, upiTxnId = response.txnId ?: response.approvalRefNo, source = StatusSource.UPI_APP)

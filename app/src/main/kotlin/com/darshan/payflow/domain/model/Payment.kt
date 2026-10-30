@@ -27,12 +27,21 @@ data class Payment(
     val mandateId: String? = null,
     /** Who established [status]: the sandbox PSP, the UPI app's response, or the user. */
     val statusSource: StatusSource = StatusSource.PSP,
-    /** Package of the UPI app that handled the payment (UPI-apps mode); null for sandbox payments. */
+    /**
+     * Package of the UPI app that handled the payment (UPI-apps mode), [VIA_SYSTEM_CHOOSER] when the system chooser picked it,
+     * null for sandbox payments. Non-null means: no PSP knows this payment, never ask one about it.
+     */
     val handlerPackage: String? = null,
 ) {
+    /** Sent to a real UPI app (UPI-apps mode). The sandbox PSP must never confirm, poll or fail it. */
+    val isUpiAppPayment: Boolean get() = handlerPackage != null
+
+    /** The handler's package when PayFlow knows it (not the system-chooser sentinel). */
+    val knownHandlerPackage: String? get() = handlerPackage?.takeIf { it != VIA_SYSTEM_CHOOSER }
+
     /** A real UPI-app payment whose outcome is still unknown: the user may settle it by hand after checking their UPI app. */
     val canBeMarkedManually: Boolean
-        get() = handlerPackage != null && (status == PaymentStatus.PENDING || status == PaymentStatus.CREATED)
+        get() = isUpiAppPayment && (status == PaymentStatus.PENDING || status == PaymentStatus.CREATED)
 
     init {
         require(amountPaise in 1..MAX_AMOUNT_PAISE) { "amount out of range: $amountPaise" }
@@ -43,6 +52,9 @@ data class Payment(
     companion object {
         /** ₹1,00,000 per UPI transaction (NPCI limit for most categories), in paise. */
         const val MAX_AMOUNT_PAISE: Long = 1_00_000_00L
+
+        /** [handlerPackage] for a UPI-apps payment launched through the system chooser (the chosen app is unknown). */
+        const val VIA_SYSTEM_CHOOSER = "upi:system-chooser"
     }
 }
 

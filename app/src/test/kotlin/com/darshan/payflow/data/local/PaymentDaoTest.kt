@@ -194,4 +194,16 @@ class PaymentDaoTest {
         assertThat(stored.handlerPackage).isEqualTo("com.example.gpay")
         assertThat(stored.toDomain().statusSource).isEqualTo(StatusSource.UPI_APP)
     }
+
+    @Test
+    fun `stale pending lookups for the reconciler skip upi app payments`() = runTest {
+        dao.insertAll(
+            listOf(
+                testPayment("sandbox", status = PaymentStatus.PENDING).toEntity(),
+                testPayment("app", status = PaymentStatus.PENDING).copy(handlerPackage = "com.example.gpay").toEntity(),
+                testPayment("chooser", status = PaymentStatus.PENDING).copy(handlerPackage = com.darshan.payflow.domain.model.Payment.VIA_SYSTEM_CHOOSER).toEntity(),
+            ),
+        )
+        assertThat(dao.pendingOlderThan(FIXED_INSTANT.toEpochMilli() + 1, 10).map { it.id }).containsExactly("sandbox")
+    }
 }

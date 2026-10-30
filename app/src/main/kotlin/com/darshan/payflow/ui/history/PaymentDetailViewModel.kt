@@ -45,7 +45,7 @@ class PaymentDetailViewModel @Inject constructor(
         if (payment == null) {
             PaymentDetailUiState.NotFound
         } else {
-            PaymentDetailUiState.Content(payment, payment.handlerPackage?.let(upiAppLauncher::appLabel), busy)
+            PaymentDetailUiState.Content(payment, payment.knownHandlerPackage?.let(upiAppLauncher::appLabel), busy)
         }
     }
         .onStart<PaymentDetailUiState> { emit(PaymentDetailUiState.Loading) }
