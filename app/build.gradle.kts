@@ -22,6 +22,9 @@ val playIntegrityCloudProject: Long = localProperty("PLAY_INTEGRITY_CLOUD_PROJEC
 val pspBaseUrl: String = localProperty("PSP_BASE_URL") ?: ""
 // Optional: SHA-256 of the release signing certificate; when set, the tamper detector flags a repackaged APK.
 val expectedSigningSha256: String = localProperty("EXPECTED_SIGNING_SHA256") ?: ""
+// Debug-only screenshot mode: `./gradlew assembleDebug -PscreenshotMode=true` lets FLAG_SECURE screens be captured
+// (README screenshots, UI review on an emulator). Release builds always keep FLAG_SECURE on.
+val screenshotMode: Boolean = (project.findProperty("screenshotMode") as? String)?.toBoolean() ?: false
 
 android {
     namespace = "com.darshan.payflow"
@@ -40,10 +43,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "ALLOW_SCREENSHOTS", "$screenshotMode")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("boolean", "ALLOW_SCREENSHOTS", "false")
         }
     }
 
@@ -99,6 +106,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.core)
+    implementation(libs.compose.material.icons.extended)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 

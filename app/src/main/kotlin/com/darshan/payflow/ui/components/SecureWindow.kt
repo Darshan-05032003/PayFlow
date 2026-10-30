@@ -8,18 +8,23 @@ import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalView
+import com.darshan.payflow.BuildConfig
 import java.util.WeakHashMap
 
 /**
  * Marks the hosting window as secure while this composable is in the tree: `FLAG_SECURE` blocks screenshots, screen recording
  * and non-secure displays, and `filterTouchesWhenObscured` on the decor view rejects taps delivered through an overlay
  * (tapjacking). Reference-counted so nested payment screens never clear the flag early.
+ *
+ * [enabled] defaults to `true` unless the build was made with `-PscreenshotMode=true` (debug only, see `build.gradle.kts`),
+ * which exists so README screenshots and UI reviews can capture the payment screens on an emulator.
  */
 @Composable
-fun SecureWindow() {
+fun SecureWindow(enabled: Boolean = !BuildConfig.ALLOW_SCREENSHOTS) {
     val view = LocalView.current
-    DisposableEffect(view) {
-        val window = view.context.findActivity()?.window
+    DisposableEffect(view, enabled) {
+        // Debug-only screenshot mode (`-PscreenshotMode=true`) skips the flag; release builds can never turn it off.
+        val window = if (enabled) view.context.findActivity()?.window else null
         window?.let(SecureWindowRegistry::acquire)
         onDispose { window?.let(SecureWindowRegistry::release) }
     }

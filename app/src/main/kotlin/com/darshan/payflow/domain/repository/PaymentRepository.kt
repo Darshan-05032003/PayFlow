@@ -4,6 +4,7 @@ import com.darshan.payflow.domain.model.HistoryFilter
 import com.darshan.payflow.domain.model.HistorySummary
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentEvent
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 interface PaymentRepository {
@@ -23,6 +24,9 @@ interface PaymentRepository {
     suspend fun applyEvent(id: String, event: PaymentEvent): Result<Payment>
 
     fun observeSummary(): Flow<HistorySummary>
+
+    /** Summary of payments created at or after [since] (the home dashboard uses the start of the current month). */
+    fun observeSummarySince(since: Instant): Flow<HistorySummary>
 
     /** The payment stored under an idempotency key, if any (the key is written before the PSP is called). */
     suspend fun findByIdempotencyKey(key: String): Payment?

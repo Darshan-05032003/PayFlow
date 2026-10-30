@@ -91,4 +91,20 @@ interface PaymentDao {
         """,
     )
     fun observeSummary(): Flow<SummaryRow>
+
+    /** Same aggregate restricted to payments created at or after [sinceMillis] (e.g. the start of the current month). */
+    @Query(
+        """
+        SELECT COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'REFUND_PENDING') THEN 1 ELSE 0 END), 0) AS success,
+            COALESCE(SUM(CASE WHEN status IN ('CREATED', 'PENDING') THEN 1 ELSE 0 END), 0) AS pending,
+            COALESCE(SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END), 0) AS failed,
+            COALESCE(SUM(CASE WHEN status = 'REFUNDED' THEN 1 ELSE 0 END), 0) AS refunded,
+            COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'REFUND_PENDING') AND direction = 'OUTGOING' THEN amount_paise ELSE 0 END), 0) AS sent_paise,
+            COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'REFUND_PENDING') AND direction = 'INCOMING' THEN amount_paise ELSE 0 END), 0) AS received_paise
+        FROM payments
+        WHERE created_at >= :sinceMillis
+        """,
+    )
+    fun observeSummarySince(sinceMillis: Long): Flow<SummaryRow>
 }

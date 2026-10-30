@@ -119,6 +119,20 @@ class PaymentDaoTest {
         assertThat(s.receivedPaise).isEqualTo(300)
     }
 
+    @Test
+    fun `summary since a cut-off only counts payments created at or after it`() = runTest {
+        val cutOff = FIXED_INSTANT
+        dao.insert(testPayment("old", status = PaymentStatus.SUCCESS, amountPaise = 100, createdAt = cutOff.minusSeconds(1)).toEntity())
+        dao.insert(testPayment("edge", status = PaymentStatus.SUCCESS, amountPaise = 200, createdAt = cutOff).toEntity())
+        dao.insert(testPayment("new", status = PaymentStatus.PENDING, amountPaise = 300, createdAt = cutOff.plusSeconds(60)).toEntity())
+        val s = dao.observeSummarySince(cutOff.toEpochMilli()).first()
+        assertThat(s.total).isEqualTo(2)
+        assertThat(s.success).isEqualTo(1)
+        assertThat(s.pending).isEqualTo(1)
+        assertThat(s.sentPaise).isEqualTo(200)
+        assertThat(dao.observeSummarySince(cutOff.plusSeconds(3_600).toEpochMilli()).first().total).isEqualTo(0)
+    }
+
     // --- security regression tests (feature 1 review) ---
 
     @Test

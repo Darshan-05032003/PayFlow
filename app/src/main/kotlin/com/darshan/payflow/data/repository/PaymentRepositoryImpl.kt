@@ -14,6 +14,7 @@ import com.darshan.payflow.domain.repository.PaymentRepository
 import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -58,6 +59,9 @@ class PaymentRepositoryImpl @Inject constructor(
     }
 
     override fun observeSummary(): Flow<HistorySummary> = dao.observeSummary().map { it.toDomain() }
+
+    override fun observeSummarySince(since: Instant): Flow<HistorySummary> =
+        dao.observeSummarySince(since.toEpochMilli()).map { it.toDomain() }
 
     override suspend fun findByIdempotencyKey(key: String): Payment? = dao.getByIdempotencyKey(key)?.toDomain()
 

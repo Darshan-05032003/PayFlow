@@ -57,6 +57,23 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `month summary only counts payments created this month`() = runTest(dispatcher) {
+        // fixedClock is 2026-10-29T10:15:30Z; "b" was created in September.
+        repo.seed(
+            testPayment("a", status = PaymentStatus.SUCCESS, amountPaise = 100),
+            testPayment("b", status = PaymentStatus.SUCCESS, amountPaise = 200, createdAt = java.time.Instant.parse("2026-09-30T23:59:59Z")),
+        )
+        val vm = HomeViewModel(repo, reconcile(), TestDispatcherProvider(dispatcher), com.darshan.payflow.testutil.fixedClock, java.time.ZoneOffset.UTC)
+        vm.uiState.test {
+            awaitItem() // loading
+            val content = awaitItem() as HomeUiState.Content
+            assertThat(content.summary.sentPaise).isEqualTo(300)
+            assertThat(content.month.sentPaise).isEqualTo(100)
+            assertThat(content.month.total).isEqualTo(1)
+        }
+    }
+
+    @Test
     fun `repository failure becomes error state and retry recovers`() = runTest(dispatcher) {
         repo.failure = IOException("disk")
         val vm = vm()

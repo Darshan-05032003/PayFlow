@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,7 +71,7 @@ class HomeHistoryFlowIntegrationTest {
             }
         }
         rule.waitUntilWithMainLooper(5_000) { vm.uiState.value is HomeUiState.Empty }
-        rule.onNodeWithTag(PayFlowTestTags.EMPTY).assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.EMPTY).performScrollTo().assertIsDisplayed()
 
         runOffMain {
             repo.create(testPayment("a", payeeName = "Alice", amountPaise = 9_900))
@@ -78,8 +79,8 @@ class HomeHistoryFlowIntegrationTest {
             repo.applyEvent("a", PaymentEvent.Confirm("psp", "upi"))
         }
         rule.waitUntilWithMainLooper(5_000) { vm.uiState.value is HomeUiState.Content }
-        rule.onNodeWithText("Alice").assertIsDisplayed()
-        rule.onAllNodesWithText("₹99.00").onFirst().assertIsDisplayed()
+        rule.onNodeWithText("Alice").performScrollTo().assertIsDisplayed()
+        rule.onAllNodesWithText("₹99.00").onFirst().performScrollTo().assertIsDisplayed()
     }
 
     @Test

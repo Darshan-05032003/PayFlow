@@ -97,6 +97,10 @@ class PaymentRepositoryImplTest {
         assertThat(summary.total).isEqualTo(2)
         assertThat(summary.success).isEqualTo(1)
         assertThat(summary.failed).isEqualTo(1)
+        val recentOnly = repo.observeSummarySince(FIXED_INSTANT).first()
+        assertThat(recentOnly.total).isEqualTo(1)
+        assertThat(recentOnly.failed).isEqualTo(1)
+        assertThat(recentOnly.success).isEqualTo(0)
     }
 
     @Test

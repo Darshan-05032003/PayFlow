@@ -80,7 +80,7 @@ class HistoryScreenTest {
         rule.onNodeWithText("alice@okbank").assertIsDisplayed()
         rule.onNodeWithText("PSP123").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("UPI456").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Success").assertIsDisplayed()
+        rule.onNodeWithText("Success").performScrollTo().assertIsDisplayed()
     }
 
     @Test

@@ -4,16 +4,33 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,16 +41,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,8 +64,14 @@ import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.ui.PayFlowTestTags
+import com.darshan.payflow.ui.components.BannerTone
+import com.darshan.payflow.ui.components.InfoBanner
 import com.darshan.payflow.ui.components.LoadingView
 import com.darshan.payflow.ui.components.SecureWindow
+import com.darshan.payflow.ui.components.SectionCard
+import com.darshan.payflow.ui.components.StateIcon
+import com.darshan.payflow.ui.theme.PayFlowTheme
+import com.darshan.payflow.ui.theme.ScreenPadding
 
 data class PayCallbacks(
     val onBack: () -> Unit = {},
@@ -122,31 +149,52 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, snackbarHostState: Sna
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             when (val phase = state.phase) {
                 PayPhase.Idle, PayPhase.Submitting -> PayForm(state, callbacks)
-                is PayPhase.AwaitingApp -> StatusBlock(stringResource(R.string.pay_awaiting_app), stringResource(R.string.pay_awaiting_app_hint)) {
+                is PayPhase.AwaitingApp -> StatusBlock(
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                    colors = PayFlowTheme.status.pending,
+                    title = stringResource(R.string.pay_awaiting_app),
+                    hint = stringResource(R.string.pay_awaiting_app_hint),
+                ) {
                     OutlinedButton(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
                         Text(stringResource(R.string.pay_check_status))
                     }
                 }
-                is PayPhase.Confirming -> {
-                    Text(stringResource(R.string.pay_confirming), style = MaterialTheme.typography.titleMedium)
-                    LoadingView(Modifier.padding(top = 32.dp))
+                is PayPhase.Confirming -> Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(56.dp))
+                    Text(stringResource(R.string.pay_confirming), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    Text(
+                        stringResource(R.string.pay_confirming_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
                 }
                 is PayPhase.Done -> DoneBlock(phase, callbacks)
-                is PayPhase.Unresolved -> StatusBlock(stringResource(R.string.pay_unresolved), stringResource(R.string.pay_unresolved_hint)) {
+                is PayPhase.Unresolved -> StatusBlock(
+                    icon = Icons.Outlined.CloudOff,
+                    colors = PayFlowTheme.status.failed,
+                    title = stringResource(R.string.pay_unresolved),
+                    hint = stringResource(R.string.pay_unresolved_hint),
+                ) {
                     Button(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
                         Text(stringResource(R.string.pay_check_status))
                     }
-                    TextButton(onClick = { callbacks.onOpenPayment(phase.paymentId) }) { Text(stringResource(R.string.pay_view_payment)) }
+                    OutlinedButton(onClick = { callbacks.onOpenPayment(phase.paymentId) }) { Text(stringResource(R.string.pay_view_payment)) }
                 }
             }
         }
@@ -156,77 +204,143 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, snackbarHostState: Sna
 @Composable
 private fun PayForm(state: PayUiState, callbacks: PayCallbacks) {
     val busy = state.isBusy
-    OutlinedTextField(
-        value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = !busy && !state.payeeLocked, singleLine = true,
-        label = { Text(stringResource(R.string.pay_vpa)) },
-        isError = state.errors.vpa != null,
-        supportingText = {
-            val error = state.errors.vpa
-            when {
-                error != null -> Text(error.message())
-                state.verification is VpaVerificationState.Verifying -> Text(stringResource(R.string.pay_verifying))
-                state.verification is VpaVerificationState.Verified -> Text(stringResource(R.string.pay_verified, state.verification.payeeName), modifier = Modifier.testTag(PayFlowTestTags.PAY_VERIFIED))
-                state.verification is VpaVerificationState.NotFound -> Text(stringResource(R.string.error_vpa_not_found), color = MaterialTheme.colorScheme.error)
-                state.verification is VpaVerificationState.Unavailable -> Text(stringResource(R.string.pay_verify_unavailable), color = MaterialTheme.colorScheme.tertiary)
-                else -> Unit
-            }
-        },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_VPA),
-    )
-    OutlinedTextField(
-        value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.nameLocked, singleLine = true,
-        label = { Text(stringResource(R.string.pay_payee_name)) },
-        isError = state.errors.name != null,
-        supportingText = state.errors.name?.let { { Text(it.message()) } },
-        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NAME),
-    )
-    OutlinedTextField(
-        value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = !busy && !state.amountLocked, singleLine = true,
-        label = { Text(stringResource(R.string.pay_amount)) },
-        prefix = { Text("₹") },
-        isError = state.errors.amount != null,
-        supportingText = state.errors.amount?.let { { Text(it.message()) } },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_AMOUNT),
-    )
-    OutlinedTextField(
-        value = state.note, onValueChange = callbacks.onNoteChange, enabled = !busy, singleLine = true,
-        label = { Text(stringResource(R.string.pay_note)) },
-        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NOTE),
-    )
-    Button(onClick = callbacks.onSubmit, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_SUBMIT)) {
-        Text(stringResource(R.string.pay_submit))
+    SectionCard(stringResource(R.string.pay_section_payee), icon = Icons.Outlined.Person) {
+        OutlinedTextField(
+            value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = !busy && !state.payeeLocked, singleLine = true,
+            label = { Text(stringResource(R.string.pay_vpa)) },
+            placeholder = { Text(stringResource(R.string.pay_vpa_placeholder)) },
+            leadingIcon = { Icon(Icons.Outlined.AlternateEmail, contentDescription = null) },
+            trailingIcon = when {
+                state.payeeLocked -> ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) })
+                state.verification is VpaVerificationState.Verified -> ({ Icon(Icons.Outlined.Verified, contentDescription = null, tint = PayFlowTheme.status.success.content) })
+                else -> null
+            },
+            isError = state.errors.vpa != null,
+            supportingText = {
+                val error = state.errors.vpa
+                when {
+                    error != null -> Text(error.message())
+                    state.verification is VpaVerificationState.Verifying -> Text(stringResource(R.string.pay_verifying))
+                    state.verification is VpaVerificationState.Verified -> Text(
+                        stringResource(R.string.pay_verified, state.verification.payeeName),
+                        color = PayFlowTheme.status.success.content,
+                        modifier = Modifier.testTag(PayFlowTestTags.PAY_VERIFIED),
+                    )
+                    state.verification is VpaVerificationState.NotFound -> Text(stringResource(R.string.error_vpa_not_found), color = MaterialTheme.colorScheme.error)
+                    state.verification is VpaVerificationState.Unavailable -> Text(stringResource(R.string.pay_verify_unavailable), color = MaterialTheme.colorScheme.tertiary)
+                    else -> Text(stringResource(R.string.pay_vpa_hint))
+                }
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_VPA),
+        )
+        OutlinedTextField(
+            value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.nameLocked, singleLine = true,
+            label = { Text(stringResource(R.string.pay_payee_name)) },
+            leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+            trailingIcon = if (state.nameLocked) ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) }) else null,
+            isError = state.errors.name != null,
+            supportingText = state.errors.name?.let { { Text(it.message()) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NAME),
+        )
     }
-    if (busy) LoadingView(Modifier.padding(top = 16.dp))
-    Text(stringResource(R.string.pay_sandbox_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    SectionCard(stringResource(R.string.pay_section_amount), icon = Icons.Outlined.Notes) {
+        OutlinedTextField(
+            value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = !busy && !state.amountLocked, singleLine = true,
+            label = { Text(stringResource(R.string.pay_amount)) },
+            prefix = { Text("₹", style = MaterialTheme.typography.headlineSmall) },
+            textStyle = MaterialTheme.typography.headlineSmall,
+            trailingIcon = if (state.amountLocked) ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) }) else null,
+            isError = state.errors.amount != null,
+            supportingText = { Text(state.errors.amount?.message() ?: stringResource(R.string.pay_amount_hint, Money.formatInr(Payment.MAX_AMOUNT_PAISE))) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_AMOUNT),
+        )
+        OutlinedTextField(
+            value = state.note, onValueChange = callbacks.onNoteChange, enabled = !busy, singleLine = true,
+            label = { Text(stringResource(R.string.pay_note)) },
+            leadingIcon = { Icon(Icons.Outlined.Notes, contentDescription = null) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NOTE),
+        )
+    }
+    Button(
+        onClick = callbacks.onSubmit,
+        enabled = !busy,
+        contentPadding = ButtonDefaults.ContentPadding,
+        modifier = Modifier.fillMaxWidth().height(52.dp).testTag(PayFlowTestTags.PAY_SUBMIT),
+    ) {
+        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+        Text(stringResource(R.string.pay_submit), modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
+    }
+    if (busy) LoadingView(Modifier.height(72.dp))
+    InfoBanner(stringResource(R.string.pay_sandbox_note), icon = Icons.Outlined.Science, tone = BannerTone.Info)
 }
 
+/** Centred status block: a big tinted icon, a title, a hint and the actions for this phase. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatusBlock(title: String, hint: String, actions: @Composable () -> Unit) {
-    Text(title, style = MaterialTheme.typography.titleMedium)
-    Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
+private fun StatusBlock(
+    icon: ImageVector,
+    colors: com.darshan.payflow.ui.theme.StatusColor,
+    title: String,
+    hint: String?,
+    detail: @Composable (() -> Unit)? = null,
+    actions: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        StateIcon(icon, container = colors.container, tint = colors.content, modifier = Modifier.size(96.dp))
+        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        if (hint != null) {
+            Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        }
+        detail?.invoke()
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 8.dp),
+        ) { actions() }
+    }
 }
 
 @Composable
 private fun DoneBlock(phase: PayPhase.Done, callbacks: PayCallbacks) {
-    val title = when (phase.status) {
-        PaymentStatus.SUCCESS -> stringResource(R.string.pay_done_success)
-        PaymentStatus.PENDING, PaymentStatus.CREATED -> stringResource(R.string.pay_done_pending)
+    val pending = phase.status == PaymentStatus.PENDING || phase.status == PaymentStatus.CREATED
+    val success = phase.status == PaymentStatus.SUCCESS
+    val (icon, colors) = when {
+        success -> Icons.Outlined.CheckCircle to PayFlowTheme.status.success
+        pending -> Icons.Outlined.Schedule to PayFlowTheme.status.pending
+        else -> Icons.Outlined.ErrorOutline to PayFlowTheme.status.failed
+    }
+    val title = when {
+        success -> stringResource(R.string.pay_done_success)
+        pending -> stringResource(R.string.pay_done_pending)
         else -> stringResource(R.string.pay_done_failed)
     }
-    Text(title, style = MaterialTheme.typography.headlineSmall)
-    phase.reason?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    if (phase.status == PaymentStatus.PENDING) {
-        Text(stringResource(R.string.pay_done_pending_hint), style = MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
-            Text(stringResource(R.string.pay_check_status))
-        }
+    val hint = when {
+        success -> stringResource(R.string.pay_done_success_hint)
+        pending -> stringResource(R.string.pay_done_pending_hint)
+        else -> null
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    StatusBlock(
+        icon = icon,
+        colors = colors,
+        title = title,
+        hint = hint,
+        detail = phase.reason?.let { reason -> { Text(reason, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) } },
+    ) {
+        if (pending) {
+            OutlinedButton(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
+                Text(stringResource(R.string.pay_check_status))
+            }
+        }
         if (phase.paymentId.isNotEmpty()) {
-            TextButton(onClick = { callbacks.onOpenPayment(phase.paymentId) }) { Text(stringResource(R.string.pay_view_payment)) }
+            OutlinedButton(onClick = { callbacks.onOpenPayment(phase.paymentId) }) { Text(stringResource(R.string.pay_view_payment)) }
         }
         Button(onClick = callbacks.onReset, modifier = Modifier.testTag(PayFlowTestTags.PAY_RESET)) { Text(stringResource(R.string.pay_new_payment)) }
     }

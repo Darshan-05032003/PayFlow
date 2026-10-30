@@ -1,6 +1,7 @@
 package com.darshan.payflow.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,26 +40,26 @@ fun PaymentStatus.label(): String = stringResource(
     },
 )
 
+/** Foreground colour for a status, usable on plain surfaces (headlines, detail text). */
 @Composable
-fun PaymentStatus.color(): Color = when (this) {
-    PaymentStatus.SUCCESS -> MaterialTheme.colorScheme.primary
-    PaymentStatus.FAILED -> MaterialTheme.colorScheme.error
-    PaymentStatus.REFUNDED, PaymentStatus.REFUND_PENDING -> MaterialTheme.colorScheme.tertiary
-    PaymentStatus.CREATED, PaymentStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
-}
+fun PaymentStatus.color(): Color = statusColor().content
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
 fun Payment.formattedDate(zone: ZoneId = ZoneId.systemDefault()): String = dateFormatter.format(createdAt.atZone(zone))
 
+/**
+ * One payment in a list: payee avatar + name, relative time and UPI ID, amount and a status chip.
+ * The whole row is one accessibility node ("Payment to Alice, ₹123.45, Success").
+ */
 @Composable
 fun PaymentRow(payment: Payment, onClick: (String) -> Unit, modifier: Modifier = Modifier) {
     val amount = Money.formatInr(payment.amountPaise)
     val status = payment.status.label()
-    val direction = stringResource(
-        if (payment.direction == PaymentDirection.OUTGOING) R.string.payment_to else R.string.payment_from,
-    )
+    val outgoing = payment.direction == PaymentDirection.OUTGOING
+    val direction = stringResource(if (outgoing) R.string.payment_to else R.string.payment_from)
     val description = stringResource(R.string.payment_row_description, direction, payment.payeeName, amount, status)
+    val time = payment.createdAt.relativeLabel()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -67,23 +68,29 @@ fun PaymentRow(payment: Payment, onClick: (String) -> Unit, modifier: Modifier =
             .testTag(PayFlowTestTags.paymentRow(payment.id))
             .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        InitialAvatar(payment.payeeName)
         Column(modifier = Modifier.weight(1f)) {
             Text(payment.payeeName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                payment.payeeVpa,
+                "$time · ${payment.payeeVpa}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                if (payment.direction == PaymentDirection.OUTGOING) amount else "+$amount",
-                style = MaterialTheme.typography.bodyLarge,
+                if (outgoing) "− $amount" else "+ $amount",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (!outgoing) PayFlowThemeSuccess() else MaterialTheme.colorScheme.onSurface,
             )
-            Text(status, style = MaterialTheme.typography.labelMedium, color = payment.status.color())
+            StatusChip(payment.status)
         }
     }
 }
+
+@Composable
+private fun PayFlowThemeSuccess(): Color = com.darshan.payflow.ui.theme.PayFlowTheme.status.success.content

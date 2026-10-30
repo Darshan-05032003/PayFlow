@@ -5,19 +5,64 @@
     <string name="back">Back</string>
     <string name="error_generic">Something went wrong. Please try again.</string>
 
+    <!-- Relative time -->
+    <string name="time_just_now">Just now</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="one">%1$d min ago</item>
+        <item quantity="other">%1$d min ago</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <string name="time_yesterday">Yesterday</string>
+    <plurals name="time_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+
     <!-- Home -->
+    <string name="home_tagline">UPI payments · sandbox</string>
     <string name="home_empty_title">No payments yet</string>
-    <string name="home_empty_subtitle">Your UPI payments will show up here.</string>
-    <string name="home_recent">Recent</string>
+    <string name="home_empty_subtitle">Pay someone or scan a QR code to see it here.</string>
+    <string name="home_recent">Recent payments</string>
     <string name="home_view_all">View all</string>
-    <string name="home_sent">Sent (successful)</string>
+    <string name="home_sent_this_month">Sent this month</string>
+    <string name="home_all_time">All time: %1$s across %2$d payments</string>
     <string name="home_summary_line">%1$d successful · %2$d pending · %3$d failed</string>
+    <string name="home_quick_actions">Quick actions</string>
+    <string name="home_action_pay">Pay</string>
+    <string name="home_action_scan">Scan QR</string>
+    <string name="home_action_requests">Requests</string>
+    <string name="home_action_autopay">AutoPay</string>
+    <string name="home_action_checkout">Checkout</string>
+    <string name="home_action_security">Security</string>
+    <string name="home_sandbox_footer">Sandbox build: payments are settled by an in-app fake provider, no real money moves.</string>
 
     <!-- History -->
     <string name="history_title">History</string>
     <string name="history_search">Search payee or UPI ID</string>
-    <string name="history_empty_filter">No %1$s payments</string>
+    <string name="history_empty_all">No payments yet</string>
+    <string name="history_empty_success">No successful payments</string>
+    <string name="history_empty_pending">No pending payments</string>
+    <string name="history_empty_failed">No failed payments</string>
+    <string name="history_empty_refunded">No refunded payments</string>
+    <string name="history_empty_hint">Payments you make will show up here.</string>
     <string name="history_empty_search">No payments match “%1$s”</string>
+    <string name="history_empty_search_hint">Try a different payee name or UPI ID.</string>
+    <string name="history_count">%1$d payments</string>
+    <string name="history_clear_search">Clear search</string>
+
+    <!-- Payment detail -->
+    <string name="detail_section_details">Details</string>
+    <string name="detail_section_references">References</string>
+    <string name="detail_copied">%1$s copied</string>
+    <string name="detail_copy">Copy %1$s</string>
+    <string name="method_upi_intent">UPI app</string>
+    <string name="method_qr_scan">QR scan</string>
+    <string name="method_collect">Collect request</string>
+    <string name="method_mandate">AutoPay mandate</string>
+    <string name="method_checkout">Checkout</string>
     <string name="filter_all">All</string>
     <string name="filter_success">Success</string>
     <string name="filter_pending">Pending</string>
@@ -57,6 +102,14 @@
     <string name="pay_amount">Amount</string>
     <string name="pay_note">Note (optional)</string>
     <string name="pay_submit">Pay with UPI app</string>
+    <string name="pay_section_payee">Payee</string>
+    <string name="pay_section_amount">Amount</string>
+    <string name="pay_vpa_placeholder">name@bank</string>
+    <string name="pay_vpa_hint">The registered name is checked before you pay.</string>
+    <string name="pay_field_locked">Filled from the QR code</string>
+    <string name="pay_amount_hint">Up to %1$s per payment</string>
+    <string name="pay_confirming_hint">This usually takes a few seconds. Please keep the app open.</string>
+    <string name="pay_done_success_hint">Confirmed by the payment provider.</string>
     <string name="pay_chooser_title">Pay with</string>
     <string name="pay_no_upi_app">No UPI app found on this device</string>
     <string name="pay_sandbox_note">Sandbox build: the result shown here comes from the sandbox payment provider, not from your bank.</string>
@@ -83,7 +136,9 @@
     <string name="scan_torch_on">Turn torch on</string>
     <string name="scan_torch_off">Turn torch off</string>
     <string name="scan_permission_rationale">PayFlow needs the camera to read UPI QR codes</string>
+    <string name="scan_permission_hint">The camera is used only while this screen is open. Nothing is recorded.</string>
     <string name="scan_allow_camera">Allow camera</string>
+    <string name="scan_permission_denied_hint">Enable the camera permission for PayFlow in system settings to scan codes.</string>
     <string name="scan_permission_denied">Camera permission is turned off</string>
     <string name="scan_open_settings">Open settings</string>
     <string name="scan_camera_error">The camera could not be started</string>
@@ -111,6 +166,12 @@
     <string name="collect_empty">No payment requests</string>
     <string name="collect_empty_hint">Requests to pay someone will appear here.</string>
     <string name="collect_received">Received %1$s</string>
+    <string name="collect_expires">Expires %1$s</string>
+    <plurals name="collect_pending_banner">
+        <item quantity="one">%1$d request is waiting for your answer. Approving pays from the sandbox account.</item>
+        <item quantity="other">%1$d requests are waiting for your answer. Approving pays from the sandbox account.</item>
+    </plurals>
+    <string name="collect_none_pending">All requests have been answered. Tap refresh to check for new ones.</string>
     <string name="collect_approve">Approve</string>
     <string name="collect_decline">Decline</string>
     <string name="collect_status_pending">Pending</string>
@@ -129,6 +190,14 @@
     <string name="mandates_empty">No AutoPay mandates</string>
     <string name="mandates_empty_hint">Set up a mandate to let a merchant debit you automatically within limits you choose.</string>
     <string name="mandate_create">New mandate</string>
+    <string name="mandates_intro">Standing instructions that let a merchant debit you automatically, within the limits you set.</string>
+    <string name="mandate_section_merchant">Merchant</string>
+    <string name="mandate_section_rules">Rules</string>
+    <string name="mandate_section_terms">Terms</string>
+    <string name="mandate_max_amount_hint">The merchant can never debit more than this per period.</string>
+    <string name="mandate_validity_range">%1$s – %2$s</string>
+    <string name="mandate_history_empty_hint">Debits taken under this mandate will be listed here.</string>
+    <string name="mandate_create_sandbox">Sandbox: the mandate is registered with the fake payment provider. No bank is involved.</string>
     <string name="mandate_create_submit">Create mandate</string>
     <string name="mandate_detail_title">Mandate</string>
     <string name="mandate_not_found">Mandate not found</string>
@@ -240,11 +309,28 @@
     <string name="security_integrity_unevaluated">Integrity could not be evaluated.</string>
     <string name="security_integrity_sandbox">(verified by the sandbox verifier; real verification needs a server)</string>
     <string name="security_integrity_check">Request token</string>
+    <string name="security_overview_title">%1$d of %2$d protections active</string>
+    <string name="security_overview_hint">App lock, device binding, tamper checks and Play Integrity.</string>
+    <string name="security_state_on">On</string>
+    <string name="security_state_off">Off</string>
+    <string name="security_phone_placeholder">98765 43210</string>
+    <string name="security_tamper_debug_hint">Debug builds always report the debuggable flag; that is expected during development.</string>
+    <string name="security_sandbox_note">Sandbox: OTP delivery and the integrity verdict are simulated in-app. The Keystore, BiometricPrompt and the Play Integrity request itself are real.</string>
+
+    <!-- Lock screen -->
+    <string name="lock_setup_title">Set up app lock</string>
+    <string name="lock_setup_confirm_hint">Enter the same PIN once more.</string>
+    <string name="lock_backspace">Delete last digit</string>
 
     <!-- Checkout (CheckoutKit) -->
     <string name="checkout_title">Checkout</string>
     <string name="checkout_intro">Sandbox merchant demo: pay with the CheckoutKit payment sheet (UPI, card or wallet). Every outcome lands in your history.</string>
     <string name="checkout_buy">Buy</string>
+    <string name="checkout_merchant">Sold by %1$s</string>
+    <string name="checkout_section_products">Products</string>
+    <string name="checkout_section_outcome">Last checkout</string>
+    <string name="checkout_powered_by">Powered by the CheckoutKit SDK (JitPack)</string>
+    <string name="checkout_test_hint">Any UPI ID works in the sandbox: the fake provider settles every order and records it in your history.</string>
     <string name="checkout_cancelled">Checkout cancelled. Nothing was charged.</string>
     <string name="checkout_outcome_success">Payment successful</string>
     <string name="checkout_outcome_failed">Payment failed</string>

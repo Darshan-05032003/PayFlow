@@ -1,6 +1,30 @@
 package com.darshan.payflow.ui.security
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.PhonelinkLock
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Sms
+import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.ImeAction
+import com.darshan.payflow.ui.components.BannerTone
+import com.darshan.payflow.ui.components.InfoBanner
+import com.darshan.payflow.ui.components.SectionCard
+import com.darshan.payflow.ui.components.StatusChip
+import com.darshan.payflow.ui.theme.PayFlowTheme
+import com.darshan.payflow.ui.theme.ScreenPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,6 +112,7 @@ fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
             TopAppBar(
                 title = { Text(stringResource(R.string.security_title)) },
                 navigationIcon = { IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -95,46 +120,116 @@ fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
             LoadingView(Modifier.padding(padding))
             return@Scaffold
         }
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Section(stringResource(R.string.security_pin_title)) {
+        Column(
+            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SecurityOverview(state)
+            SectionCard(stringResource(R.string.security_pin_title), icon = Icons.Outlined.Fingerprint, trailing = { OnOffChip(state.pinConfigured) }) {
                 if (state.pinConfigured) {
-                    Text(stringResource(R.string.security_pin_on))
+                    StatusLine(stringResource(R.string.security_pin_on), ok = true)
                     OutlinedButton(onClick = callbacks.onRemovePin, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_REMOVE_PIN)) { Text(stringResource(R.string.security_pin_remove)) }
                 } else {
-                    Text(stringResource(R.string.security_pin_off), color = MaterialTheme.colorScheme.error)
+                    StatusLine(stringResource(R.string.security_pin_off), ok = false)
                     Button(onClick = callbacks.onSetupPin, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_SETUP_PIN)) { Text(stringResource(R.string.security_pin_setup)) }
                 }
             }
-            Section(stringResource(R.string.security_binding_title)) { BindingSection(state, callbacks) }
-            Section(stringResource(R.string.security_tamper_title)) {
+            SectionCard(stringResource(R.string.security_binding_title), icon = Icons.Outlined.PhonelinkLock, trailing = { OnOffChip(state.binding is BindingStatus.Bound) }) {
+                BindingSection(state, callbacks)
+            }
+            SectionCard(stringResource(R.string.security_tamper_title), icon = Icons.Outlined.Shield, trailing = { state.tamper?.let { OnOffChip(it.findings.isEmpty()) } }) {
                 val report = state.tamper
                 when {
-                    report == null -> Text(stringResource(R.string.loading))
-                    report.findings.isEmpty() -> Text(stringResource(R.string.security_tamper_clean), color = MaterialTheme.colorScheme.primary)
-                    else -> report.findings.forEach { Text("• " + it.label(), color = MaterialTheme.colorScheme.error) }
+                    report == null -> Text(stringResource(R.string.loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    report.findings.isEmpty() -> StatusLine(stringResource(R.string.security_tamper_clean), ok = true)
+                    else -> report.findings.forEach { StatusLine(it.label(), ok = false) }
                 }
-                if (report?.shouldBlockPayments == true) Text(stringResource(R.string.security_tamper_blocked), style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(onClick = callbacks.onRefresh) { Text(stringResource(R.string.security_rescan)) }
+                if (report?.shouldBlockPayments == true) {
+                    InfoBanner(stringResource(R.string.security_tamper_blocked), icon = Icons.Outlined.Block, tone = BannerTone.Error)
+                } else if (report != null && report.findings.isNotEmpty()) {
+                    Text(stringResource(R.string.security_tamper_debug_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = callbacks.onRefresh) {
+                    Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.security_rescan), modifier = Modifier.padding(start = 6.dp))
+                }
             }
-            Section(stringResource(R.string.security_integrity_title)) {
-                Text(
-                    when (val s = state.integrity) {
-                        IntegrityStatus.NotChecked -> stringResource(R.string.security_integrity_not_checked)
-                        IntegrityStatus.Checking -> stringResource(R.string.loading)
-                        IntegrityStatus.NotConfigured -> stringResource(R.string.security_integrity_not_configured)
-                        is IntegrityStatus.Error -> stringResource(R.string.security_integrity_error, s.code)
-                        is IntegrityStatus.Result -> when (s.verdict) {
-                            IntegrityVerdict.MEETS_DEVICE_INTEGRITY -> stringResource(R.string.security_integrity_ok)
-                            IntegrityVerdict.FAILED -> stringResource(R.string.security_integrity_failed)
-                            IntegrityVerdict.UNEVALUATED -> stringResource(R.string.security_integrity_unevaluated)
-                        } + if (s.sandboxVerifier) " " + stringResource(R.string.security_integrity_sandbox) else ""
-                    },
-                )
-                Button(onClick = callbacks.onCheckIntegrity, enabled = state.integrity != IntegrityStatus.Checking, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_INTEGRITY)) {
+            SectionCard(stringResource(R.string.security_integrity_title), icon = Icons.Outlined.VerifiedUser) {
+                val s = state.integrity
+                val ok: Boolean? = when (s) {
+                    is IntegrityStatus.Result -> s.verdict == IntegrityVerdict.MEETS_DEVICE_INTEGRITY
+                    is IntegrityStatus.Error -> false
+                    else -> null
+                }
+                val text = when (s) {
+                    IntegrityStatus.NotChecked -> stringResource(R.string.security_integrity_not_checked)
+                    IntegrityStatus.Checking -> stringResource(R.string.loading)
+                    IntegrityStatus.NotConfigured -> stringResource(R.string.security_integrity_not_configured)
+                    is IntegrityStatus.Error -> stringResource(R.string.security_integrity_error, s.code)
+                    is IntegrityStatus.Result -> when (s.verdict) {
+                        IntegrityVerdict.MEETS_DEVICE_INTEGRITY -> stringResource(R.string.security_integrity_ok)
+                        IntegrityVerdict.FAILED -> stringResource(R.string.security_integrity_failed)
+                        IntegrityVerdict.UNEVALUATED -> stringResource(R.string.security_integrity_unevaluated)
+                    } + if (s.sandboxVerifier) " " + stringResource(R.string.security_integrity_sandbox) else ""
+                }
+                if (ok == null) Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant) else StatusLine(text, ok = ok)
+                if (s == IntegrityStatus.Checking) LinearProgressIndicator(Modifier.fillMaxWidth())
+                Button(onClick = callbacks.onCheckIntegrity, enabled = s != IntegrityStatus.Checking, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_INTEGRITY)) {
                     Text(stringResource(R.string.security_integrity_check))
                 }
             }
+            InfoBanner(stringResource(R.string.security_sandbox_note), icon = Icons.Outlined.Science, tone = BannerTone.Info)
         }
+    }
+}
+
+/** Headline card: how many of the four protections are active. */
+@Composable
+private fun SecurityOverview(state: SecurityUiState) {
+    val checks = listOf(
+        state.pinConfigured,
+        state.binding is BindingStatus.Bound,
+        state.tamper?.findings?.isEmpty() == true,
+        (state.integrity as? IntegrityStatus.Result)?.verdict == IntegrityVerdict.MEETS_DEVICE_INTEGRITY,
+    )
+    val active = checks.count { it }
+    val colors = when {
+        active == checks.size -> PayFlowTheme.status.success
+        active >= 2 -> PayFlowTheme.status.pending
+        else -> PayFlowTheme.status.failed
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = colors.container, contentColor = colors.content),
+    ) {
+        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Shield, contentDescription = null, modifier = Modifier.size(40.dp))
+            Column(Modifier.padding(start = 16.dp)) {
+                Text(stringResource(R.string.security_overview_title, active, checks.size), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.security_overview_hint), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnOffChip(on: Boolean) {
+    val colors = if (on) PayFlowTheme.status.success else PayFlowTheme.status.pending
+    StatusChip(stringResource(if (on) R.string.security_state_on else R.string.security_state_off), colors)
+}
+
+@Composable
+private fun StatusLine(text: String, ok: Boolean) {
+    val colors = if (ok) PayFlowTheme.status.success else PayFlowTheme.status.failed
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            if (ok) Icons.Outlined.CheckCircle else Icons.Outlined.ErrorOutline,
+            contentDescription = null,
+            tint = colors.content,
+            modifier = Modifier.size(20.dp).padding(top = 1.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -142,19 +237,27 @@ fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
 private fun BindingSection(state: SecurityUiState, callbacks: SecurityCallbacks) {
     when (val b = state.binding) {
         is BindingStatus.Bound -> {
-            Text(stringResource(R.string.security_bound, b.maskedPhone))
+            StatusLine(stringResource(R.string.security_bound, b.maskedPhone), ok = true)
             OutlinedButton(onClick = callbacks.onUnbind, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_UNBIND)) { Text(stringResource(R.string.security_unbind)) }
         }
         is BindingStatus.Mismatch -> {
-            Text(stringResource(R.string.security_binding_mismatch, b.maskedPhone), color = MaterialTheme.colorScheme.error)
+            StatusLine(stringResource(R.string.security_binding_mismatch, b.maskedPhone), ok = false)
             Button(onClick = callbacks.onUnbind) { Text(stringResource(R.string.security_rebind)) }
         }
         is BindingStatus.OtpPending -> {
-            Text(stringResource(R.string.security_otp_sent, b.maskedPhone))
-            state.sandboxOtp?.let { Text(stringResource(R.string.security_sandbox_otp, it), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_SANDBOX_OTP)) }
+            Text(stringResource(R.string.security_otp_sent, b.maskedPhone), style = MaterialTheme.typography.bodyMedium)
+            state.sandboxOtp?.let {
+                InfoBanner(
+                    stringResource(R.string.security_sandbox_otp, it),
+                    icon = Icons.Outlined.Sms,
+                    tone = BannerTone.Warning,
+                    modifier = Modifier.testTag(PayFlowTestTags.SECURITY_SANDBOX_OTP),
+                )
+            }
             OutlinedTextField(
                 value = state.otpInput, onValueChange = callbacks.onOtpChange, singleLine = true, enabled = !state.busy,
-                label = { Text(stringResource(R.string.security_otp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                label = { Text(stringResource(R.string.security_otp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                leadingIcon = { Icon(Icons.Outlined.Password, contentDescription = null) },
                 isError = state.bindingError != null,
                 supportingText = state.bindingError?.let { { Text(stringResource(if (it == BindingError.WRONG_OTP) R.string.security_otp_wrong else R.string.security_otp_expired)) } },
                 modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.SECURITY_OTP),
@@ -165,10 +268,12 @@ private fun BindingSection(state: SecurityUiState, callbacks: SecurityCallbacks)
             }
         }
         BindingStatus.Unbound -> {
-            Text(stringResource(R.string.security_unbound))
+            Text(stringResource(R.string.security_unbound), style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = state.phoneInput, onValueChange = callbacks.onPhoneChange, singleLine = true, enabled = !state.busy,
-                label = { Text(stringResource(R.string.security_phone)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                label = { Text(stringResource(R.string.security_phone)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+                leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = null) },
+                placeholder = { Text(stringResource(R.string.security_phone_placeholder)) },
                 isError = state.bindingError == BindingError.INVALID_PHONE,
                 supportingText = if (state.bindingError == BindingError.INVALID_PHONE) { { Text(stringResource(R.string.security_phone_invalid)) } } else null,
                 modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.SECURITY_PHONE),
@@ -176,14 +281,5 @@ private fun BindingSection(state: SecurityUiState, callbacks: SecurityCallbacks)
             Button(onClick = callbacks.onRequestOtp, enabled = !state.busy, modifier = Modifier.testTag(PayFlowTestTags.SECURITY_SEND_OTP)) { Text(stringResource(R.string.security_send_otp)) }
         }
     }
-}
-
-@Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            content()
-        }
-    }
+    if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
 }

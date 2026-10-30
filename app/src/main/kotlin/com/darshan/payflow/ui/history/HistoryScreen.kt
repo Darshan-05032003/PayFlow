@@ -2,13 +2,33 @@ package com.darshan.payflow.ui.history
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.ImeAction
+import com.darshan.payflow.ui.theme.ScreenPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,6 +37,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -74,6 +95,25 @@ fun HistoryFilter.label(): String = stringResource(
     },
 )
 
+@Composable
+private fun HistoryFilter.emptyTitle(): String = stringResource(
+    when (this) {
+        HistoryFilter.ALL -> R.string.history_empty_all
+        HistoryFilter.SUCCESS -> R.string.history_empty_success
+        HistoryFilter.PENDING -> R.string.history_empty_pending
+        HistoryFilter.FAILED -> R.string.history_empty_failed
+        HistoryFilter.REFUNDED -> R.string.history_empty_refunded
+    },
+)
+
+private fun HistoryFilter.emptyIcon(): ImageVector = when (this) {
+    HistoryFilter.ALL -> Icons.Outlined.ReceiptLong
+    HistoryFilter.SUCCESS -> Icons.Outlined.CheckCircle
+    HistoryFilter.PENDING -> Icons.Outlined.Schedule
+    HistoryFilter.FAILED -> Icons.Outlined.ErrorOutline
+    HistoryFilter.REFUNDED -> Icons.Outlined.Replay
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
@@ -98,6 +138,7 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -105,12 +146,24 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it; callbacks.onQuery(it) },
-                label = { Text(stringResource(R.string.history_search)) },
+                placeholder = { Text(stringResource(R.string.history_search)) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                trailingIcon = if (text.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { text = ""; callbacks.onQuery("") }) {
+                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.history_clear_search))
+                        }
+                    }
+                } else {
+                    null
+                },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(PayFlowTestTags.SEARCH_FIELD),
+                shape = MaterialTheme.shapes.extraLarge,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = ScreenPadding).testTag(PayFlowTestTags.SEARCH_FIELD),
             )
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 HistoryFilter.entries.forEach { filter ->
@@ -118,6 +171,11 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
                         selected = filter == selectedFilter,
                         onClick = { callbacks.onFilter(filter) },
                         label = { Text(filter.label()) },
+                        leadingIcon = if (filter == selectedFilter) {
+                            { Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+                        } else {
+                            null
+                        },
                         modifier = Modifier.testTag(PayFlowTestTags.filterChip(filter)),
                     )
                 }
@@ -125,17 +183,46 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
             when (state) {
                 HistoryUiState.Loading -> LoadingView()
                 is HistoryUiState.Error -> ErrorView(stringResource(R.string.error_generic), callbacks.onRetry)
-                is HistoryUiState.Empty -> EmptyView(
-                    title = if (state.query.isNotBlank()) {
-                        stringResource(R.string.history_empty_search, state.query)
-                    } else {
-                        stringResource(R.string.history_empty_filter, state.filter.label().lowercase())
-                    },
-                )
-                is HistoryUiState.Content -> LazyColumn(modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.PAYMENT_LIST)) {
-                    items(state.payments, key = { it.id }) { payment ->
-                        PaymentRow(payment, onClick = callbacks.onPaymentClick)
-                        HorizontalDivider()
+                is HistoryUiState.Empty -> if (state.query.isNotBlank()) {
+                    EmptyView(
+                        title = stringResource(R.string.history_empty_search, state.query),
+                        subtitle = stringResource(R.string.history_empty_search_hint),
+                        icon = Icons.Outlined.SearchOff,
+                    )
+                } else {
+                    EmptyView(
+                        title = state.filter.emptyTitle(),
+                        subtitle = stringResource(R.string.history_empty_hint),
+                        icon = state.filter.emptyIcon(),
+                    )
+                }
+                is HistoryUiState.Content -> LazyColumn(
+                    modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.PAYMENT_LIST),
+                    contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, bottom = 24.dp),
+                ) {
+                    item(key = "count") {
+                        Text(
+                            stringResource(R.string.history_count, state.payments.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+                        )
+                    }
+                    itemsIndexed(state.payments, key = { _, p -> p.id }) { index, payment ->
+                        val shape = when {
+                            state.payments.size == 1 -> MaterialTheme.shapes.medium
+                            index == 0 -> MaterialTheme.shapes.medium.copy(bottomStart = CornerSize(0.dp), bottomEnd = CornerSize(0.dp))
+                            index == state.payments.lastIndex -> MaterialTheme.shapes.medium.copy(topStart = CornerSize(0.dp), topEnd = CornerSize(0.dp))
+                            else -> RectangleShape
+                        }
+                        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = shape, modifier = Modifier.fillMaxWidth()) {
+                            Column {
+                                PaymentRow(payment, onClick = callbacks.onPaymentClick)
+                                if (index < state.payments.lastIndex) {
+                                    HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                }
+                            }
+                        }
                     }
                 }
             }

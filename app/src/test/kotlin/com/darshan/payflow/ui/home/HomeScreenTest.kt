@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.darshan.payflow.domain.model.HistorySummary
 import com.darshan.payflow.domain.model.PaymentStatus
@@ -32,13 +33,14 @@ class HomeScreenTest {
     @Test
     fun loadingState() {
         show(HomeUiState.Loading)
-        rule.onNodeWithTag(PayFlowTestTags.LOADING).assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.LOADING).performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun emptyState() {
         show(HomeUiState.Empty)
-        rule.onNodeWithTag(PayFlowTestTags.EMPTY).assertIsDisplayed()
+        // The dashboard puts the summary and quick actions above the list, so scroll the empty card into view first.
+        rule.onNodeWithTag(PayFlowTestTags.EMPTY).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("No payments yet").assertIsDisplayed()
     }
 
@@ -46,7 +48,7 @@ class HomeScreenTest {
     fun errorStateRetries() {
         var retried = false
         show(HomeUiState.Error("x"), callbacks = HomeCallbacks(onRetry = { retried = true }))
-        rule.onNodeWithTag(PayFlowTestTags.ERROR).assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.ERROR).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Retry").performClick()
         assertThat(retried).isTrue()
     }
@@ -64,13 +66,15 @@ class HomeScreenTest {
             dark = true,
             callbacks = HomeCallbacks(onPaymentClick = { clicked = it }, onViewAll = { viewAll = true }),
         )
-        rule.onNodeWithText("Alice").assertIsDisplayed()
-        rule.onAllNodesWithText("₹123.45").onFirst().assertIsDisplayed()
-        rule.onNodeWithText("Failed").assertIsDisplayed()
+        rule.onNodeWithText("Alice").performScrollTo().assertIsDisplayed()
+        rule.onAllNodesWithText("₹123.45").onFirst().performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Failed").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Alice").performClick()
         assertThat(clicked).isEqualTo("a")
-        rule.onNodeWithText("View all").performClick()
+        rule.onNodeWithText("View all").performScrollTo().performClick()
         assertThat(viewAll).isTrue()
         rule.onNodeWithContentDescription("Payment to Alice, ₹123.45, Success").assertExists()
+        // Every quick action is labelled and reachable.
+        listOf("Scan QR", "Requests", "AutoPay", "Checkout", "Security").forEach { rule.onNodeWithContentDescription(it).assertExists() }
     }
 }

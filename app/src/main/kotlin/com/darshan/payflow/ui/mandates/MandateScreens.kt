@@ -1,8 +1,44 @@
 package com.darshan.payflow.ui.mandates
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Rule
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import com.darshan.payflow.ui.components.BannerTone
+import com.darshan.payflow.ui.components.DetailRow
+import com.darshan.payflow.ui.components.InfoBanner
+import com.darshan.payflow.ui.components.InitialAvatar
+import com.darshan.payflow.ui.components.SectionCard
+import com.darshan.payflow.ui.components.SectionHeader
+import com.darshan.payflow.ui.components.StatusChip
+import com.darshan.payflow.ui.theme.PayFlowTheme
+import com.darshan.payflow.ui.theme.ScreenPadding
+import com.darshan.payflow.ui.theme.StatusColor
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +56,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -137,29 +172,58 @@ fun MandatesScreen(state: MandatesUiState, callbacks: MandatesCallbacks) {
             TopAppBar(
                 title = { Text(stringResource(R.string.mandates_title)) },
                 navigationIcon = { IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = callbacks.onCreate, modifier = Modifier.testTag(PayFlowTestTags.MANDATE_CREATE)) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.mandate_create))
-            }
+            ExtendedFloatingActionButton(
+                onClick = callbacks.onCreate,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text(stringResource(R.string.mandate_create)) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.testTag(PayFlowTestTags.MANDATE_CREATE),
+            )
         },
     ) { padding ->
         when (state) {
             MandatesUiState.Loading -> LoadingView(Modifier.padding(padding))
-            MandatesUiState.Empty -> EmptyView(stringResource(R.string.mandates_empty), Modifier.padding(padding), stringResource(R.string.mandates_empty_hint))
+            MandatesUiState.Empty -> EmptyView(
+                stringResource(R.string.mandates_empty),
+                Modifier.padding(padding),
+                stringResource(R.string.mandates_empty_hint),
+                icon = Icons.Outlined.EventRepeat,
+            )
             is MandatesUiState.Error -> ErrorView(stringResource(R.string.error_generic), callbacks.onRetry, Modifier.padding(padding))
-            is MandatesUiState.Content -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+            is MandatesUiState.Content -> LazyColumn(
+                Modifier.padding(padding).fillMaxSize(),
+                contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, top = 8.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item(key = "intro") {
+                    Text(
+                        stringResource(R.string.mandates_intro),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+                    )
+                }
                 items(state.mandates, key = { it.id }) { mandate ->
-                    Column(Modifier.fillMaxWidth().clickable { callbacks.onOpen(mandate.id) }.padding(16.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(mandate.payeeName, style = MaterialTheme.typography.titleMedium)
-                            Text(mandate.status.label(), style = MaterialTheme.typography.labelLarge, color = mandate.status.color())
+                    Card(
+                        onClick = { callbacks.onOpen(mandate.id) },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            InitialAvatar(mandate.payeeName)
+                            Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(mandate.payeeName, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(mandate.payeeVpa, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(R.string.mandate_summary, Money.formatInr(mandate.maxAmountPaise), mandate.frequency.label()), style = MaterialTheme.typography.bodyMedium)
+                            }
+                            StatusChip(mandate.status.label(), mandate.status.statusColor())
                         }
-                        Text(mandate.payeeVpa, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(stringResource(R.string.mandate_summary, Money.formatInr(mandate.maxAmountPaise), mandate.frequency.label()), style = MaterialTheme.typography.bodyMedium)
                     }
-                    HorizontalDivider()
                 }
             }
         }
@@ -167,10 +231,11 @@ fun MandatesScreen(state: MandatesUiState, callbacks: MandatesCallbacks) {
 }
 
 @Composable
-private fun MandateStatus.color() = when (this) {
-    MandateStatus.ACTIVE -> MaterialTheme.colorScheme.primary
-    MandateStatus.PAUSED -> MaterialTheme.colorScheme.tertiary
-    MandateStatus.REVOKED, MandateStatus.EXPIRED -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun MandateStatus.statusColor(): StatusColor = when (this) {
+    MandateStatus.ACTIVE -> PayFlowTheme.status.success
+    MandateStatus.PAUSED -> PayFlowTheme.status.pending
+    MandateStatus.REVOKED -> PayFlowTheme.status.failed
+    MandateStatus.EXPIRED -> PayFlowTheme.status.neutral
 }
 
 // ------------------------------------------------------------------ create
@@ -215,45 +280,59 @@ fun CreateMandateScreen(state: CreateMandateUiState, callbacks: CreateMandateCal
             TopAppBar(
                 title = { Text(stringResource(R.string.mandate_create)) },
                 navigationIcon = { IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             val enabled = !state.submitting
-            OutlinedTextField(
-                value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = enabled, singleLine = true,
-                label = { Text(stringResource(R.string.pay_vpa)) }, isError = state.errors.vpa != null,
-                supportingText = state.errors.vpa?.let { { Text(it.message()) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_VPA),
-            )
-            OutlinedTextField(
-                value = state.name, onValueChange = callbacks.onNameChange, enabled = enabled, singleLine = true,
-                label = { Text(stringResource(R.string.pay_payee_name)) }, isError = state.errors.name != null,
-                supportingText = state.errors.name?.let { { Text(it.message()) } },
-                modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_NAME),
-            )
-            OutlinedTextField(
-                value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = enabled, singleLine = true,
-                label = { Text(stringResource(R.string.mandate_max_amount)) }, prefix = { Text("₹") }, isError = state.errors.amount != null,
-                supportingText = state.errors.amount?.let { { Text(it.message()) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_AMOUNT),
-            )
-            Text(stringResource(R.string.mandate_frequency), style = MaterialTheme.typography.labelLarge)
-            ChipRow(MandateFrequency.entries, state.frequency, { it.label() }, { PayFlowTestTags.mandateFrequency(it) }, callbacks.onFrequencyChange, enabled)
-            Text(stringResource(R.string.mandate_validity), style = MaterialTheme.typography.labelLarge)
-            ChipRow(listOf(1, 3, 6, 12, 24), state.validityMonths, { stringResource(R.string.mandate_months, it) }, { PayFlowTestTags.mandateValidity(it) }, callbacks.onValidityMonthsChange, enabled)
-            OutlinedTextField(
-                value = state.note, onValueChange = callbacks.onNoteChange, enabled = enabled, singleLine = true,
-                label = { Text(stringResource(R.string.pay_note)) }, modifier = Modifier.fillMaxWidth(),
-            )
-            state.ruleError?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
-            Button(onClick = callbacks.onSubmit, enabled = enabled, modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_SUBMIT)) {
-                Text(stringResource(R.string.mandate_create_submit))
+            SectionCard(stringResource(R.string.mandate_section_merchant), icon = Icons.Outlined.Storefront) {
+                OutlinedTextField(
+                    value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = enabled, singleLine = true,
+                    label = { Text(stringResource(R.string.pay_vpa)) }, isError = state.errors.vpa != null,
+                    placeholder = { Text(stringResource(R.string.pay_vpa_placeholder)) },
+                    leadingIcon = { Icon(Icons.Outlined.AlternateEmail, contentDescription = null) },
+                    supportingText = state.errors.vpa?.let { { Text(it.message()) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_VPA),
+                )
+                OutlinedTextField(
+                    value = state.name, onValueChange = callbacks.onNameChange, enabled = enabled, singleLine = true,
+                    label = { Text(stringResource(R.string.pay_payee_name)) }, isError = state.errors.name != null,
+                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                    supportingText = state.errors.name?.let { { Text(it.message()) } },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_NAME),
+                )
             }
-            if (state.submitting) LoadingView(Modifier.padding(top = 16.dp))
+            SectionCard(stringResource(R.string.mandate_section_rules), icon = Icons.Outlined.Rule) {
+                OutlinedTextField(
+                    value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = enabled, singleLine = true,
+                    label = { Text(stringResource(R.string.mandate_max_amount)) }, prefix = { Text("₹") }, isError = state.errors.amount != null,
+                    supportingText = { Text(state.errors.amount?.message() ?: stringResource(R.string.mandate_max_amount_hint)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_AMOUNT),
+                )
+                Text(stringResource(R.string.mandate_frequency), style = MaterialTheme.typography.labelLarge)
+                ChipRow(MandateFrequency.entries, state.frequency, { it.label() }, { PayFlowTestTags.mandateFrequency(it) }, callbacks.onFrequencyChange, enabled)
+                Text(stringResource(R.string.mandate_validity), style = MaterialTheme.typography.labelLarge)
+                ChipRow(listOf(1, 3, 6, 12, 24), state.validityMonths, { stringResource(R.string.mandate_months, it) }, { PayFlowTestTags.mandateValidity(it) }, callbacks.onValidityMonthsChange, enabled)
+                OutlinedTextField(
+                    value = state.note, onValueChange = callbacks.onNoteChange, enabled = enabled, singleLine = true,
+                    label = { Text(stringResource(R.string.pay_note)) }, modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Outlined.Notes, contentDescription = null) },
+                )
+            }
+            state.ruleError?.let { InfoBanner(it.message(), icon = Icons.Outlined.ErrorOutline, tone = BannerTone.Error) }
+            Button(onClick = callbacks.onSubmit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(52.dp).testTag(PayFlowTestTags.MANDATE_SUBMIT)) {
+                Text(stringResource(R.string.mandate_create_submit), style = MaterialTheme.typography.titleMedium)
+            }
+            if (state.submitting) LoadingView(Modifier.height(72.dp))
+            InfoBanner(stringResource(R.string.mandate_create_sandbox), icon = Icons.Outlined.Science, tone = BannerTone.Info)
         }
     }
 }
@@ -318,13 +397,14 @@ fun MandateDetailScreen(state: MandateDetailUiState, callbacks: MandateDetailCal
             TopAppBar(
                 title = { Text(stringResource(R.string.mandate_detail_title)) },
                 navigationIcon = { IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         when (state) {
             MandateDetailUiState.Loading -> LoadingView(Modifier.padding(padding))
-            MandateDetailUiState.NotFound -> EmptyView(stringResource(R.string.mandate_not_found), Modifier.padding(padding))
+            MandateDetailUiState.NotFound -> EmptyView(stringResource(R.string.mandate_not_found), Modifier.padding(padding), icon = Icons.Outlined.SearchOff)
             is MandateDetailUiState.Error -> ErrorView(stringResource(R.string.error_generic), callbacks.onBack, Modifier.padding(padding))
             is MandateDetailUiState.Content -> DetailContent(state, callbacks, Modifier.padding(padding))
         }
@@ -334,62 +414,90 @@ fun MandateDetailScreen(state: MandateDetailUiState, callbacks: MandateDetailCal
 @Composable
 private fun DetailContent(state: MandateDetailUiState.Content, callbacks: MandateDetailCallbacks, modifier: Modifier) {
     val m = state.mandate
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(m.payeeName, style = MaterialTheme.typography.headlineSmall)
-        Text(m.payeeVpa, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(m.status.label(), color = m.status.color(), style = MaterialTheme.typography.titleMedium)
-        HorizontalDivider()
-        DetailLine(stringResource(R.string.mandate_umn), m.umn)
-        DetailLine(stringResource(R.string.mandate_max_amount), Money.formatInr(m.maxAmountPaise))
-        DetailLine(stringResource(R.string.mandate_frequency), m.frequency.label())
-        DetailLine(stringResource(R.string.mandate_validity), "${m.startDate} → ${m.endDate}")
-        DetailLine(stringResource(R.string.mandate_executions), m.executionCount.toString())
-        if (m.note.isNotBlank()) DetailLine(stringResource(R.string.detail_note), m.note)
+    Column(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                InitialAvatar(m.payeeName, size = 64.dp)
+                Text(m.payeeName, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                Text(m.payeeVpa, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.mandate_summary, Money.formatInr(m.maxAmountPaise), m.frequency.label()),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                StatusChip(m.status.label(), m.status.statusColor())
+            }
+        }
         if (state.availableActions.isNotEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 state.availableActions.forEach { action ->
-                    val tag = Modifier.testTag(PayFlowTestTags.mandateAction(action))
+                    val tag = Modifier.weight(1f).testTag(PayFlowTestTags.mandateAction(action))
+                    val icon = when (action) {
+                        MandateAction.PAUSE -> Icons.Outlined.Pause
+                        MandateAction.RESUME -> Icons.Outlined.PlayArrow
+                        MandateAction.REVOKE -> Icons.Outlined.Block
+                        MandateAction.EXPIRE -> Icons.Outlined.Timer
+                    }
                     if (action == MandateAction.REVOKE) {
-                        OutlinedButton(onClick = { callbacks.onAction(action) }, enabled = !state.busy, modifier = tag) { Text(action.label()) }
+                        OutlinedButton(
+                            onClick = { callbacks.onAction(action) }, enabled = !state.busy, modifier = tag,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) {
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(action.label(), modifier = Modifier.padding(start = 6.dp))
+                        }
                     } else {
-                        Button(onClick = { callbacks.onAction(action) }, enabled = !state.busy, modifier = tag) { Text(action.label()) }
+                        FilledTonalButton(onClick = { callbacks.onAction(action) }, enabled = !state.busy, modifier = tag) {
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(action.label(), modifier = Modifier.padding(start = 6.dp))
+                        }
                     }
                 }
             }
+        }
+        SectionCard(stringResource(R.string.mandate_section_terms), icon = Icons.Outlined.Rule) {
+            DetailRow(stringResource(R.string.mandate_umn), m.umn)
+            DetailRow(stringResource(R.string.mandate_max_amount), Money.formatInr(m.maxAmountPaise))
+            DetailRow(stringResource(R.string.mandate_frequency), m.frequency.label())
+            DetailRow(stringResource(R.string.mandate_validity), stringResource(R.string.mandate_validity_range, m.startDate.format(dateFormatter), m.endDate.format(dateFormatter)))
+            DetailRow(stringResource(R.string.mandate_executions), m.executionCount.toString())
+            if (m.note.isNotBlank()) DetailRow(stringResource(R.string.detail_note), m.note)
         }
         if (m.status == MandateStatus.ACTIVE) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.mandate_simulate_title), style = MaterialTheme.typography.titleSmall)
-                    Text(stringResource(R.string.mandate_simulate_hint), style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(
-                        value = state.debitAmountText, onValueChange = callbacks.onDebitAmountChange, singleLine = true, enabled = !state.busy,
-                        label = { Text(stringResource(R.string.pay_amount)) }, prefix = { Text("₹") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_DEBIT_AMOUNT),
-                    )
-                    Button(onClick = { callbacks.onSimulateDebit(state.debitAmountText) }, enabled = !state.busy, modifier = Modifier.testTag(PayFlowTestTags.MANDATE_DEBIT)) {
-                        Text(stringResource(R.string.mandate_simulate_button))
-                    }
+            SectionCard(stringResource(R.string.mandate_simulate_title), icon = Icons.Outlined.Science) {
+                Text(stringResource(R.string.mandate_simulate_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = state.debitAmountText, onValueChange = callbacks.onDebitAmountChange, singleLine = true, enabled = !state.busy,
+                    label = { Text(stringResource(R.string.pay_amount)) }, prefix = { Text("₹") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_DEBIT_AMOUNT),
+                )
+                Button(onClick = { callbacks.onSimulateDebit(state.debitAmountText) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.MANDATE_DEBIT)) {
+                    Text(stringResource(R.string.mandate_simulate_button))
                 }
             }
         }
-        Text(stringResource(R.string.mandate_history), style = MaterialTheme.typography.titleMedium)
-        if (state.executions.isEmpty()) {
-            Text(stringResource(R.string.mandate_history_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            state.executions.forEach { payment ->
-                PaymentRow(payment, onClick = callbacks.onOpenPayment)
-                HorizontalDivider()
+        SectionHeader(stringResource(R.string.mandate_history))
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
+            if (state.executions.isEmpty()) {
+                EmptyView(stringResource(R.string.mandate_history_empty), subtitle = stringResource(R.string.mandate_history_empty_hint), icon = Icons.Outlined.ReceiptLong, fillHeight = false, modifier = Modifier.fillMaxWidth())
+            } else {
+                Column {
+                    state.executions.forEachIndexed { index, payment ->
+                        PaymentRow(payment, onClick = callbacks.onOpenPayment)
+                        if (index < state.executions.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
             }
         }
     }
 }
 
-@Composable
-private fun DetailLine(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, modifier = Modifier.padding(start = 16.dp))
-    }
-}
+private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy")

@@ -9,6 +9,29 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.FlashlightOff
+import androidx.compose.material.icons.outlined.FlashlightOn
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.NoPhotography
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import com.darshan.payflow.ui.components.BannerTone
+import com.darshan.payflow.ui.components.InfoBanner
+import com.darshan.payflow.ui.components.InitialAvatar
+import com.darshan.payflow.ui.components.StateIcon
+import com.darshan.payflow.ui.theme.ScreenPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +40,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,7 +75,6 @@ import com.darshan.payflow.data.qr.CameraPermission
 import com.darshan.payflow.data.qr.QrError
 import com.darshan.payflow.data.qr.UpiQrPayload
 import com.darshan.payflow.ui.PayFlowTestTags
-import com.darshan.payflow.ui.components.EmptyView
 import com.darshan.payflow.ui.components.ErrorView
 import com.darshan.payflow.ui.components.LoadingView
 import com.darshan.payflow.ui.components.SecureWindow
@@ -141,10 +162,11 @@ fun ScanScreen(state: ScanUiState, callbacks: ScanCallbacks, cameraController: C
                     if (state is ScanUiState.Scanning) {
                         val label = stringResource(if (state.torchOn) R.string.scan_torch_off else R.string.scan_torch_on)
                         IconButton(onClick = callbacks.onToggleTorch, modifier = Modifier.semantics { contentDescription = label }) {
-                            Icon(Icons.Default.Star, contentDescription = null)
+                            Icon(if (state.torchOn) Icons.Outlined.FlashlightOff else Icons.Outlined.FlashlightOn, contentDescription = null)
                         }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -153,13 +175,16 @@ fun ScanScreen(state: ScanUiState, callbacks: ScanCallbacks, cameraController: C
                 ScanUiState.CheckingPermission -> LoadingView()
                 is ScanUiState.PermissionRequired -> PermissionBlock(
                     title = stringResource(R.string.scan_permission_rationale),
+                    hint = stringResource(R.string.scan_permission_hint),
                     button = stringResource(R.string.scan_allow_camera),
                     onClick = callbacks.onRequestPermission,
                 )
                 ScanUiState.PermissionDenied -> PermissionBlock(
                     title = stringResource(R.string.scan_permission_denied),
+                    hint = stringResource(R.string.scan_permission_denied_hint),
                     button = stringResource(R.string.scan_open_settings),
                     onClick = callbacks.onOpenSettings,
+                    icon = Icons.Outlined.NoPhotography,
                 )
                 is ScanUiState.Scanning -> CameraPreview(state, callbacks, cameraController)
                 is ScanUiState.Found -> FoundCard(state.payload, callbacks)
@@ -170,17 +195,19 @@ fun ScanScreen(state: ScanUiState, callbacks: ScanCallbacks, cameraController: C
 }
 
 @Composable
-private fun PermissionBlock(title: String, button: String, onClick: () -> Unit) {
+private fun PermissionBlock(title: String, hint: String, button: String, onClick: () -> Unit, icon: ImageVector = Icons.Outlined.CameraAlt) {
     Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        Button(onClick = onClick, modifier = Modifier.padding(top = 16.dp)) { Text(button) }
+        StateIcon(icon)
+        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp))
+        Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+        Button(onClick = onClick, modifier = Modifier.padding(top = 20.dp)) { Text(button) }
     }
 }
 
 @Composable
 private fun CameraPreview(state: ScanUiState.Scanning, callbacks: ScanCallbacks, controller: CameraController) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = { context -> PreviewView(context) },
             update = { view -> controller.start(lifecycleOwner, view, callbacks.onBarcode, callbacks.onCameraError) },
@@ -188,34 +215,70 @@ private fun CameraPreview(state: ScanUiState.Scanning, callbacks: ScanCallbacks,
         )
         DisposableEffect(controller) { onDispose { controller.stop() } }
         LaunchedEffect(state.torchOn) { controller.setTorch(state.torchOn) }
-        val hint = state.hint?.message() ?: stringResource(R.string.scan_hint)
-        Card(modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)) {
-            Text(hint, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+        ViewfinderFrame(Modifier.align(Alignment.Center))
+        val hint = state.hint?.message()
+        Card(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (hint != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                contentColor = if (hint != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (hint != null) Icons.Outlined.ErrorOutline else Icons.Outlined.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text(hint ?: stringResource(R.string.scan_hint), modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium)
+            }
         }
+    }
+}
+
+/** Four corner brackets over the preview so the user knows where to hold the code. */
+@Composable
+private fun ViewfinderFrame(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier.size(240.dp)) {
+        val len = 36.dp.toPx()
+        val stroke = 4.dp.toPx()
+        val w = size.width
+        val h = size.height
+        fun corner(x: Float, y: Float, dx: Float, dy: Float) {
+            drawLine(color, Offset(x, y), Offset(x + dx * len, y), stroke, StrokeCap.Round)
+            drawLine(color, Offset(x, y), Offset(x, y + dy * len), stroke, StrokeCap.Round)
+        }
+        corner(0f, 0f, 1f, 1f)
+        corner(w, 0f, -1f, 1f)
+        corner(0f, h, 1f, -1f)
+        corner(w, h, -1f, -1f)
     }
 }
 
 @Composable
 private fun FoundCard(payload: UpiQrPayload, callbacks: ScanCallbacks) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.scan_found_title), style = MaterialTheme.typography.titleMedium)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(payload.payeeName, style = MaterialTheme.typography.titleLarge)
+    Column(modifier = Modifier.fillMaxSize().padding(ScreenPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                InitialAvatar(payload.payeeName, size = 64.dp)
+                Text(stringResource(R.string.scan_found_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                Text(payload.payeeName, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
                 Text(payload.payeeVpa, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     payload.amountPaise?.let { Money.formatInr(it) } ?: stringResource(R.string.scan_enter_amount),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = if (payload.amountPaise != null) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
-                if (payload.note.isNotBlank()) Text(payload.note, style = MaterialTheme.typography.bodyMedium)
+                if (payload.note.isNotBlank()) Text(payload.note, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = callbacks.onPay, modifier = Modifier.testTag(PayFlowTestTags.SCAN_PAY)) { Text(stringResource(R.string.scan_pay)) }
-            OutlinedButton(onClick = callbacks.onRescan) { Text(stringResource(R.string.scan_again)) }
-        }
         if (payload.amountPaise == null) {
-            EmptyView(title = "", subtitle = stringResource(R.string.scan_static_qr_hint), modifier = Modifier.fillMaxWidth())
+            InfoBanner(stringResource(R.string.scan_static_qr_hint), icon = Icons.Outlined.Info, tone = BannerTone.Info)
+        }
+        Button(onClick = callbacks.onPay, modifier = Modifier.fillMaxWidth().height(52.dp).testTag(PayFlowTestTags.SCAN_PAY)) {
+            Text(stringResource(R.string.scan_pay), style = MaterialTheme.typography.titleMedium)
+        }
+        OutlinedButton(onClick = callbacks.onRescan, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Outlined.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(stringResource(R.string.scan_again), modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

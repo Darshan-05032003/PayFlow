@@ -9,6 +9,7 @@ import com.darshan.payflow.domain.model.PaymentStateMachine
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.repository.PaymentRepository
 import java.time.Clock
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -64,4 +65,7 @@ class FakePaymentRepository(private val clock: Clock = fixedClock) : PaymentRepo
 
     override fun observeSummary(): Flow<HistorySummary> =
         payments.map { map -> HistorySummary.of(map.values) }.failing()
+
+    override fun observeSummarySince(since: Instant): Flow<HistorySummary> =
+        payments.map { map -> HistorySummary.of(map.values.filter { !it.createdAt.isBefore(since) }) }.failing()
 }

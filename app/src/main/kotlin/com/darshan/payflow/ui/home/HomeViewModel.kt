@@ -8,6 +8,10 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.repository.PaymentRepository
 import com.darshan.payflow.domain.usecase.ReconcilePendingPaymentsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Clock
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +30,8 @@ sealed interface HomeUiState {
     data object Loading : HomeUiState
     data object Empty : HomeUiState
     data class Error(val detail: String?) : HomeUiState
-    data class Content(val recent: List<Payment>, val summary: HistorySummary) : HomeUiState
+    /** [summary] is all-time; [month] covers payments created since the start of the current month (device zone). */
+    data class Content(val recent: List<Payment>, val summary: HistorySummary, val month: HistorySummary = summary) : HomeUiState
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -35,7 +40,11 @@ class HomeViewModel @Inject constructor(
     repository: PaymentRepository,
     reconcilePending: ReconcilePendingPaymentsUseCase,
     dispatchers: DispatcherProvider,
+    clock: Clock = Clock.systemUTC(),
+    zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
+
+    private val monthStart: Instant = YearMonth.now(clock.withZone(zone)).atDay(1).atStartOfDay(zone).toInstant()
 
     private val reload = MutableStateFlow(0)
 
@@ -46,8 +55,12 @@ class HomeViewModel @Inject constructor(
 
     val uiState: StateFlow<HomeUiState> = reload
         .flatMapLatest {
-            combine(repository.observeRecent(RECENT_LIMIT), repository.observeSummary()) { recent, summary ->
-                if (summary.total == 0) HomeUiState.Empty else HomeUiState.Content(recent, summary)
+            combine(
+                repository.observeRecent(RECENT_LIMIT),
+                repository.observeSummary(),
+                repository.observeSummarySince(monthStart),
+            ) { recent, summary, month ->
+                if (summary.total == 0) HomeUiState.Empty else HomeUiState.Content(recent, summary, month)
             }
                 .onStart<HomeUiState> { emit(HomeUiState.Loading) }
                 .catch { emit(HomeUiState.Error(it.message)) }
