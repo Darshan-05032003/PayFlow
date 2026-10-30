@@ -10,6 +10,7 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentEvent
 import com.darshan.payflow.domain.model.PaymentNotFoundException
 import com.darshan.payflow.domain.model.PaymentStateMachine
+import com.darshan.payflow.domain.model.RecentPayee
 import com.darshan.payflow.domain.repository.PaymentRepository
 import java.time.Clock
 import javax.inject.Inject
@@ -50,6 +51,7 @@ class PaymentRepositoryImpl @Inject constructor(
                 upiTxnId = updated.upiTxnId.takeIf { it != current.upiTxnId },
                 refundId = updated.refundId.takeIf { it != current.refundId },
                 failureReason = updated.failureReason.takeIf { it != current.failureReason },
+                statusSource = updated.statusSource.name,
                 updatedAt = updated.updatedAt.toEpochMilli(),
             )
             if (rows == 1) return Result.success(updated)
@@ -70,6 +72,9 @@ class PaymentRepositoryImpl @Inject constructor(
 
     override fun observeByMandate(mandateId: String): Flow<List<Payment>> =
         dao.observeByMandate(mandateId).map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeRecentPayees(limit: Int): Flow<List<RecentPayee>> =
+        dao.observeRecentPayees(limit).map { rows -> rows.map { it.toDomain() } }
 
     companion object {
         private const val MAX_CAS_ATTEMPTS = 3

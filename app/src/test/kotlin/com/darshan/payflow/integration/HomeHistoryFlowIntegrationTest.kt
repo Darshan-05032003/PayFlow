@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -79,7 +80,8 @@ class HomeHistoryFlowIntegrationTest {
             repo.applyEvent("a", PaymentEvent.Confirm("psp", "upi"))
         }
         rule.waitUntilWithMainLooper(5_000) { vm.uiState.value is HomeUiState.Content }
-        rule.onNodeWithText("Alice").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.paymentRow("a")).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithContentDescription("Pay Alice again (alice@okbank)").assertExists() // the recent-payee row
         rule.onAllNodesWithText("₹99.00").onFirst().performScrollTo().assertIsDisplayed()
     }
 
@@ -90,7 +92,7 @@ class HomeHistoryFlowIntegrationTest {
             repo.create(testPayment("bad", status = PaymentStatus.FAILED, payeeName = "Bob"))
         }
         val handle = SavedStateHandle()
-        val vm1 = HistoryViewModel(repo, DefaultDispatcherProvider(), handle)
+        val vm1 = HistoryViewModel(repo, com.darshan.payflow.testutil.reconcileNoop(repo), DefaultDispatcherProvider(), handle)
         rule.setContent {
             PayFlowTheme {
                 val state by vm1.uiState.collectAsStateWithLifecycle()
@@ -103,7 +105,7 @@ class HomeHistoryFlowIntegrationTest {
         rule.onNodeWithText("Bob").assertIsDisplayed()
 
         // "Process death": a new ViewModel over the same SavedStateHandle and database.
-        val vm2 = HistoryViewModel(repo, DefaultDispatcherProvider(), handle)
+        val vm2 = HistoryViewModel(repo, com.darshan.payflow.testutil.reconcileNoop(repo), DefaultDispatcherProvider(), handle)
         val restored = awaitFlowValue(vm2.uiState) { it is HistoryUiState.Content } as HistoryUiState.Content
         assertThat(restored.filter).isEqualTo(HistoryFilter.FAILED)
         assertThat(restored.payments.map { it.id }).containsExactly("bad")

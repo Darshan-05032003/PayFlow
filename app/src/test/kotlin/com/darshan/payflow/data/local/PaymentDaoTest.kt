@@ -7,6 +7,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.testutil.FIXED_INSTANT
 import com.darshan.payflow.testutil.testPayment
+import com.darshan.payflow.domain.model.StatusSource
+import com.darshan.payflow.domain.model.PaymentDirection
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -64,13 +66,13 @@ class PaymentDaoTest {
         dao.insert(testPayment("a").toEntity())
         val wrong = dao.compareAndSetStatus(
             id = "a", expectedStatus = "PENDING", newStatus = "SUCCESS",
-            pspTxnId = "p", upiTxnId = null, refundId = null, failureReason = null, updatedAt = 1L,
+            pspTxnId = "p", upiTxnId = null, refundId = null, failureReason = null, statusSource = "PSP", updatedAt = 1L,
         )
         assertThat(wrong).isEqualTo(0)
         assertThat(dao.getById("a")!!.status).isEqualTo("CREATED")
         val right = dao.compareAndSetStatus(
             id = "a", expectedStatus = "CREATED", newStatus = "PENDING",
-            pspTxnId = null, upiTxnId = null, refundId = null, failureReason = null, updatedAt = 2L,
+            pspTxnId = null, upiTxnId = null, refundId = null, failureReason = null, statusSource = "PSP", updatedAt = 2L,
         )
         assertThat(right).isEqualTo(1)
         assertThat(dao.getById("a")!!.status).isEqualTo("PENDING")
@@ -164,5 +166,32 @@ class PaymentDaoTest {
         assertThat(dao.getById("rtl")!!.payeeName).isEqualTo(rtl)
         assertThat(dao.getById("long")!!.payeeName).hasLength(10_000)
         assertThat(dao.observeHistory(PaymentStatus.entries.map { it.name }, "\u0645\u0631").first().map { it.id }).containsExactly("rtl")
+    }
+
+    @Test
+    fun `recent payees are distinct outgoing payees, most recently paid first`() = runTest {
+        dao.insertAll(
+            listOf(
+                testPayment("1", payeeVpa = "alice@okbank", payeeName = "Alice", createdAt = FIXED_INSTANT.minusSeconds(300)).toEntity(),
+                testPayment("2", payeeVpa = "bob@upi", payeeName = "Bob", createdAt = FIXED_INSTANT.minusSeconds(200)).toEntity(),
+                testPayment("3", payeeVpa = "alice@okbank", payeeName = "Alice K", createdAt = FIXED_INSTANT.minusSeconds(100)).toEntity(),
+                testPayment("4", payeeVpa = "me@upi", payeeName = "Me", direction = PaymentDirection.INCOMING).toEntity(),
+            ),
+        )
+        val payees = dao.observeRecentPayees(5).first()
+        assertThat(payees.map { it.vpa }).containsExactly("alice@okbank", "bob@upi").inOrder()
+        assertThat(payees.first().name).isEqualTo("Alice K") // the name used most recently
+        assertThat(dao.observeRecentPayees(1).first()).hasSize(1)
+    }
+
+    @Test
+    fun `compare and set writes the status source`() = runTest {
+        dao.insert(testPayment("p", status = PaymentStatus.PENDING).copy(handlerPackage = "com.example.gpay").toEntity())
+        val rows = dao.compareAndSetStatus("p", "PENDING", "SUCCESS", null, "UPI1", null, null, "UPI_APP", 1L)
+        assertThat(rows).isEqualTo(1)
+        val stored = dao.getById("p")!!
+        assertThat(stored.statusSource).isEqualTo("UPI_APP")
+        assertThat(stored.handlerPackage).isEqualTo("com.example.gpay")
+        assertThat(stored.toDomain().statusSource).isEqualTo(StatusSource.UPI_APP)
     }
 }

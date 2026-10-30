@@ -23,7 +23,7 @@ class HistoryViewModelTest {
     private val repo = FakePaymentRepository()
 
     private fun vm(handle: SavedStateHandle = SavedStateHandle()) =
-        HistoryViewModel(repo, TestDispatcherProvider(dispatcher), handle)
+        HistoryViewModel(repo, com.darshan.payflow.testutil.reconcileNoop(repo), TestDispatcherProvider(dispatcher), handle)
 
     @Test
     fun `empty history shows empty state`() = runTest(dispatcher) {

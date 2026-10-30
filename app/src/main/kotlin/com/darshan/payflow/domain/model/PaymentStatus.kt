@@ -10,7 +10,8 @@ enum class PaymentStatus(val isTerminal: Boolean) {
     REFUNDED(true),
 }
 
-enum class PaymentMethod { UPI_INTENT, QR_SCAN, COLLECT, MANDATE, CHECKOUT }
+/** [DEEP_LINK]: the payee came from a `upi://pay` link opened from another app. */
+enum class PaymentMethod { UPI_INTENT, QR_SCAN, COLLECT, MANDATE, CHECKOUT, DEEP_LINK }
 
 enum class PaymentDirection { OUTGOING, INCOMING }
 

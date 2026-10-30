@@ -63,6 +63,14 @@ class FakePaymentRepository(private val clock: Clock = fixedClock) : PaymentRepo
     override fun observeByMandate(mandateId: String): Flow<List<Payment>> =
         payments.map { map -> map.values.filter { it.mandateId == mandateId }.sortedByDescending { it.createdAt } }.failing()
 
+    override fun observeRecentPayees(limit: Int): Flow<List<com.darshan.payflow.domain.model.RecentPayee>> =
+        payments.map { map ->
+            map.values.filter { it.direction == com.darshan.payflow.domain.model.PaymentDirection.OUTGOING }
+                .groupBy { it.payeeVpa }.values
+                .map { group -> group.maxBy { it.createdAt }.let { com.darshan.payflow.domain.model.RecentPayee(it.payeeVpa, it.payeeName, it.createdAt) } }
+                .sortedByDescending { it.lastPaidAt }.take(limit)
+        }.failing()
+
     override fun observeSummary(): Flow<HistorySummary> =
         payments.map { map -> HistorySummary.of(map.values) }.failing()
 

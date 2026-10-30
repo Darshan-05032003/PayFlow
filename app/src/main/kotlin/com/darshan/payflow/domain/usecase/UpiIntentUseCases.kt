@@ -14,6 +14,7 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentEvent
 import com.darshan.payflow.domain.model.PaymentMethod
+import com.darshan.payflow.domain.model.PaymentMode
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.model.UpiPayRequest
 import com.darshan.payflow.domain.repository.PaymentRepository
@@ -26,8 +27,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** What the UI needs to open the UPI app. */
-data class UpiLaunch(val paymentId: String, val upiUri: String)
+/** What the UI needs to open the UPI app. [packageName] is the app the user picked (null = system chooser). */
+data class UpiLaunch(val paymentId: String, val upiUri: String, val packageName: String? = null)
 
 /**
  * Step 1 of the intent flow: store the payment (CREATED), register it with the PSP, move it to PENDING and return the
@@ -52,30 +53,42 @@ class PayViaUpiIntentUseCase(
 
     private val keyLocks = ConcurrentHashMap<String, Mutex>()
 
-    suspend operator fun invoke(request: UpiPayRequest, method: PaymentMethod, idempotencyKey: String? = null): Result<UpiLaunch> {
-        if (idempotencyKey == null) return submit(request, method, null)
+    /**
+     * [mode] decides what happens between "row stored" and "link returned": in [PaymentMode.SANDBOX] the order is registered with
+     * the PSP; in [PaymentMode.UPI_APPS] there is no PSP, so the payment goes straight to PENDING and the chosen app
+     * ([handlerPackage]) is recorded on the row so the result screen can say which app reported the outcome.
+     */
+    suspend operator fun invoke(
+        request: UpiPayRequest,
+        method: PaymentMethod,
+        idempotencyKey: String? = null,
+        mode: PaymentMode = PaymentMode.SANDBOX,
+        handlerPackage: String? = null,
+    ): Result<UpiLaunch> {
+        val target = handlerPackage?.takeIf { mode == PaymentMode.UPI_APPS }
+        if (idempotencyKey == null) return submit(request, method, null, mode, target)
         return keyLocks.getOrPut(idempotencyKey) { Mutex() }.withLock {
-            repository.findByIdempotencyKey(idempotencyKey)?.let { return reuse(it, request, idempotencyKey) }
-            submit(request, method, idempotencyKey)
+            repository.findByIdempotencyKey(idempotencyKey)?.let { return reuse(it, request, idempotencyKey, mode) }
+            submit(request, method, idempotencyKey, mode, target)
         }
     }
 
     /** Dedupe path: the key already has a payment. Same details → same launch; different details or spent → conflict. */
-    private suspend fun reuse(existing: Payment, request: UpiPayRequest, key: String): Result<UpiLaunch> {
+    private suspend fun reuse(existing: Payment, request: UpiPayRequest, key: String, mode: PaymentMode): Result<UpiLaunch> {
         if (existing.amountPaise != request.amountPaise || !existing.payeeVpa.equals(request.payeeVpa, ignoreCase = true)) {
             return Result.failure(IdempotencyConflictException(key, "different amount or payee"))
         }
         val link = UpiLinkBuilder.build(UpiPayRequest(existing.payeeVpa, existing.payeeName, existing.amountPaise, existing.note, existing.txnRef))
         return when (existing.status) {
-            PaymentStatus.PENDING -> Result.success(UpiLaunch(existing.id, link))
+            PaymentStatus.PENDING -> Result.success(UpiLaunch(existing.id, link, existing.handlerPackage))
             // Stored but the PSP was never reached (process died in between): take over and finish the registration.
-            PaymentStatus.CREATED -> register(existing, key).map { UpiLaunch(existing.id, link) }
+            PaymentStatus.CREATED -> register(existing, key, mode).map { UpiLaunch(existing.id, link, existing.handlerPackage) }
             PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.REFUND_PENDING, PaymentStatus.REFUNDED ->
                 Result.failure(IdempotencyConflictException(key, "attempt already settled as ${existing.status}"))
         }
     }
 
-    private suspend fun submit(request: UpiPayRequest, method: PaymentMethod, idempotencyKey: String?): Result<UpiLaunch> {
+    private suspend fun submit(request: UpiPayRequest, method: PaymentMethod, idempotencyKey: String?, mode: PaymentMode, handlerPackage: String?): Result<UpiLaunch> {
         val now = clock.instant()
         val payment = Payment(
             id = idGenerator(),
@@ -94,22 +107,28 @@ class PayViaUpiIntentUseCase(
             createdAt = now,
             updatedAt = now,
             idempotencyKey = idempotencyKey,
+            handlerPackage = handlerPackage,
         )
         try {
             repository.create(payment)
         } catch (e: Exception) {
             // Unique index on the key: another process inserted first. Reuse its row.
             val existing = idempotencyKey?.let { repository.findByIdempotencyKey(it) } ?: return Result.failure(e)
-            return reuse(existing, request, idempotencyKey)
+            return reuse(existing, request, idempotencyKey, mode)
         }
-        return register(payment, idempotencyKey).map { UpiLaunch(payment.id, UpiLinkBuilder.build(request)) }
+        return register(payment, idempotencyKey, mode).map { UpiLaunch(payment.id, UpiLinkBuilder.build(request), handlerPackage) }
     }
 
-    /** CREATED → PSP registration → PENDING. A PSP rejection fails the payment: the UPI app was never opened. */
-    private suspend fun register(payment: Payment, idempotencyKey: String?): Result<Unit> = try {
-        retry.execute {
-            psp.initiatePayment(PspInitiateRequest(payment.txnRef, payment.amountPaise, payment.payeeVpa, payment.payeeName, payment.note, idempotencyKey))
-        }.getOrThrow()
+    /**
+     * CREATED → (sandbox: PSP registration) → PENDING. A PSP rejection fails the payment: the UPI app was never opened.
+     * In UPI-apps mode there is no PSP; the row simply moves to PENDING before the app is launched.
+     */
+    private suspend fun register(payment: Payment, idempotencyKey: String?, mode: PaymentMode): Result<Unit> = try {
+        if (mode == PaymentMode.SANDBOX) {
+            retry.execute {
+                psp.initiatePayment(PspInitiateRequest(payment.txnRef, payment.amountPaise, payment.payeeVpa, payment.payeeName, payment.note, idempotencyKey))
+            }.getOrThrow()
+        }
         repository.applyEvent(payment.id, PaymentEvent.Initiate).getOrElse { error ->
             // Lost a race with another process that already moved it on: fine as long as it is not failed.
             val latest = repository.getById(payment.id) ?: throw error

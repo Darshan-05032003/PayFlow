@@ -22,7 +22,7 @@
     </plurals>
 
     <!-- Home -->
-    <string name="home_tagline">UPI payments · sandbox</string>
+    <string name="home_tagline">UPI payments</string>
     <string name="home_empty_title">No payments yet</string>
     <string name="home_empty_subtitle">Pay someone or scan a QR code to see it here.</string>
     <string name="home_recent">Recent payments</string>
@@ -37,7 +37,14 @@
     <string name="home_action_autopay">AutoPay</string>
     <string name="home_action_checkout">Checkout</string>
     <string name="home_action_security">Security</string>
-    <string name="home_sandbox_footer">Sandbox build: payments are settled by an in-app fake provider, no real money moves.</string>
+    <string name="home_sandbox_footer">Sandbox mode: payments are settled by an in-app fake provider, no real money moves. Switch modes under Security.</string>
+    <string name="home_real_footer">UPI apps mode: payments go through the UPI apps installed on this phone. Results are reported by that app; PayFlow has no bank connection to verify them.</string>
+    <string name="home_action_receive">Receive</string>
+    <string name="home_action_history">History</string>
+    <string name="home_recent_payees">Pay again</string>
+    <string name="home_payee_description">Pay %1$s again (%2$s)</string>
+    <string name="sandbox_badge">Sandbox</string>
+    <string name="sandbox_badge_description">Sandbox mode is on: no real money moves</string>
 
     <!-- History -->
     <string name="history_title">History</string>
@@ -52,6 +59,7 @@
     <string name="history_empty_search_hint">Try a different payee name or UPI ID.</string>
     <string name="history_count">%1$d payments</string>
     <string name="history_clear_search">Clear search</string>
+    <string name="history_refresh">Refresh</string>
 
     <!-- Payment detail -->
     <string name="detail_section_details">Details</string>
@@ -63,6 +71,7 @@
     <string name="method_collect">Collect request</string>
     <string name="method_mandate">AutoPay mandate</string>
     <string name="method_checkout">Checkout</string>
+    <string name="method_deep_link">UPI link</string>
     <string name="filter_all">All</string>
     <string name="filter_success">Success</string>
     <string name="filter_pending">Pending</string>
@@ -99,26 +108,54 @@
     <string name="pay_title">Pay with UPI</string>
     <string name="pay_vpa">Payee UPI ID</string>
     <string name="pay_payee_name">Payee name</string>
+    <string name="pay_payee_name_optional">Payee name (optional)</string>
     <string name="pay_amount">Amount</string>
     <string name="pay_note">Note (optional)</string>
     <string name="pay_submit">Pay with UPI app</string>
+    <string name="pay_submit_amount">Pay %1$s</string>
+    <string name="pay_amount_placeholder">₹0.00</string>
+    <string name="pay_amount_display">Amount to pay: %1$s</string>
+    <string name="pay_amount_display_hint">Amount in rupees</string>
     <string name="pay_section_payee">Payee</string>
     <string name="pay_section_amount">Amount</string>
     <string name="pay_vpa_placeholder">name@bank</string>
     <string name="pay_vpa_hint">The registered name is checked before you pay.</string>
+    <string name="pay_vpa_hint_real">Your UPI app shows the registered name before you confirm.</string>
     <string name="pay_field_locked">Filled from the QR code</string>
     <string name="pay_amount_hint">Up to %1$s per payment</string>
     <string name="pay_confirming_hint">This usually takes a few seconds. Please keep the app open.</string>
     <string name="pay_done_success_hint">Confirmed by the payment provider.</string>
     <string name="pay_chooser_title">Pay with</string>
+    <string name="pay_chooser_subtitle">%1$s to %2$s</string>
+    <string name="pay_chooser_app">Pay with %1$s</string>
+    <string name="pay_chooser_note">You will confirm the payment in the app you choose. PayFlow records what that app reports back.</string>
     <string name="pay_no_upi_app">No UPI app found on this device</string>
-    <string name="pay_sandbox_note">Sandbox build: the result shown here comes from the sandbox payment provider, not from your bank.</string>
+    <string name="pay_sandbox_note">Sandbox mode: the result shown here comes from the in-app fake payment provider, not from your bank. No real money moves.</string>
+    <string name="pay_real_note">The payment is completed inside your UPI app. The status PayFlow shows afterwards is what that app reported; PayFlow has no bank connection to verify it.</string>
     <string name="pay_awaiting_app">Complete the payment in your UPI app</string>
     <string name="pay_awaiting_app_hint">When you return, PayFlow confirms the result with the payment provider.</string>
+    <string name="pay_awaiting_app_hint_real">Approve or cancel in the app, then come back. PayFlow records what the app reports.</string>
+    <string name="pay_recording">Reading the result from your UPI app…</string>
     <string name="pay_confirming">Confirming with the payment provider…</string>
     <string name="pay_check_status">Check status</string>
     <string name="pay_view_payment">View payment</string>
-    <string name="pay_new_payment">New payment</string>
+    <string name="pay_again">Pay again</string>
+    <string name="pay_done">Done</string>
+    <string name="pay_share_receipt">Share receipt</string>
+    <string name="pay_mark_paid">I paid</string>
+    <string name="pay_mark_not_paid">It did not go through</string>
+    <string name="pay_pending_real_hint">PayFlow did not get a clear answer from %1$s. Check the payment there before you mark it here or pay again.</string>
+    <string name="pay_source_app_generic">your UPI app</string>
+    <string name="pay_source_reported_by">Reported by %1$s. Not verified by PayFlow.</string>
+    <string name="pay_source_marked_by_user">Marked by you after checking your UPI app.</string>
+    <string name="pay_source_unconfirmed">Not confirmed yet. Check in %1$s.</string>
+    <string name="pay_source_pending_psp">The provider has not confirmed yet.</string>
+    <string name="pay_source_psp">Confirmed by the sandbox payment provider.</string>
+    <string name="detail_paid_via">Paid via</string>
+    <string name="detail_mark_title">Did this payment go through?</string>
+    <string name="detail_mark_hint">PayFlow could not read a result from %1$s. Open that app, check the transaction, then record it here.</string>
+    <string name="detail_mark_paid">Mark as paid</string>
+    <string name="detail_mark_not_paid">Mark as not paid</string>
     <string name="pay_done_success">Payment successful</string>
     <string name="pay_done_pending">Payment pending</string>
     <string name="pay_done_pending_hint">The provider has not confirmed yet. Money may still be debited; check again in a moment.</string>
@@ -263,7 +300,7 @@
 
     <!-- Pay guard -->
     <string name="pay_blocked">Payment blocked: this device failed the security checks (root, hooking tools or a modified app).</string>
-    <string name="pay_guard_warning">Security warning: device not fully verified. Proceeding in sandbox mode.</string>
+    <string name="pay_guard_warning">Security warning: this device is not fully verified.</string>
 
     <!-- Security screen -->
     <string name="security_title">Security</string>
@@ -315,6 +352,13 @@
     <string name="security_state_off">Off</string>
     <string name="security_phone_placeholder">98765 43210</string>
     <string name="security_tamper_debug_hint">Debug builds always report the debuggable flag; that is expected during development.</string>
+    <string name="security_mode_title">Payment mode</string>
+    <string name="security_mode_upi">UPI apps</string>
+    <string name="security_mode_upi_hint">Pay through GPay, PhonePe, Paytm or any UPI app on this phone. Real money moves. The result is reported by that app; PayFlow cannot verify it with a bank.</string>
+    <string name="security_mode_sandbox">Sandbox</string>
+    <string name="security_mode_sandbox_hint">Every payment is settled by the in-app fake provider. Nothing leaves the phone and no money moves. Collect requests, AutoPay and Checkout always use the sandbox.</string>
+    <string name="security_mode_no_apps">No UPI app is installed on this device, so UPI apps mode cannot be used.</string>
+    <string name="security_mode_locked_hint">This setting is protected by the app lock.</string>
     <string name="security_sandbox_note">Sandbox: OTP delivery and the integrity verdict are simulated in-app. The Keystore, BiometricPrompt and the Play Integrity request itself are real.</string>
 
     <!-- Lock screen -->
@@ -336,4 +380,28 @@
     <string name="checkout_outcome_failed">Payment failed</string>
     <string name="checkout_outcome_pending">Payment pending</string>
     <string name="checkout_outcome_refunded">Payment refunded</string>
+
+    <!-- Receive money -->
+    <string name="receive_title">Receive money</string>
+    <string name="receive_setup_title">Set up your UPI ID</string>
+    <string name="receive_setup_hint">Enter the name and UPI ID you receive money with. PayFlow stores them encrypted on this phone and shows them as a QR for others to scan.</string>
+    <string name="receive_name">Your name</string>
+    <string name="receive_vpa">Your UPI ID</string>
+    <string name="receive_save">Save</string>
+    <string name="receive_cancel">Cancel</string>
+    <string name="receive_edit">Edit</string>
+    <string name="receive_amount">Amount (optional)</string>
+    <string name="receive_amount_hint">Leave empty to let the payer choose the amount.</string>
+    <string name="receive_scan_hint">Ask the payer to scan this with any UPI app.</string>
+    <string name="receive_qr_description">UPI QR code for %1$s</string>
+    <string name="receive_copy">Copy UPI ID</string>
+    <string name="receive_copied">UPI ID copied</string>
+    <string name="receive_share">Share as text</string>
+    <string name="receive_share_image">Share QR image</string>
+    <string name="receive_share_text">Pay %1$s (%2$s) with UPI: %3$s</string>
+    <string name="receive_share_failed">Could not share the QR code</string>
+    <string name="receive_error_required">Required</string>
+    <string name="receive_error_too_long">Use at most 50 characters</string>
+    <string name="receive_error_vpa">Enter a UPI ID like name@bank</string>
+    <string name="receive_note">Receiving happens in the payer\'s UPI app and your bank; PayFlow only shows the QR and cannot see incoming money.</string>
 </resources>

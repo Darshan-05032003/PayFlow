@@ -15,6 +15,10 @@ import com.darshan.payflow.data.security.OtpVerification
 import com.darshan.payflow.data.security.PinManager
 import com.darshan.payflow.data.security.TamperDetector
 import com.darshan.payflow.data.security.TamperReport
+import com.darshan.payflow.data.upi.UpiAppLauncher
+import com.darshan.payflow.domain.model.PaymentMode
+import com.darshan.payflow.domain.repository.PaymentModeRepository
+import kotlinx.coroutines.flow.flowOn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +47,10 @@ data class SecurityUiState(
     val tamper: TamperReport? = null,
     val integrity: IntegrityStatus = IntegrityStatus.NotChecked,
     val busy: Boolean = false,
+    /** Null until read from DataStore. */
+    val paymentMode: PaymentMode? = null,
+    /** Whether UPI-apps mode can be used at all on this device. */
+    val upiAppAvailable: Boolean = true,
 )
 
 enum class BindingError { INVALID_PHONE, WRONG_OTP, OTP_EXPIRED }
@@ -55,6 +63,8 @@ class SecurityViewModel @Inject constructor(
     private val tamper: TamperDetector,
     private val integrityChecker: IntegrityChecker,
     private val integrityVerifier: IntegrityVerifier,
+    private val paymentModes: PaymentModeRepository,
+    private val upiAppLauncher: UpiAppLauncher,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SecurityUiState())
@@ -62,6 +72,17 @@ class SecurityViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch {
+            val available = withContext(dispatchers.io) { upiAppLauncher.isUpiAppInstalled() }
+            _uiState.update { it.copy(upiAppAvailable = available) }
+            paymentModes.mode.flowOn(dispatchers.io).collect { mode -> _uiState.update { it.copy(paymentMode = mode) } }
+        }
+    }
+
+    /** Only reachable from this screen, which sits behind the app lock once a PIN is set. */
+    fun setPaymentMode(mode: PaymentMode) {
+        if (mode == PaymentMode.UPI_APPS && !_uiState.value.upiAppAvailable) return
+        viewModelScope.launch { withContext(dispatchers.io) { paymentModes.set(mode) } }
     }
 
     fun refresh() {

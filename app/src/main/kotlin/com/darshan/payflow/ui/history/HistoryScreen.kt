@@ -15,6 +15,9 @@ import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import com.darshan.payflow.ui.components.SandboxBadgeIfActive
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Surface
@@ -67,6 +70,7 @@ data class HistoryCallbacks(
     val onQuery: (String) -> Unit = {},
     val onPaymentClick: (String) -> Unit = {},
     val onRetry: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
 )
 
 @Composable
@@ -80,6 +84,7 @@ fun HistoryRoute(onBack: () -> Unit, onPaymentClick: (String) -> Unit, viewModel
             onQuery = viewModel::setQuery,
             onPaymentClick = onPaymentClick,
             onRetry = viewModel::retry,
+            onRefresh = viewModel::refresh,
         ),
     )
 }
@@ -138,11 +143,18 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                actions = {
+                    SandboxBadgeIfActive(Modifier.padding(end = 4.dp))
+                    IconButton(onClick = callbacks.onRefresh, modifier = Modifier.testTag(PayFlowTestTags.HISTORY_REFRESH)) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.history_refresh))
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+        PullToRefreshBox(isRefreshing = state is HistoryUiState.Loading, onRefresh = callbacks.onRefresh, modifier = Modifier.padding(padding).fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it; callbacks.onQuery(it) },
@@ -226,6 +238,7 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
                     }
                 }
             }
+        }
         }
     }
 }

@@ -53,6 +53,7 @@ class HomeViewModelTest {
             assertThat(content.recent.map { it.id }).containsExactly("b", "a").inOrder()
             assertThat(content.summary.total).isEqualTo(2)
             assertThat(content.summary.sentPaise).isEqualTo(100)
+            assertThat(content.recentPayees.map { it.vpa }).containsExactly("alice@okbank") // distinct by VPA
         }
     }
 

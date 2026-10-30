@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.darshan.payflow.ui.PayFlowTestTags
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.darshan.payflow.MainActivity
 import com.darshan.payflow.testutil.waitUntilWithMainLooper
@@ -32,7 +33,7 @@ class MainActivityTest {
         composeRule.waitUntilWithMainLooper(5_000) {
             composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag(PayFlowTestTags.EMPTY)).fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("History").performClick()
+        composeRule.onNodeWithContentDescription("History").performScrollTo().performClick() // the History tile in the quick-action grid
         composeRule.onNodeWithText("History").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithText("PayFlow").assertIsDisplayed()

@@ -9,6 +9,11 @@ import com.darshan.payflow.data.upi.UpiLaunchResult
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.usecase.ConfirmPaymentUseCase
 import com.darshan.payflow.domain.usecase.PayViaUpiIntentUseCase
+import com.darshan.payflow.domain.usecase.MarkPaymentManuallyUseCase
+import com.darshan.payflow.domain.usecase.RecordUpiAppResultUseCase
+import com.darshan.payflow.data.settings.InMemoryPaymentModeRepository
+import com.darshan.payflow.domain.model.PaymentMode
+import com.darshan.payflow.domain.model.StatusSource
 import com.darshan.payflow.testutil.FakePaymentRepository
 import com.darshan.payflow.testutil.FakeUpiAppLauncher
 import com.darshan.payflow.testutil.MainDispatcherRule
@@ -29,11 +34,14 @@ class PayViewModelTest {
     private val repo = FakePaymentRepository()
     private val launcher = FakeUpiAppLauncher()
     private var guard: com.darshan.payflow.data.security.PaymentGuard = com.darshan.payflow.data.security.AllowAllPaymentGuard()
+    private val modes = InMemoryPaymentModeRepository(PaymentMode.SANDBOX)
     private var ids = 0
 
     private fun vm(psp: FakePsp = FakePsp(fixedClock), handle: SavedStateHandle = SavedStateHandle()) = PayViewModel(
         payViaUpiIntent = PayViaUpiIntentUseCase(repo, psp, fixedClock) { "pay-${++ids}" },
         confirmPayment = ConfirmPaymentUseCase(repo, psp, fixedClock),
+        recordUpiAppResult = RecordUpiAppResultUseCase(repo),
+        markPaymentManually = MarkPaymentManuallyUseCase(repo),
         verifyVpa = com.darshan.payflow.domain.usecase.VerifyVpaUseCase(psp),
         pollPaymentStatus = com.darshan.payflow.domain.usecase.PollPaymentStatusUseCase(
             ConfirmPaymentUseCase(repo, psp, fixedClock),
@@ -41,6 +49,7 @@ class PayViewModelTest {
             kotlin.random.Random(1),
         ),
         paymentGuard = guard,
+        paymentModes = modes,
         upiAppLauncher = launcher,
         dispatchers = TestDispatcherProvider(dispatcher),
         savedState = handle,
@@ -168,7 +177,7 @@ class PayViewModelTest {
         vm.fillValidForm(); vm.submit(); advanceUntilIdle()
         vm.onUpiAppResult(UpiLaunchResult.Cancelled); advanceUntilIdle()
         vm.reset()
-        assertThat(vm.uiState.value).isEqualTo(PayUiState())
+        assertThat(vm.uiState.value).isEqualTo(PayUiState(paymentMode = PaymentMode.SANDBOX))
     }
 
     @Test
@@ -347,5 +356,181 @@ class PayViewModelTest {
             assertThat(awaitItem()).isInstanceOf(PayEvent.LaunchUpiApp::class.java)
         }
         assertThat(repo.getById("pay-1")).isNotNull()
+    }
+
+    // --- UPI-apps mode: real apps, app-reported results ---
+
+    private fun realVm(handle: SavedStateHandle = SavedStateHandle()): PayViewModel {
+        modes.setBlocking(PaymentMode.UPI_APPS)
+        return vm(handle = handle)
+    }
+
+    private fun InMemoryPaymentModeRepository.setBlocking(mode: PaymentMode) = kotlinx.coroutines.runBlocking { set(mode) }
+
+    @Test
+    fun `upi apps mode skips directory verification and shows PayFlow's own app chooser before anything is stored`() = runTest(dispatcher) {
+        val psp = FakePsp(fixedClock)
+        val vm = realVm(); advanceUntilIdle()
+        assertThat(vm.uiState.value.paymentMode).isEqualTo(PaymentMode.UPI_APPS)
+        vm.onVpaChange("someone@okaxis"); vm.onAmountChange("250.5") // no name: optional in this mode
+        dispatcher.scheduler.advanceTimeBy(PayViewModel.VERIFY_DEBOUNCE_MS + 1); advanceUntilIdle()
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Skipped)
+        assertThat(psp.verifyCalls).isEqualTo(0)
+        vm.submit(); advanceUntilIdle()
+        val phase = vm.uiState.value.phase as PayPhase.ChoosingApp
+        assertThat(phase.apps.map { it.label }).containsExactly("GPay", "PhonePe").inOrder()
+        assertThat(repo.getById("pay-1")).isNull() // nothing is created until an app is picked
+        vm.dismissChooser()
+        assertThat(vm.uiState.value.phase).isEqualTo(PayPhase.Idle)
+        assertThat(repo.getById("pay-1")).isNull()
+    }
+
+    @Test
+    fun `picking an app stores a pending payment for that app and launches it directly, without the psp`() = runTest(dispatcher) {
+        val psp = FakePsp(fixedClock)
+        modes.setBlocking(PaymentMode.UPI_APPS)
+        val vm = vm(psp); advanceUntilIdle()
+        vm.onVpaChange("someone@okaxis"); vm.onAmountChange("250.50")
+        vm.submit(); advanceUntilIdle()
+        vm.events.test {
+            vm.onAppChosen("com.example.phonepe")
+            val event = awaitItem() as PayEvent.LaunchUpiApp
+            assertThat(event.packageName).isEqualTo("com.example.phonepe")
+            assertThat(event.upiUri).contains("pa=someone%40okaxis")
+            assertThat(event.upiUri).contains("am=250.50")
+            assertThat(event.upiUri).contains("pn=someone") // name falls back to the handle
+        }
+        val stored = repo.getById("pay-1")!!
+        assertThat(stored.status).isEqualTo(PaymentStatus.PENDING)
+        assertThat(stored.handlerPackage).isEqualTo("com.example.phonepe")
+        assertThat(psp.initiateCalls).isEqualTo(0)
+        assertThat(vm.uiState.value.phase).isEqualTo(PayPhase.AwaitingApp("pay-1"))
+        // An app that was not in the sheet cannot be picked.
+        vm.onAppChosen("com.evil.app"); advanceUntilIdle()
+        assertThat(repo.getById("pay-2")).isNull()
+    }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.launchedReal(pkg: String = "com.example.gpay"): PayViewModel {
+        val vm = realVm(); advanceUntilIdle()
+        vm.onVpaChange("someone@okaxis"); vm.onNameChange("Someone"); vm.onAmountChange("10")
+        vm.submit(); advanceUntilIdle()
+        vm.onAppChosen(pkg); advanceUntilIdle()
+        return vm
+    }
+
+    @Test
+    fun `the app's success is shown as reported by that app, never as verified`() = runTest(dispatcher) {
+        val vm = launchedReal()
+        val txnRef = repo.getById("pay-1")!!.txnRef
+        vm.onUpiAppResult(UpiLaunchResult.Responded("txnId=GP123&responseCode=00&Status=SUCCESS&txnRef=$txnRef&ApprovalRefNo=A1")); advanceUntilIdle()
+        val done = vm.uiState.value.phase as PayPhase.Done
+        assertThat(done.status).isEqualTo(PaymentStatus.SUCCESS)
+        assertThat(done.payment!!.statusSource).isEqualTo(StatusSource.UPI_APP)
+        assertThat(done.payment!!.upiTxnId).isEqualTo("GP123")
+        assertThat(done.payment!!.pspTxnId).isNull()
+        assertThat(done.handlerLabel).isEqualTo("GPay")
+        assertThat(PayViewModel.receiptText(done.payment!!, done.handlerLabel)).contains("Status: Success (reported by GPay)")
+        assertThat(PayViewModel.receiptText(done.payment!!, done.handlerLabel)).doesNotContain("verified")
+        vm.events.test {
+            vm.shareReceipt()
+            assertThat((awaitItem() as PayEvent.ShareReceipt).text).contains("someone@okaxis")
+        }
+    }
+
+    @Test
+    fun `a spoofed response for another reference is ignored and the payment stays pending`() = runTest(dispatcher) {
+        val vm = launchedReal()
+        vm.onUpiAppResult(UpiLaunchResult.Responded("Status=SUCCESS&txnRef=OTHERREF&ApprovalRefNo=1")); advanceUntilIdle()
+        val done = vm.uiState.value.phase as PayPhase.Done
+        assertThat(done.status).isEqualTo(PaymentStatus.PENDING)
+        assertThat(done.reason).isEqualTo(PayViewModel.MISMATCH_REASON)
+        assertThat(repo.getById("pay-1")!!.status).isEqualTo(PaymentStatus.PENDING)
+    }
+
+    @Test
+    fun `coming back without a result leaves the payment pending and the user can mark it by hand`() = runTest(dispatcher) {
+        val vm = launchedReal("com.example.phonepe")
+        vm.onUpiAppResult(UpiLaunchResult.Cancelled); advanceUntilIdle()
+        val pending = vm.uiState.value.phase as PayPhase.Done
+        assertThat(pending.status).isEqualTo(PaymentStatus.PENDING)
+        assertThat(pending.payment!!.canBeMarkedManually).isTrue()
+        assertThat(pending.handlerLabel).isEqualTo("PhonePe")
+        assertThat(vm.uiState.value.polling).isFalse() // no PSP to poll
+        vm.checkStatus(); advanceUntilIdle() // no PSP to ask either: a no-op
+        assertThat(vm.uiState.value.phase).isEqualTo(pending)
+        vm.markManually(paid = true); advanceUntilIdle()
+        val marked = vm.uiState.value.phase as PayPhase.Done
+        assertThat(marked.status).isEqualTo(PaymentStatus.SUCCESS)
+        assertThat(marked.payment!!.statusSource).isEqualTo(StatusSource.USER)
+        // Marking again is refused by the use case; the phase keeps the settled payment.
+        vm.markManually(paid = false); advanceUntilIdle()
+        assertThat((vm.uiState.value.phase as PayPhase.Done).status).isEqualTo(PaymentStatus.SUCCESS)
+    }
+
+    @Test
+    fun `a failure reported by the app is recorded with its code and pay again keeps the payee`() = runTest(dispatcher) {
+        val vm = launchedReal()
+        val txnRef = repo.getById("pay-1")!!.txnRef
+        vm.onUpiAppResult(UpiLaunchResult.Responded("Status=FAILURE&responseCode=ZA&txnRef=$txnRef")); advanceUntilIdle()
+        val done = vm.uiState.value.phase as PayPhase.Done
+        assertThat(done.status).isEqualTo(PaymentStatus.FAILED)
+        assertThat(done.reason).isEqualTo("Reported as failed by GPay (code ZA)")
+        vm.payAgain()
+        val s = vm.uiState.value
+        assertThat(s.phase).isEqualTo(PayPhase.Idle)
+        assertThat(s.vpa).isEqualTo("someone@okaxis")
+        assertThat(s.amountText).isEqualTo("10")
+        vm.submit(); advanceUntilIdle(); vm.onAppChosen("com.example.gpay"); advanceUntilIdle()
+        assertThat(repo.getById("pay-2")!!.idempotencyKey).isNotEqualTo(repo.getById("pay-1")!!.idempotencyKey)
+    }
+
+    @Test
+    fun `without a visible app list the system chooser is used, and with no upi app nothing is created`() = runTest(dispatcher) {
+        launcher.apps = emptyList()
+        val vm = realVm(); advanceUntilIdle()
+        vm.onVpaChange("someone@okaxis"); vm.onAmountChange("10")
+        vm.events.test {
+            vm.submit()
+            val event = awaitItem() as PayEvent.LaunchUpiApp
+            assertThat(event.packageName).isNull()
+        }
+        assertThat(repo.getById("pay-1")!!.handlerPackage).isNull()
+        assertThat(repo.getById("pay-1")!!.status).isEqualTo(PaymentStatus.PENDING)
+
+        launcher.installed = false
+        val vm2 = realVm(); advanceUntilIdle()
+        vm2.onVpaChange("someone@okaxis"); vm2.onAmountChange("10")
+        vm2.events.test {
+            vm2.submit()
+            assertThat(awaitItem()).isEqualTo(PayEvent.NoUpiApp)
+        }
+        assertThat(repo.getById("pay-2")).isNull()
+    }
+
+    @Test
+    fun `an incoming link locks payee and amount and records the deep link method`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(
+            mapOf(PayViewModel.ARG_PREFILL_VPA to "test@upi", PayViewModel.ARG_PREFILL_NAME to "Test", PayViewModel.ARG_PREFILL_AMOUNT to 100L, PayViewModel.ARG_SOURCE to PayViewModel.SOURCE_LINK),
+        )
+        val vm = realVm(handle); advanceUntilIdle()
+        val s = vm.uiState.value
+        assertThat(s.payeeLocked).isTrue()
+        assertThat(s.amountLocked).isTrue()
+        assertThat(s.amountText).isEqualTo("1.00")
+        vm.onAmountChange("999"); vm.onVpaChange("mallory@evil")
+        assertThat(vm.uiState.value.amountText).isEqualTo("1.00")
+        assertThat(vm.uiState.value.vpa).isEqualTo("test@upi")
+        vm.submit(); advanceUntilIdle(); vm.onAppChosen("com.example.gpay"); advanceUntilIdle()
+        assertThat(repo.getById("pay-1")!!.method).isEqualTo(com.darshan.payflow.domain.model.PaymentMethod.DEEP_LINK)
+    }
+
+    @Test
+    fun `a recent payee prefill is editable and verified in sandbox mode`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(mapOf(PayViewModel.ARG_PREFILL_VPA to "alice@okbank", PayViewModel.ARG_PREFILL_NAME to "Alice", PayViewModel.ARG_SOURCE to PayViewModel.SOURCE_PAYEE))
+        val vm = vm(handle = handle); advanceUntilIdle()
+        assertThat(vm.uiState.value.payeeLocked).isFalse()
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Verified("Alice Kumar"))
+        vm.onVpaChange("bob@upi")
+        assertThat(vm.uiState.value.vpa).isEqualTo("bob@upi")
     }
 }

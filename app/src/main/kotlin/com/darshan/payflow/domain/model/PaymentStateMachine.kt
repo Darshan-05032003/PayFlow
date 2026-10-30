@@ -7,11 +7,14 @@ sealed interface PaymentEvent {
     /** The payment was handed to the PSP / UPI app. CREATED → PENDING. */
     data object Initiate : PaymentEvent
 
-    /** The PSP status check confirmed the capture. PENDING → SUCCESS. */
-    data class Confirm(val pspTxnId: String, val upiTxnId: String?) : PaymentEvent
+    /**
+     * The payment was captured. PENDING → SUCCESS. [source] says who established that: the PSP status check (sandbox, with a
+     * [pspTxnId]), the UPI app's response (no PSP id, only the app's [upiTxnId]) or the user marking it by hand.
+     */
+    data class Confirm(val pspTxnId: String?, val upiTxnId: String?, val source: StatusSource = StatusSource.PSP) : PaymentEvent
 
     /** CREATED / PENDING → FAILED. */
-    data class Fail(val reason: String) : PaymentEvent
+    data class Fail(val reason: String, val source: StatusSource = StatusSource.PSP) : PaymentEvent
 
     /** SUCCESS → REFUND_PENDING. */
     data object RequestRefund : PaymentEvent
@@ -70,8 +73,11 @@ object PaymentStateMachine {
             is TransitionResult.Rejected -> Result.failure(IllegalTransitionException(payment.status, event))
             is TransitionResult.Accepted -> Result.success(
                 when (event) {
-                    is PaymentEvent.Confirm -> payment.copy(status = result.status, pspTxnId = event.pspTxnId, upiTxnId = event.upiTxnId ?: payment.upiTxnId, updatedAt = now)
-                    is PaymentEvent.Fail -> payment.copy(status = result.status, failureReason = event.reason, updatedAt = now)
+                    is PaymentEvent.Confirm -> payment.copy(
+                        status = result.status, pspTxnId = event.pspTxnId ?: payment.pspTxnId, upiTxnId = event.upiTxnId ?: payment.upiTxnId,
+                        statusSource = event.source, updatedAt = now,
+                    )
+                    is PaymentEvent.Fail -> payment.copy(status = result.status, failureReason = event.reason, statusSource = event.source, updatedAt = now)
                     is PaymentEvent.RefundConfirmed -> payment.copy(status = result.status, refundId = event.refundId, updatedAt = now)
                     PaymentEvent.Initiate, PaymentEvent.RequestRefund, PaymentEvent.RefundFailed ->
                         payment.copy(status = result.status, updatedAt = now)

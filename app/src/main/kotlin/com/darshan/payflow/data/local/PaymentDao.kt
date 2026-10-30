@@ -37,6 +37,7 @@ interface PaymentDao {
             upi_txn_id = COALESCE(:upiTxnId, upi_txn_id),
             refund_id = COALESCE(:refundId, refund_id),
             failure_reason = COALESCE(:failureReason, failure_reason),
+            status_source = :statusSource,
             updated_at = :updatedAt
         WHERE id = :id AND status = :expectedStatus
         """,
@@ -49,8 +50,19 @@ interface PaymentDao {
         upiTxnId: String?,
         refundId: String?,
         failureReason: String?,
+        statusSource: String,
         updatedAt: Long,
     ): Int
+
+    /** Distinct outgoing payees, most recently paid first (the "recent payees" row on Home). */
+    @Query(
+        """
+        SELECT payee_vpa AS vpa, payee_name AS name, MAX(created_at) AS last_paid_at
+        FROM payments WHERE direction = 'OUTGOING'
+        GROUP BY payee_vpa ORDER BY last_paid_at DESC LIMIT :limit
+        """,
+    )
+    fun observeRecentPayees(limit: Int): Flow<List<RecentPayeeRow>>
 
     @Query(
         """

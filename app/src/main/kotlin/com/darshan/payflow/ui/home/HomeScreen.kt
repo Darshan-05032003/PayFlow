@@ -1,6 +1,20 @@
 package com.darshan.payflow.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import com.darshan.payflow.domain.model.PaymentMode
+import com.darshan.payflow.domain.model.RecentPayee
+import com.darshan.payflow.ui.components.InitialAvatar
+import com.darshan.payflow.ui.components.LocalPaymentMode
+import com.darshan.payflow.ui.components.SandboxBadgeIfActive
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,6 +92,8 @@ data class HomeCallbacks(
     val onMandates: () -> Unit = {},
     val onSecurity: () -> Unit = {},
     val onCheckout: () -> Unit = {},
+    val onReceive: () -> Unit = {},
+    val onPayee: (RecentPayee) -> Unit = {},
     val onSetupPin: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
@@ -99,11 +115,7 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Bool
         topBar = {
             TopAppBar(
                 title = { BrandTitle() },
-                actions = {
-                    IconButton(onClick = callbacks.onViewAll) {
-                        Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.history_title))
-                    }
-                },
+                actions = { SandboxBadgeIfActive(Modifier.padding(end = 12.dp)) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
@@ -142,16 +154,22 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Bool
             )
             SectionHeader(stringResource(R.string.home_quick_actions))
             QuickActions(callbacks)
+            val payees = (state as? HomeUiState.Content)?.recentPayees.orEmpty()
+            if (payees.isNotEmpty()) {
+                SectionHeader(stringResource(R.string.home_recent_payees))
+                RecentPayeesRow(payees, callbacks.onPayee)
+            }
             SectionHeader(
                 stringResource(R.string.home_recent),
                 actionLabel = if (state is HomeUiState.Content) stringResource(R.string.home_view_all) else null,
                 onAction = callbacks.onViewAll,
             )
             RecentSection(state, callbacks)
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                Icon(Icons.Outlined.Science, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            val sandbox = LocalPaymentMode.current == PaymentMode.SANDBOX
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(top = 4.dp)) {
+                Icon(if (sandbox) Icons.Outlined.Science else Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                 Text(
-                    stringResource(R.string.home_sandbox_footer),
+                    stringResource(if (sandbox) R.string.home_sandbox_footer else R.string.home_real_footer),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp),
@@ -217,19 +235,56 @@ private fun Pill(text: String) {
 
 private data class QuickAction(val label: Int, val icon: ImageVector, val tag: String, val onClick: () -> Unit)
 
+/** Two rows of four, like the action grid of the big UPI apps. */
 @Composable
 private fun QuickActions(callbacks: HomeCallbacks) {
     val actions = listOf(
         QuickAction(R.string.home_action_pay, Icons.Default.Send, "${PayFlowTestTags.HOME_PAY}:tile", callbacks.onPay),
+        QuickAction(R.string.home_action_receive, Icons.Outlined.QrCode2, PayFlowTestTags.HOME_RECEIVE, callbacks.onReceive),
         QuickAction(R.string.home_action_scan, Icons.Outlined.QrCodeScanner, PayFlowTestTags.HOME_SCAN, callbacks.onScan),
         QuickAction(R.string.home_action_requests, Icons.Outlined.RequestQuote, PayFlowTestTags.HOME_COLLECT, callbacks.onCollect),
         QuickAction(R.string.home_action_autopay, Icons.Outlined.EventRepeat, PayFlowTestTags.HOME_MANDATES, callbacks.onMandates),
         QuickAction(R.string.home_action_checkout, Icons.Outlined.ShoppingBag, PayFlowTestTags.HOME_CHECKOUT, callbacks.onCheckout),
+        QuickAction(R.string.home_action_history, Icons.Outlined.History, PayFlowTestTags.HOME_HISTORY, callbacks.onViewAll),
         QuickAction(R.string.home_action_security, Icons.Outlined.Shield, PayFlowTestTags.HOME_SECURITY, callbacks.onSecurity),
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        actions.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { row.forEach { ActionTile(it) } }
+        actions.chunked(4).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { ActionTile(it) } }
+        }
+    }
+}
+
+/** Horizontally scrolling avatars of people paid before; a tap opens Pay with the payee prefilled. */
+@Composable
+private fun RecentPayeesRow(payees: List<RecentPayee>, onPayee: (RecentPayee) -> Unit) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 2.dp),
+        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.HOME_PAYEES),
+    ) {
+        items(payees, key = { it.vpa }) { payee ->
+            val description = stringResource(R.string.home_payee_description, payee.name, payee.vpa)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(68.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable { onPayee(payee) }
+                    .padding(vertical = 4.dp)
+                    .testTag(PayFlowTestTags.homePayee(payee.vpa))
+                    .semantics(mergeDescendants = true) { contentDescription = description },
+            ) {
+                InitialAvatar(payee.name, size = 52.dp)
+                Text(
+                    payee.name.substringBefore(' '),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         }
     }
 }
@@ -242,11 +297,11 @@ private fun RowScope.ActionTile(action: QuickAction) {
         modifier = Modifier.weight(1f).testTag(action.tag).semantics(mergeDescendants = true) { contentDescription = label },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer, shape = CircleShape, modifier = Modifier.size(44.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(action.icon, contentDescription = null, modifier = Modifier.size(22.dp)) }
             }
-            Text(label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }

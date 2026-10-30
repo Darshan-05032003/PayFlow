@@ -7,6 +7,9 @@ import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.domain.model.HistoryFilter
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.repository.PaymentRepository
+import com.darshan.payflow.domain.usecase.ReconcilePendingPaymentsUseCase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,7 +35,8 @@ sealed interface HistoryUiState {
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     repository: PaymentRepository,
-    dispatchers: DispatcherProvider,
+    private val reconcilePending: ReconcilePendingPaymentsUseCase,
+    private val dispatchers: DispatcherProvider,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -68,6 +72,14 @@ class HistoryViewModel @Inject constructor(
 
     fun retry() {
         reload.value++
+    }
+
+    /** Pull-to-refresh: settle stale pending sandbox payments with the PSP, then reload the list. */
+    fun refresh() {
+        viewModelScope.launch {
+            withContext(dispatchers.io) { runCatching { reconcilePending() } }
+            reload.value++
+        }
     }
 
     companion object {

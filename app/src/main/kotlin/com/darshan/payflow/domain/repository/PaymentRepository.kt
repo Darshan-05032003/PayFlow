@@ -4,6 +4,7 @@ import com.darshan.payflow.domain.model.HistoryFilter
 import com.darshan.payflow.domain.model.HistorySummary
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentEvent
+import com.darshan.payflow.domain.model.RecentPayee
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
@@ -34,4 +35,7 @@ interface PaymentRepository {
     /** CREATED / PENDING payments created at or before [before], oldest first. */
     suspend fun pendingOlderThan(before: java.time.Instant): List<Payment>
     fun observeByMandate(mandateId: String): Flow<List<Payment>>
+
+    /** Distinct outgoing payees, most recently paid first. */
+    fun observeRecentPayees(limit: Int): Flow<List<RecentPayee>>
 }

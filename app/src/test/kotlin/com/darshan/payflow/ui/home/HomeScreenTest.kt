@@ -11,6 +11,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.darshan.payflow.domain.model.HistorySummary
+import com.darshan.payflow.domain.model.PaymentMode
+import com.darshan.payflow.domain.model.RecentPayee
+import com.darshan.payflow.ui.components.LocalPaymentMode
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.testutil.testPayment
 import com.darshan.payflow.ui.PayFlowTestTags
@@ -75,6 +81,38 @@ class HomeScreenTest {
         assertThat(viewAll).isTrue()
         rule.onNodeWithContentDescription("Payment to Alice, ₹123.45, Success").assertExists()
         // Every quick action is labelled and reachable.
-        listOf("Scan QR", "Requests", "AutoPay", "Checkout", "Security").forEach { rule.onNodeWithContentDescription(it).assertExists() }
+        listOf("Scan QR", "Requests", "AutoPay", "Checkout", "Security", "Receive", "History").forEach { rule.onNodeWithContentDescription(it).assertExists() }
+    }
+
+    @Test
+    fun recentPayeesRowOpensPayPrefilledAndSandboxBadgeFollowsTheMode() {
+        var payee: RecentPayee? = null
+        var receive = false
+        val payments = listOf(testPayment("a", status = PaymentStatus.SUCCESS))
+        val payees = listOf(RecentPayee("alice@okbank", "Alice Kumar", testPayment().createdAt), RecentPayee("bob@upi", "Bob", testPayment().createdAt))
+        rule.setContent {
+            PayFlowTheme {
+                CompositionLocalProvider(LocalPaymentMode provides PaymentMode.SANDBOX) {
+                    HomeScreen(
+                        HomeUiState.Content(payments, HistorySummary.of(payments), recentPayees = payees),
+                        HomeCallbacks(onPayee = { payee = it }, onReceive = { receive = true }),
+                    )
+                }
+            }
+        }
+        rule.onNodeWithTag(PayFlowTestTags.SANDBOX_BADGE).assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.HOME_PAYEES).performScrollTo()
+        rule.onNodeWithContentDescription("Pay Alice Kumar again (alice@okbank)").performClick()
+        assertThat(payee).isEqualTo(payees[0])
+        rule.onNodeWithTag(PayFlowTestTags.HOME_RECEIVE).performScrollTo().performClick()
+        assertThat(receive).isTrue()
+        rule.onNodeWithText("Sandbox mode: payments are settled by an in-app fake provider, no real money moves. Switch modes under Security.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun upiAppsModeHasNoBadgeAndAnHonestFooter() {
+        show(HomeUiState.Empty)
+        rule.onAllNodesWithTag(PayFlowTestTags.SANDBOX_BADGE).assertCountEquals(0)
+        rule.onNodeWithText("UPI apps mode: payments go through the UPI apps installed on this phone. Results are reported by that app; PayFlow has no bank connection to verify them.").performScrollTo().assertIsDisplayed()
     }
 }

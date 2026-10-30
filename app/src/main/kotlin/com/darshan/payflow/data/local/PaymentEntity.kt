@@ -9,6 +9,8 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentMethod
 import com.darshan.payflow.domain.model.PaymentStatus
+import com.darshan.payflow.domain.model.RecentPayee
+import com.darshan.payflow.domain.model.StatusSource
 import java.time.Instant
 
 @Entity(
@@ -38,7 +40,18 @@ data class PaymentEntity(
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "idempotency_key") val idempotencyKey: String?,
     @ColumnInfo(name = "mandate_id") val mandateId: String? = null,
+    @ColumnInfo(name = "status_source", defaultValue = "PSP") val statusSource: String = "PSP",
+    @ColumnInfo(name = "handler_package") val handlerPackage: String? = null,
 )
+
+/** Row shape of [PaymentDao.observeRecentPayees]. */
+data class RecentPayeeRow(
+    val vpa: String,
+    val name: String,
+    @ColumnInfo(name = "last_paid_at") val lastPaidAt: Long,
+) {
+    fun toDomain() = RecentPayee(vpa, name, Instant.ofEpochMilli(lastPaidAt))
+}
 
 /** Row shape of [PaymentDao.observeSummary]. */
 data class SummaryRow(
@@ -71,6 +84,8 @@ fun Payment.toEntity() = PaymentEntity(
     updatedAt = updatedAt.toEpochMilli(),
     idempotencyKey = idempotencyKey,
     mandateId = mandateId,
+    statusSource = statusSource.name,
+    handlerPackage = handlerPackage,
 )
 
 fun PaymentEntity.toDomain() = Payment(
@@ -91,4 +106,6 @@ fun PaymentEntity.toDomain() = Payment(
     updatedAt = Instant.ofEpochMilli(updatedAt),
     idempotencyKey = idempotencyKey,
     mandateId = mandateId,
+    statusSource = StatusSource.fromNameOrDefault(statusSource),
+    handlerPackage = handlerPackage,
 )

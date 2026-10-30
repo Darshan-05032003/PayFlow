@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.domain.model.HistorySummary
 import com.darshan.payflow.domain.model.Payment
+import com.darshan.payflow.domain.model.RecentPayee
 import com.darshan.payflow.domain.repository.PaymentRepository
 import com.darshan.payflow.domain.usecase.ReconcilePendingPaymentsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,8 +31,16 @@ sealed interface HomeUiState {
     data object Loading : HomeUiState
     data object Empty : HomeUiState
     data class Error(val detail: String?) : HomeUiState
-    /** [summary] is all-time; [month] covers payments created since the start of the current month (device zone). */
-    data class Content(val recent: List<Payment>, val summary: HistorySummary, val month: HistorySummary = summary) : HomeUiState
+    /**
+     * [summary] is all-time; [month] covers payments created since the start of the current month (device zone);
+     * [recentPayees] are distinct outgoing payees for the "pay again" row.
+     */
+    data class Content(
+        val recent: List<Payment>,
+        val summary: HistorySummary,
+        val month: HistorySummary = summary,
+        val recentPayees: List<RecentPayee> = emptyList(),
+    ) : HomeUiState
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -59,8 +68,9 @@ class HomeViewModel @Inject constructor(
                 repository.observeRecent(RECENT_LIMIT),
                 repository.observeSummary(),
                 repository.observeSummarySince(monthStart),
-            ) { recent, summary, month ->
-                if (summary.total == 0) HomeUiState.Empty else HomeUiState.Content(recent, summary, month)
+                repository.observeRecentPayees(PAYEE_LIMIT),
+            ) { recent, summary, month, payees ->
+                if (summary.total == 0) HomeUiState.Empty else HomeUiState.Content(recent, summary, month, payees)
             }
                 .onStart<HomeUiState> { emit(HomeUiState.Loading) }
                 .catch { emit(HomeUiState.Error(it.message)) }
@@ -74,5 +84,6 @@ class HomeViewModel @Inject constructor(
 
     companion object {
         const val RECENT_LIMIT = 5
+        const val PAYEE_LIMIT = 8
     }
 }

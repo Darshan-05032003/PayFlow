@@ -1,6 +1,8 @@
 package com.darshan.payflow.ui.history
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -69,6 +71,42 @@ class HistoryScreenTest {
         assertThat(query).isEqualTo("ali")
         rule.onNodeWithText("Alice").performClick()
         assertThat(clicked).isEqualTo("a")
+    }
+
+    @Test
+    fun refreshButtonCallsBack() {
+        var refreshed = false
+        show(HistoryUiState.Empty(HistoryFilter.ALL, ""), HistoryCallbacks(onRefresh = { refreshed = true }))
+        rule.onNodeWithTag(PayFlowTestTags.HISTORY_REFRESH).performClick()
+        assertThat(refreshed).isTrue()
+    }
+
+    @Test
+    fun detailScreenOffersManualMarkingForAPendingUpiAppPayment() {
+        var paid: Boolean? = null
+        val payment = testPayment("r", status = PaymentStatus.PENDING, payeeName = "Rahul").copy(handlerPackage = "com.example.gpay")
+        rule.setContent {
+            PayFlowTheme {
+                PaymentDetailScreen(
+                    PaymentDetailUiState.Content(payment, handlerLabel = "GPay"),
+                    PaymentDetailCallbacks(onMarkPaid = { paid = true }, onMarkNotPaid = { paid = false }),
+                )
+            }
+        }
+        rule.onNodeWithText("Not confirmed yet. Check in GPay.").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.DETAIL_MARK_PAID).performScrollTo().performClick()
+        assertThat(paid).isTrue()
+        rule.onNodeWithTag(PayFlowTestTags.DETAIL_MARK_NOT_PAID).performScrollTo().performClick()
+        assertThat(paid).isFalse()
+        rule.onNodeWithText("GPay").performScrollTo().assertIsDisplayed() // "Paid via"
+    }
+
+    @Test
+    fun detailScreenSaysReportedNotVerifiedForAnAppResult() {
+        val payment = testPayment("r", status = PaymentStatus.SUCCESS).copy(handlerPackage = "com.example.gpay", statusSource = com.darshan.payflow.domain.model.StatusSource.UPI_APP, upiTxnId = "GP1")
+        rule.setContent { PayFlowTheme { PaymentDetailScreen(PaymentDetailUiState.Content(payment, handlerLabel = "GPay"), PaymentDetailCallbacks()) } }
+        rule.onNodeWithText("Reported by GPay. Not verified by PayFlow.").assertIsDisplayed()
+        rule.onAllNodesWithTag(PayFlowTestTags.DETAIL_MARK_PAID).assertCountEquals(0)
     }
 
     @Test

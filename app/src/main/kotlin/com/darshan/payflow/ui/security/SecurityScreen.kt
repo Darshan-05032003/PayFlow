@@ -13,6 +13,12 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Sms
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.semantics.Role
+import com.darshan.payflow.domain.model.PaymentMode
+import com.darshan.payflow.ui.components.SandboxBadge
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -74,6 +80,7 @@ data class SecurityCallbacks(
     val onSetupPin: () -> Unit = {},
     val onRemovePin: () -> Unit = {},
     val onRefresh: () -> Unit = {},
+    val onPaymentMode: (PaymentMode) -> Unit = {},
 )
 
 @Composable
@@ -84,7 +91,7 @@ fun SecurityRoute(onBack: () -> Unit, onSetupPin: () -> Unit, viewModel: Securit
         SecurityCallbacks(
             onBack = onBack, onPhoneChange = viewModel::onPhoneChange, onRequestOtp = viewModel::requestOtp, onOtpChange = viewModel::onOtpChange,
             onVerifyOtp = viewModel::verifyOtp, onUnbind = viewModel::unbind, onCheckIntegrity = viewModel::checkIntegrity,
-            onSetupPin = onSetupPin, onRemovePin = viewModel::removePin, onRefresh = viewModel::refresh,
+            onSetupPin = onSetupPin, onRemovePin = viewModel::removePin, onRefresh = viewModel::refresh, onPaymentMode = viewModel::setPaymentMode,
         ),
     )
 }
@@ -125,6 +132,9 @@ fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SecurityOverview(state)
+            SectionCard(stringResource(R.string.security_mode_title), icon = Icons.Outlined.SwapHoriz, trailing = { if (state.paymentMode == PaymentMode.SANDBOX) SandboxBadge() }) {
+                PaymentModeSection(state, callbacks)
+            }
             SectionCard(stringResource(R.string.security_pin_title), icon = Icons.Outlined.Fingerprint, trailing = { OnOffChip(state.pinConfigured) }) {
                 if (state.pinConfigured) {
                     StatusLine(stringResource(R.string.security_pin_on), ok = true)
@@ -179,6 +189,48 @@ fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
                 }
             }
             InfoBanner(stringResource(R.string.security_sandbox_note), icon = Icons.Outlined.Science, tone = BannerTone.Info)
+        }
+    }
+}
+
+/** Two radio rows with the honest explanation of each mode; UPI apps is disabled when no handler is installed. */
+@Composable
+private fun PaymentModeSection(state: SecurityUiState, callbacks: SecurityCallbacks) {
+    ModeOption(
+        selected = state.paymentMode == PaymentMode.UPI_APPS,
+        enabled = state.upiAppAvailable,
+        title = stringResource(R.string.security_mode_upi),
+        hint = stringResource(if (state.upiAppAvailable) R.string.security_mode_upi_hint else R.string.security_mode_no_apps),
+        tag = PayFlowTestTags.SECURITY_MODE_UPI,
+        onClick = { callbacks.onPaymentMode(PaymentMode.UPI_APPS) },
+    )
+    ModeOption(
+        selected = state.paymentMode == PaymentMode.SANDBOX,
+        enabled = true,
+        title = stringResource(R.string.security_mode_sandbox),
+        hint = stringResource(R.string.security_mode_sandbox_hint),
+        tag = PayFlowTestTags.SECURITY_MODE_SANDBOX,
+        onClick = { callbacks.onPaymentMode(PaymentMode.SANDBOX) },
+    )
+    if (state.pinConfigured) {
+        Text(stringResource(R.string.security_mode_locked_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ModeOption(selected: Boolean, enabled: Boolean, title: String, hint: String, tag: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 6.dp)
+            .testTag(tag),
+        verticalAlignment = Alignment.Top,
+    ) {
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        Column(Modifier.padding(start = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

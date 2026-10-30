@@ -20,9 +20,31 @@ class PaymentDetailViewModelTest {
     @get:Rule val mainRule = MainDispatcherRule(dispatcher)
     private val repo = FakePaymentRepository()
 
+    private val launcher = com.darshan.payflow.testutil.FakeUpiAppLauncher()
+
     private fun vm(id: String) = PaymentDetailViewModel(
-        repo, TestDispatcherProvider(dispatcher), SavedStateHandle(mapOf(PaymentDetailViewModel.ARG_ID to id)),
+        repo, com.darshan.payflow.domain.usecase.MarkPaymentManuallyUseCase(repo), launcher, TestDispatcherProvider(dispatcher),
+        SavedStateHandle(mapOf(PaymentDetailViewModel.ARG_ID to id)),
     )
+
+    @Test
+    fun `a pending upi app payment shows the app name and can be marked by hand`() = runTest(dispatcher) {
+        repo.seed(testPayment("r", status = PaymentStatus.PENDING).copy(handlerPackage = "com.example.gpay"))
+        val vm = vm("r")
+        vm.uiState.test {
+            awaitItem() // loading
+            val content = awaitItem() as PaymentDetailUiState.Content
+            assertThat(content.handlerLabel).isEqualTo("GPay")
+            assertThat(content.payment.canBeMarkedManually).isTrue()
+            vm.markManually(paid = false)
+            val marked = awaitItem() as PaymentDetailUiState.Content
+            assertThat(marked.marking).isTrue()
+            val settled = awaitItem() as PaymentDetailUiState.Content
+            assertThat(settled.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(settled.payment.statusSource).isEqualTo(com.darshan.payflow.domain.model.StatusSource.USER)
+            assertThat(awaitItem()).isEqualTo(settled.copy(marking = false))
+        }
+    }
 
     @Test
     fun `shows the payment and follows updates`() = runTest(dispatcher) {

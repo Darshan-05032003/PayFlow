@@ -35,12 +35,30 @@ class SecurityViewModelTest {
     private var report = TamperReport.CLEAN
     private val tamper = object : TamperDetector { override suspend fun scan() = report }
     private var integrity: IntegrityResult = IntegrityResult.Token("tok")
+    private val modes = com.darshan.payflow.data.settings.InMemoryPaymentModeRepository(com.darshan.payflow.domain.model.PaymentMode.UPI_APPS)
+    private val launcher = com.darshan.payflow.testutil.FakeUpiAppLauncher()
 
     private fun vm() = SecurityViewModel(
         pins, binding, sender, tamper,
         object : IntegrityChecker { override val isConfigured get() = integrity !is IntegrityResult.NotConfigured; override suspend fun requestToken(requestHash: String) = integrity },
-        FakeIntegrityVerifier(IntegrityVerdict.MEETS_DEVICE_INTEGRITY), TestDispatcherProvider(dispatcher),
+        FakeIntegrityVerifier(IntegrityVerdict.MEETS_DEVICE_INTEGRITY), modes, launcher, TestDispatcherProvider(dispatcher),
     )
+
+    @Test
+    fun `payment mode is read, switched and refused when no upi app exists`() = runTest(dispatcher) {
+        val vm = vm(); advanceUntilIdle()
+        assertThat(vm.uiState.value.paymentMode).isEqualTo(com.darshan.payflow.domain.model.PaymentMode.UPI_APPS)
+        assertThat(vm.uiState.value.upiAppAvailable).isTrue()
+        vm.setPaymentMode(com.darshan.payflow.domain.model.PaymentMode.SANDBOX); advanceUntilIdle()
+        assertThat(vm.uiState.value.paymentMode).isEqualTo(com.darshan.payflow.domain.model.PaymentMode.SANDBOX)
+        assertThat(modes.current()).isEqualTo(com.darshan.payflow.domain.model.PaymentMode.SANDBOX)
+
+        launcher.installed = false
+        val vm2 = vm(); advanceUntilIdle()
+        assertThat(vm2.uiState.value.upiAppAvailable).isFalse()
+        vm2.setPaymentMode(com.darshan.payflow.domain.model.PaymentMode.UPI_APPS); advanceUntilIdle()
+        assertThat(modes.current()).isEqualTo(com.darshan.payflow.domain.model.PaymentMode.SANDBOX)
+    }
 
     @Test
     fun `loads pin, binding and tamper status`() = runTest(dispatcher) {

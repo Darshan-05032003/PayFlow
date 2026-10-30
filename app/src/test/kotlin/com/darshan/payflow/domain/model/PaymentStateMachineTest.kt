@@ -143,4 +143,22 @@ class PaymentStateMachineTest {
         assertThat(summary.sentPaise).isEqualTo(150)
         assertThat(summary.receivedPaise).isEqualTo(250)
     }
+
+    @Test
+    fun `confirm and fail record who established the status`() {
+        val pending = testPayment(status = PaymentStatus.PENDING).copy(handlerPackage = "com.example.gpay")
+        val byApp = PaymentStateMachine.apply(pending, PaymentEvent.Confirm(null, "UPI1", StatusSource.UPI_APP), FIXED_INSTANT).getOrThrow()
+        assertThat(byApp.statusSource).isEqualTo(StatusSource.UPI_APP)
+        assertThat(byApp.pspTxnId).isNull()
+        assertThat(byApp.upiTxnId).isEqualTo("UPI1")
+        val byUser = PaymentStateMachine.apply(pending, PaymentEvent.Fail("not paid", StatusSource.USER), FIXED_INSTANT).getOrThrow()
+        assertThat(byUser.statusSource).isEqualTo(StatusSource.USER)
+        // Default source stays PSP so every existing sandbox path is unchanged.
+        val byPsp = PaymentStateMachine.apply(pending, PaymentEvent.Confirm("psp-1", null), FIXED_INSTANT).getOrThrow()
+        assertThat(byPsp.statusSource).isEqualTo(StatusSource.PSP)
+        assertThat(byPsp.pspTxnId).isEqualTo("psp-1")
+        assertThat(pending.canBeMarkedManually).isTrue()
+        assertThat(byApp.canBeMarkedManually).isFalse()
+        assertThat(testPayment(status = PaymentStatus.PENDING).canBeMarkedManually).isFalse()
+    }
 }

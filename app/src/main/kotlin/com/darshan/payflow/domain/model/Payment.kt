@@ -25,7 +25,15 @@ data class Payment(
     val idempotencyKey: String?,
     /** Set when the payment is a debit under an AutoPay mandate. */
     val mandateId: String? = null,
+    /** Who established [status]: the sandbox PSP, the UPI app's response, or the user. */
+    val statusSource: StatusSource = StatusSource.PSP,
+    /** Package of the UPI app that handled the payment (UPI-apps mode); null for sandbox payments. */
+    val handlerPackage: String? = null,
 ) {
+    /** A real UPI-app payment whose outcome is still unknown: the user may settle it by hand after checking their UPI app. */
+    val canBeMarkedManually: Boolean
+        get() = handlerPackage != null && (status == PaymentStatus.PENDING || status == PaymentStatus.CREATED)
+
     init {
         require(amountPaise in 1..MAX_AMOUNT_PAISE) { "amount out of range: $amountPaise" }
         require(id.isNotBlank()) { "id is blank" }
@@ -37,6 +45,9 @@ data class Payment(
         const val MAX_AMOUNT_PAISE: Long = 1_00_000_00L
     }
 }
+
+/** A payee the user has paid before (distinct by VPA), for the "recent payees" row. */
+data class RecentPayee(val vpa: String, val name: String, val lastPaidAt: Instant)
 
 /** Aggregate numbers for the home card. Money sums only count captured payments. */
 data class HistorySummary(
