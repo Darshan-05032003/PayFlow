@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import androidx.core.net.toUri
 import com.darshan.payflow.R
@@ -28,7 +29,7 @@ class UpiApp(val packageName: String, val label: String, val icon: Drawable? = n
 interface UpiAppLauncher {
     fun isUpiAppInstalled(): Boolean
 
-    /** Installed UPI handlers, sorted by label, PayFlow itself excluded. */
+    /** Installed UPI handlers, sorted by label, PayFlow's own link handler (`MainActivity`) excluded. */
     fun installedUpiApps(): List<UpiApp>
 
     /** System chooser over every handler (fallback when [installedUpiApps] is empty but [isUpiAppInstalled] is true). */
@@ -43,17 +44,27 @@ interface UpiAppLauncher {
     fun appLabel(packageName: String): String?
 }
 
+/**
+ * Android implementation. PayFlow itself handles `upi://pay` (incoming links land in `MainActivity`), so that one component is
+ * filtered out of every query; any other handler, including the debug-only "Sandbox UPI" activity that ships in debug builds,
+ * counts as a UPI app.
+ */
 @Singleton
 class AndroidUpiAppLauncher @Inject constructor(@ApplicationContext private val context: Context) : UpiAppLauncher {
     private val probe: Intent get() = Intent(Intent.ACTION_VIEW, "upi://pay".toUri())
+    private val ownLinkHandler: String get() = "${context.packageName}.MainActivity"
 
-    override fun isUpiAppInstalled(): Boolean = installedUpiApps().isNotEmpty() ||
-        context.packageManager.queryIntentActivities(probe, PackageManager.MATCH_DEFAULT_ONLY).any { it.activityInfo?.packageName != context.packageName }
+    /** Every `upi://pay` handler except PayFlow's own link entry point. */
+    private fun handlers(intent: Intent = probe): List<ResolveInfo> =
+        runCatching { context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY) }.getOrDefault(emptyList())
+            .filter { info -> info.activityInfo != null && !(info.activityInfo.packageName == context.packageName && info.activityInfo.name == ownLinkHandler) }
+
+    override fun isUpiAppInstalled(): Boolean = handlers().isNotEmpty()
 
     override fun installedUpiApps(): List<UpiApp> {
         val pm = context.packageManager
-        return runCatching { pm.queryIntentActivities(probe, PackageManager.MATCH_DEFAULT_ONLY) }.getOrDefault(emptyList())
-            .mapNotNull { info -> info.activityInfo?.packageName?.takeIf { it != context.packageName }?.let { it to info } }
+        return handlers()
+            .map { info -> info.activityInfo.packageName to info }
             .distinctBy { it.first }
             .map { (pkg, info) ->
                 val label = runCatching { info.loadLabel(pm)?.toString() }.getOrNull()?.takeIf { it.isNotBlank() } ?: pkg
@@ -68,8 +79,15 @@ class AndroidUpiAppLauncher @Inject constructor(@ApplicationContext private val 
         return Intent.createChooser(view, context.getString(R.string.pay_chooser_title))
     }
 
-    override fun targetedIntent(upiUri: String, packageName: String): Intent =
-        Intent(Intent.ACTION_VIEW, upiUri.toUri()).setPackage(packageName)
+    /**
+     * Pinned to the chosen package and, when it can be resolved, to the exact activity: an app with two `upi://pay` handlers (or
+     * PayFlow's own package in debug, which also contains `MainActivity`) would otherwise show a disambiguation dialog.
+     */
+    override fun targetedIntent(upiUri: String, packageName: String): Intent {
+        val intent = Intent(Intent.ACTION_VIEW, upiUri.toUri()).setPackage(packageName)
+        val target = handlers(Intent(intent)).firstOrNull()?.activityInfo ?: return intent
+        return intent.setClassName(target.packageName, target.name)
+    }
 
     override fun parseActivityResult(resultCode: Int, data: Intent?): UpiLaunchResult {
         val raw = runCatching { data?.getStringExtra(EXTRA_RESPONSE) }.getOrNull()
@@ -80,9 +98,12 @@ class AndroidUpiAppLauncher @Inject constructor(@ApplicationContext private val 
         }
     }
 
+    /** The UPI handler's own label when the package has one (e.g. "Sandbox UPI (debug)"), otherwise the application label. */
     override fun appLabel(packageName: String): String? = runCatching {
         val pm = context.packageManager
-        pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString().takeIf { it.isNotBlank() }?.take(MAX_LABEL_LENGTH)
+        val handlerLabel = handlers(Intent(probe).setPackage(packageName)).firstOrNull()?.loadLabel(pm)?.toString()
+        (handlerLabel?.takeIf { it.isNotBlank() } ?: pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString())
+            .takeIf { it.isNotBlank() }?.take(MAX_LABEL_LENGTH)
     }.getOrNull()
 
     companion object {

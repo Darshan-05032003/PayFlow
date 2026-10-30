@@ -1,0 +1,14 @@
+<resources>
+    <string name="sandbox_upi_label">Sandbox UPI (debug)</string>
+    <string name="sandbox_upi_title">Sandbox UPI (debug build only)</string>
+    <string name="sandbox_upi_hint">A fake UPI app for testing PayFlow on an emulator. No money moves. Pick the answer this app should report back.</string>
+    <string name="sandbox_upi_to">Pay to</string>
+    <string name="sandbox_upi_ref">Reference (tr): %1$s</string>
+    <string name="sandbox_upi_no_amount">No amount in the link</string>
+    <string name="sandbox_upi_invalid">This is not a valid upi://pay link.</string>
+    <string name="sandbox_upi_success">Report success</string>
+    <string name="sandbox_upi_failure">Report failure</string>
+    <string name="sandbox_upi_pending">Report pending (SUBMITTED)</string>
+    <string name="sandbox_upi_cancel">Cancel (no response)</string>
+    <string name="sandbox_upi_tamper">Tamper: success for another txnRef</string>
+</resources>

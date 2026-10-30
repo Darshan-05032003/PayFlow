@@ -20,10 +20,10 @@ class AndroidUpiAppLauncherTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val launcher = AndroidUpiAppLauncher(context)
 
-    private fun installFakeUpiApp(packageName: String = "com.example.upiapp", label: String = "UPI App") {
+    private fun installFakeUpiApp(packageName: String = "com.example.upiapp", label: String = "UPI App", activity: String = "PayActivity") {
         val info = ResolveInfo().apply {
             activityInfo = ActivityInfo().apply {
-                this.packageName = packageName; name = "PayActivity"
+                this.packageName = packageName; name = activity
                 applicationInfo = ApplicationInfo().apply { this.packageName = packageName; nonLocalizedLabel = label }
             }
             nonLocalizedLabel = label
@@ -32,11 +32,30 @@ class AndroidUpiAppLauncherTest {
         shadowOf(context.packageManager).addResolveInfoForIntent(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("upi://pay")), info)
     }
 
+    private val sandboxUpi = android.content.ComponentName(context, "com.darshan.payflow.debugupi.SandboxUpiActivity")
+
+    /** The debug build ships the "Sandbox UPI (debug)" fake app; disabling it gives a device with no UPI handler at all. */
+    private fun disableSandboxUpi() = context.packageManager.setComponentEnabledSetting(
+        sandboxUpi, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, android.content.pm.PackageManager.DONT_KILL_APP,
+    )
+
     @Test
     fun `detects whether any upi app can handle the scheme`() {
-        assertThat(launcher.isUpiAppInstalled()).isFalse()
+        disableSandboxUpi()
+        assertThat(launcher.isUpiAppInstalled()).isFalse() // PayFlow's own MainActivity filter does not count
         installFakeUpiApp()
         assertThat(launcher.isUpiAppInstalled()).isTrue()
+    }
+
+    @Test
+    fun `debug builds list the sandbox upi app, never payflow's own link handler, and launch it by component`() {
+        val apps = launcher.installedUpiApps()
+        assertThat(apps).containsExactly(UpiApp(context.packageName, "Sandbox UPI (debug)"))
+        assertThat(launcher.isUpiAppInstalled()).isTrue()
+        assertThat(launcher.appLabel(context.packageName)).isEqualTo("Sandbox UPI (debug)")
+        // Same package as MainActivity: the launch must name the exact activity or Android would ask which one to use.
+        val intent = launcher.targetedIntent("upi://pay?pa=a%40b&am=1.00&cu=INR&tr=T1", context.packageName)
+        assertThat(intent.component).isEqualTo(sandboxUpi)
     }
 
     @Test
@@ -65,10 +84,11 @@ class AndroidUpiAppLauncherTest {
 
     @Test
     fun `installed upi apps are listed by label, excluding payflow itself, and launched by package`() {
+        disableSandboxUpi()
         assertThat(launcher.installedUpiApps()).isEmpty()
         installFakeUpiApp()
         installFakeUpiApp(packageName = "com.example.zpay", label = "Zeta Pay")
-        installFakeUpiApp(packageName = context.packageName, label = "PayFlow") // our own upi:// filter must not be offered
+        installFakeUpiApp(packageName = context.packageName, label = "PayFlow", activity = "${context.packageName}.MainActivity") // our own upi:// filter must not be offered
         val apps = launcher.installedUpiApps()
         assertThat(apps.map { it.packageName }).containsExactly("com.example.upiapp", "com.example.zpay").inOrder()
         val targeted = launcher.targetedIntent("upi://pay?pa=a%40b&am=1.00&cu=INR&tr=T1", "com.example.zpay")
