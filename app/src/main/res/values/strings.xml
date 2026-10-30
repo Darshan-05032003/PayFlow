@@ -240,4 +240,14 @@
     <string name="security_integrity_unevaluated">Integrity could not be evaluated.</string>
     <string name="security_integrity_sandbox">(verified by the sandbox verifier; real verification needs a server)</string>
     <string name="security_integrity_check">Request token</string>
+
+    <!-- Checkout (CheckoutKit) -->
+    <string name="checkout_title">Checkout</string>
+    <string name="checkout_intro">Sandbox merchant demo: pay with the CheckoutKit payment sheet (UPI, card or wallet). Every outcome lands in your history.</string>
+    <string name="checkout_buy">Buy</string>
+    <string name="checkout_cancelled">Checkout cancelled. Nothing was charged.</string>
+    <string name="checkout_outcome_success">Payment successful</string>
+    <string name="checkout_outcome_failed">Payment failed</string>
+    <string name="checkout_outcome_pending">Payment pending</string>
+    <string name="checkout_outcome_refunded">Payment refunded</string>
 </resources>

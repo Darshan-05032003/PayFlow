@@ -157,6 +157,16 @@ class ConfirmPaymentUseCase @Inject constructor(
             is PspPaymentStatus.Pending -> ConfirmResult.Pending(payment)
             is PspPaymentStatus.NotFound -> fail(payment, "PSP has no record of ${payment.txnRef}", appResponse)
             is PspPaymentStatus.Failed -> fail(payment, "PSP ${status.code}: ${status.reason}", appResponse)
+            is PspPaymentStatus.Refunded -> {
+                // Captured then refunded at the PSP: walk the local state through SUCCESS → REFUND_PENDING → REFUNDED.
+                if (status.txnRef != payment.txnRef || status.amountPaise != payment.amountPaise) {
+                    return ConfirmResult.Mismatch(payment, PspPaymentStatus.Success(status.txnRef, status.pspTxnId, null, status.amountPaise, payment.payeeVpa))
+                }
+                repository.applyEvent(payment.id, PaymentEvent.Confirm(status.pspTxnId, null))
+                repository.applyEvent(payment.id, PaymentEvent.RequestRefund)
+                repository.applyEvent(payment.id, PaymentEvent.RefundConfirmed(status.refundId))
+                terminal(repository.getById(payment.id) ?: return ConfirmResult.NotFound)
+            }
             is PspPaymentStatus.Success -> {
                 val matches = status.txnRef == payment.txnRef &&
                     status.amountPaise == payment.amountPaise &&

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Card
@@ -53,6 +54,7 @@ data class HomeCallbacks(
     val onCollect: () -> Unit = {},
     val onMandates: () -> Unit = {},
     val onSecurity: () -> Unit = {},
+    val onCheckout: () -> Unit = {},
     val onSetupPin: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
@@ -71,6 +73,9 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Bool
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = callbacks.onCheckout, modifier = Modifier.testTag(PayFlowTestTags.HOME_CHECKOUT)) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = stringResource(R.string.checkout_title))
+                    }
                     IconButton(onClick = callbacks.onSecurity, modifier = Modifier.testTag(PayFlowTestTags.HOME_SECURITY)) {
                         Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.security_title))
                     }

@@ -96,4 +96,19 @@ class FakePspTest {
         assertThat(runCatching { psp.updateMandate("nope", "PAUSE") }.exceptionOrNull()).isInstanceOf(PspException.ClientError::class.java)
         assertThat(runCatching { psp.updateMandate(created.umn, "DANCE") }.exceptionOrNull()).isInstanceOf(PspException.ClientError::class.java)
     }
+
+    @Test
+    fun `refund in the sandbox is idempotent by key and only for captured orders`() = runTest {
+        val psp = FakePsp(fixedClock)
+        psp.initiatePayment(request)
+        val notCaptured = runCatching { psp.refund("PF1", 12_300, "rf-key") }.exceptionOrNull() as PspException.ClientError
+        assertThat(notCaptured.status).isEqualTo(409)
+        psp.getPaymentStatus("PF1") // settles as success
+        val refund = psp.refund("PF1", 12_300, "rf-key")
+        assertThat(refund.amountPaise).isEqualTo(12_300)
+        assertThat(psp.refund("PF1", 12_300, "rf-key")).isEqualTo(refund)
+        assertThat(psp.getPaymentStatus("PF1")).isInstanceOf(PspPaymentStatus.Refunded::class.java)
+        assertThat((runCatching { psp.refund("PF1", 1, "other") }.exceptionOrNull() as PspException.ClientError).status).isEqualTo(409)
+        assertThat((runCatching { psp.refund("nope", 1, "x") }.exceptionOrNull() as PspException.ClientError).status).isEqualTo(404)
+    }
 }

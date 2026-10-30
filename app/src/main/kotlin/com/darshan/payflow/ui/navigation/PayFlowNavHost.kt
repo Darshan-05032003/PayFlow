@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.darshan.checkoutkit.core.CheckoutKit
+import com.darshan.payflow.ui.checkout.CheckoutRoute
 import com.darshan.payflow.ui.lock.AppLockViewModel
 import com.darshan.payflow.ui.lock.LockCallbacks
 import com.darshan.payflow.ui.lock.LockScreen
@@ -46,6 +48,7 @@ data class PayDestination(
 @Serializable object ScanDestination
 @Serializable object CollectDestination
 @Serializable object SecurityDestination
+@Serializable object CheckoutDestination
 @Serializable object MandatesDestination
 @Serializable object CreateMandateDestination
 @Serializable data class MandateDetailDestination(val id: String)
@@ -60,13 +63,14 @@ fun AppRoot(
     upiAppLauncher: UpiAppLauncher,
     cameraController: CameraController,
     cameraPermission: CameraPermission,
+    checkoutKit: CheckoutKit,
     lockViewModel: AppLockViewModel = hiltViewModel(),
 ) {
     val lockState by lockViewModel.uiState.collectAsStateWithLifecycle()
     lockViewModel.host = LocalActivity.current
     when (lockState) {
         is LockUiState.Unlocked -> PayFlowNavHost(
-            upiAppLauncher, cameraController, cameraPermission,
+            upiAppLauncher, cameraController, cameraPermission, checkoutKit,
             pinConfigured = (lockState as LockUiState.Unlocked).pinConfigured,
             onSetupPin = lockViewModel::startSetup,
         )
@@ -85,6 +89,7 @@ fun PayFlowNavHost(
     upiAppLauncher: UpiAppLauncher,
     cameraController: CameraController,
     cameraPermission: CameraPermission,
+    checkoutKit: CheckoutKit,
     pinConfigured: Boolean = true,
     onSetupPin: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
@@ -100,6 +105,7 @@ fun PayFlowNavHost(
                     onCollect = { navController.navigate(CollectDestination) },
                     onMandates = { navController.navigate(MandatesDestination) },
                     onSecurity = { navController.navigate(SecurityDestination) },
+                    onCheckout = { navController.navigate(CheckoutDestination) },
                     onSetupPin = onSetupPin,
                 ),
                 pinConfigured = pinConfigured,
@@ -117,6 +123,9 @@ fun PayFlowNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) },
             )
+        }
+        composable<CheckoutDestination> {
+            CheckoutRoute(checkoutKit, onBack = { navController.popBackStack() }, onOpenPayment = { navController.navigate(PaymentDetailDestination(it)) })
         }
         composable<SecurityDestination> {
             SecurityRoute(onBack = { navController.popBackStack() }, onSetupPin = onSetupPin)

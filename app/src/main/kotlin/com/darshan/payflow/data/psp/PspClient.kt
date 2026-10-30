@@ -21,7 +21,11 @@ sealed interface PspPaymentStatus {
     data class Success(val txnRef: String, val pspTxnId: String, val upiTxnId: String?, val amountPaise: Long, val payeeVpa: String) : PspPaymentStatus
     data class Failed(val txnRef: String, val code: String, val reason: String) : PspPaymentStatus
     data class NotFound(val txnRef: String) : PspPaymentStatus
+    /** Captured and later fully refunded. */
+    data class Refunded(val txnRef: String, val pspTxnId: String, val amountPaise: Long, val refundId: String) : PspPaymentStatus
 }
+
+data class PspRefund(val refundId: String, val txnRef: String, val amountPaise: Long)
 
 /** Result of asking the PSP who owns a VPA. */
 sealed interface VpaVerification {
@@ -92,4 +96,7 @@ interface PspClient {
 
     /** A debit under the mandate; creates an order under [txnRef] to be confirmed through [getPaymentStatus]. */
     suspend fun executeMandate(umn: String, txnRef: String, amountPaise: Long): PspInitiateResponse
+
+    /** Full refund of a captured order; idempotent by [refundKey]. 409 if not captured or the amount differs, 404 if unknown. */
+    suspend fun refund(txnRef: String, amountPaise: Long, refundKey: String): PspRefund
 }

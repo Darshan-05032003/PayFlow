@@ -20,4 +20,5 @@ open class StubPsp : PspClient {
     override suspend fun createMandate(request: PspMandateRequest): PspMandate = PspMandate("UMN-stub", com.darshan.payflow.domain.model.MandateStatus.ACTIVE)
     override suspend fun updateMandate(umn: String, action: String): PspMandate = error("not stubbed")
     override suspend fun executeMandate(umn: String, txnRef: String, amountPaise: Long): PspInitiateResponse = PspInitiateResponse("stub", txnRef)
+    override suspend fun refund(txnRef: String, amountPaise: Long, refundKey: String): com.darshan.payflow.data.psp.PspRefund = error("not stubbed")
 }

@@ -221,3 +221,32 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: burned-OTP semantics; API-28 guard on signing-info lookup; locale-independent OTP formatting.
 - Scope for improvement: SQLCipher / column encryption; WorkManager relock; biometric-bound Keystore key; server-side integrity
   verification; gate collect approvals and mandate revokes behind a fresh unlock.
+
+## Feature: CheckoutKit integration (JitPack `checkoutkit-ui:v1.0.0`)
+- Attacks tried:
+  - **SDK public-API misuse**: wrong coordinate (aggregate artifact → duplicate classes, documented), `Unresolved` without a
+    transaction id, `Pending` delivered only on close, retry/pending policies with extreme values; all exercised through the real
+    sheet in `CheckoutKitIntegrationTest` and `CheckoutKitStressTest`.
+  - **Amount truthfulness**: the adapter reports the amount the PSP actually captured; a PSP success for a different amount is passed
+    through unchanged so the SDK's own `ResponseMismatch` check fails the payment (`a psp success for a different amount is reported
+    truthfully`).
+  - **Replay / double charge through the SDK**: the SDK's idempotency key becomes the PSP order reference, so a retried `charge`
+    (SDK retry policy, double submit) hits the same order; 1,000 concurrent sessions → 1,000 distinct orders, every SUCCESS row
+    matched to a captured PSP order of the same amount (`CheckoutKitStressTest`).
+  - **Transport failures**: timeouts, network, 429 + `Retry-After`, 5xx, 401, 4xx, malformed JSON → typed `GatewayException`
+    / `GatewayResult.Failed` so the SDK retries only what is retryable (`PayFlowPaymentGatewayTest`).
+  - **Captured-but-unanswered**: PSP accepts the charge then every status call times out → the SDK reports `Unresolved`; PayFlow
+    stores it PENDING under the gateway's order reference so the feature 6 reconciler settles it later, never "failed".
+  - **Cancelled checkout**: nothing is charged and nothing is stored (`cancelled_storesNothing`).
+  - **Recording idempotency**: the same order recorded twice yields one history row (`checkout:<orderId>` key).
+  - **Screen capture**: the checkout screen is a `SecureWindow`; the SDK's sheet sets `FLAG_SECURE` itself.
+- What broke:
+  - **Medium (fixed)**: `CheckoutResult.Unresolved` carries only the last error, so a host cannot correlate it with its PSP order.
+    Fixed on the PayFlow side by having the gateway adapter remember `orderId → txnRef`; reported as SDK feedback (see DECISIONS).
+  - **Low (fixed)**: the sandbox PSP's decline code `U30` is not in the SDK's NPCI table, so declines surfaced as a generic
+    `GatewayError(U30)` instead of `Declined`. The sandbox now returns `ZA` (declined by payer); feedback recorded for the SDK.
+  - **Low (accepted)**: card details typed into the sheet never reach PayFlow (the adapter only sees `method.type`); the sandbox PSP
+    has no card tokenisation, which the SDK README already states.
+- Fixed now: order-reference mapping for `Unresolved`; sandbox decline code.
+- Scope for improvement: pass the SDK's `Pending` through the feature 6 poller immediately (today the reconciler picks it up after
+  30 s); refunds from the history screen via `CheckoutKit.refund`; PSP-side card tokenisation.

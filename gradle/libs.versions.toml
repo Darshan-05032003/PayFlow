@@ -28,6 +28,7 @@ biometric = "1.1.0"
 playIntegrity = "1.6.0"
 zxing = "3.5.4"
 accompanist = "0.37.3"
+checkoutkit = "v1.0.0"
 
 [libraries]
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
@@ -65,6 +66,7 @@ androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
+checkoutkit-ui = { module = "com.github.Darshan-05032003.CheckoutKit:checkoutkit-ui", version.ref = "checkoutkit" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }

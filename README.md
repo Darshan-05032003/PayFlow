@@ -21,7 +21,7 @@ realistic **sandbox PSP** (no real money moves).
 | 5 | AutoPay mandates: create / view / pause / resume / revoke with frequency and max-amount rules | done |
 | 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | done |
 | 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | done (Keystore / BiometricPrompt / Play Integrity request are device-only) |
-| 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | planned |
+| 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | done |
 
 ## Screenshots
 
@@ -58,6 +58,7 @@ flowchart TB
         mandates["Mandates / CreateMandate / MandateDetail routes → ViewModels"]
         lock["AppRoot → AppLockViewModel → LockScreen (FLAG_SECURE)"]
         security["SecurityRoute → SecurityViewModel"]
+        checkout["CheckoutRoute → CheckoutViewModel<br/>+ CheckoutKit rememberCheckoutSheet"]
     end
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
@@ -71,6 +72,7 @@ flowchart TB
         room["Room: PayFlowDatabase (v3) · PaymentDao · CollectDao · MandateDao"]
         crepoImpl["CollectRepositoryImpl"]
         psp["PspClient → FakePsp (sandbox) · HttpPspClient (OkHttp)"]
+        ckgw["PayFlowPaymentGateway (CheckoutKit PaymentGateway → PspClient)"]
         upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher"]
         qr["UpiQrPayloadParser · CameraController → CameraXController<br/>BarcodeScanner → MlKitBarcodeScanner"]
         sec["CryptoBox → KeystoreCryptoBox (AES-GCM) · EncryptedSecureStore<br/>PinManager (PBKDF2 + lockout) · AppLock · BiometricAuthenticator<br/>DeviceBindingManager · TamperDetector · IntegrityGate → PlayIntegrityChecker<br/>PaymentGuard"]
@@ -78,7 +80,9 @@ flowchart TB
     lock --> sec
     security --> sec
     pay --> sec
-    nav --> home & history & detail & pay & scan & collect & mandates & security
+    checkout --> ckgw --> psp
+    checkout --> usecases
+    nav --> home & history & detail & pay & scan & collect & mandates & security & checkout
     mandates --> usecases
     usecases --> mrepo -. implemented by .-> room
     collect --> usecases
@@ -132,6 +136,23 @@ git clone https://github.com/Darshan-05032003/PayFlow.git && cd PayFlow
 | `EXPECTED_SIGNING_SHA256` | no | SHA-256 of the signing certificate; when set, the tamper detector flags a repackaged APK (`SIGNATURE_MISMATCH` blocks payments). |
 | `PSP_BASE_URL` | no | Base URL of a PSP REST sandbox for `HttpPspClient`. When empty the app uses the in-memory `FakePsp`. |
 
+### CheckoutKit integration (feature 8)
+
+PayFlow consumes [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) from JitPack:
+
+```kotlin
+// settings.gradle.kts: maven("https://jitpack.io")
+implementation("com.github.Darshan-05032003.CheckoutKit:checkoutkit-ui:v1.0.0")
+```
+
+`PayFlowPaymentGateway` implements the SDK's `PaymentGateway` (charge / status / refund) on top of PayFlow's sandbox `PspClient`,
+so a merchant checkout paid through the SDK's sheet lands in the same history as every other payment. The "Checkout" screen is a
+sandbox merchant demo (three items); `rememberCheckoutSheet` hosts the sheet and `RecordCheckoutResultUseCase` stores the final
+`CheckoutResult` as a `CHECKOUT` payment: success → SUCCESS, pending → PENDING, failed/rejected → FAILED with the typed error code,
+unresolved → PENDING under the PSP order reference (settled later by the reconciler), cancelled → nothing. Robolectric integration
+tests drive the real sheet through all six outcomes. API issues found while integrating are listed in
+[`docs/DECISIONS.md`](docs/DECISIONS.md) under "CheckoutKit API feedback".
+
 ### Real UPI apps
 
 The UPI intent flow (feature 2) builds a real `upi://pay` link and opens the installed UPI apps (GPay, PhonePe,
@@ -151,11 +172,11 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, use cases, ViewModels, Compose screens) | 249 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer) | 44 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 19 |
+| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, use cases, ViewModels, Compose screens) | 266 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet) | 51 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 20 |
 
-Domain + data line coverage (Kover): **87.5 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
+Domain + data line coverage (Kover): **88.0 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
 `PlayIntegrityChecker`, `AndroidTamperProbe`, `CameraXController` and `MlKitBarcodeScanner` are counted and untested on the JVM). (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
 untested on the JVM).
 
@@ -202,6 +223,8 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
 - **Root / tamper detection** (su, Magisk, test-keys, Frida ports and libraries, debugger, signing-certificate mismatch) and a real
   **Play Integrity** token request gate every payment: root, hooking or a repackaged build block it, warnings are shown otherwise.
 - **`FLAG_SECURE`** on every payment screen and the lock screen, `filterTouchesWhenObscured` app-wide (tapjacking).
+- CheckoutKit payments reuse the same PSP, the same idempotency (SDK key = PSP order reference) and the same reconciliation as every
+  other payment; an `Unresolved` sheet outcome is stored pending under the PSP order reference, never dropped or marked failed.
 - The HTTP client maps every failure (401, 429 + `Retry-After`, 5xx, timeouts, connection drops, malformed JSON) to typed
   exceptions; a body-read timeout that escaped as a raw exception was found by the review and fixed.
 - `allowBackup=false`, data extraction rules exclude everything, no cleartext traffic, only the launcher activity is exported.
@@ -225,6 +248,8 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
   **Backoff jitter**: peak retries per 10 ms window 10,000 → 45.
 - **PIN brute force**: 1,000 guesses in 332 ms total, 997 refused by the lockout before any hashing (one PBKDF2 verify ≈ 97 ms).
   **AES-GCM**: 10,000 × 1 KB round trips in 120 ms.
+- **1,000 concurrent CheckoutKit sessions** through the gateway adapter against a flaky PSP: 915 ms, 1,000 history rows, 1,000
+  distinct orders despite 1,225 PSP initiate calls (SDK retries deduped by key), every success matched to a captured order.
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
 
 ## Project docs

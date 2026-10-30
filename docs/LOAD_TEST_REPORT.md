@@ -150,3 +150,17 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
   attempt costs a store read and is refused → with doubling lockouts the 6-digit space (1,000,000) would take years.
 - Fix applied / recommendation: keep 150k iterations (OWASP ≥ 100k); on low-end devices consider measuring and tuning the
   iteration count at setup time (store it in the record, as already done).
+
+## Feature: CheckoutKit integration
+- Scenario and scale: `CheckoutKitStressTest.thousandConcurrentCheckoutSessions`: 1,000 concurrent `CheckoutKit.createSession(...).submit(Upi)`
+  calls through `PayFlowPaymentGateway` against `FakePsp` (20 % declines, 5 % timeouts, 5 % 5xx, one pending poll each), every
+  `CheckoutResult` recorded into Room through `RecordCheckoutResultUseCase`.
+- Results (numbers): **915 ms** for 1,000 sessions; outcomes `Success=798, Failed=202`, **1,000 rows recorded, 1,000 distinct
+  order references, 0 pending, 0 lost**; PSP calls: 1,225 initiates (SDK retries of transient failures) and 2,208 status calls
+  (one pending poll + confirmation per session). Every SUCCESS row matched a PSP order captured for the same amount.
+- What broke: nothing. The SDK's retry policy plus the adapter's key→order mapping mean retried charges never created a second order
+  (1,225 initiate calls, 1,000 orders).
+- Failure flow (step by step): transient 5xx on `charge` → SDK retries with the same idempotency key → adapter reuses the same
+  `txnRef` → PSP dedupes → status call confirms → one order, one history row.
+- Fix applied / recommendation: none needed; for production, wire the SDK `Pending` outcome straight into the feature 6 poller
+  rather than waiting for the 30 s reconciler window.

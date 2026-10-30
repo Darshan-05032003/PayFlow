@@ -57,6 +57,7 @@ class FakeOrder(
     val createdAtMillis: Long,
 ) {
     val polls = AtomicInteger()
+    @Volatile var refundId: String? = null
 }
 
 /** In-memory sandbox PSP. Thread-safe; deterministic for a given [seed]. */
@@ -107,11 +108,12 @@ class FakePsp(
         injectTransientFailure()
         val order = orders[txnRef] ?: return PspPaymentStatus.NotFound(txnRef)
         val poll = order.polls.incrementAndGet()
+        order.refundId?.let { return PspPaymentStatus.Refunded(txnRef, order.pspTxnId, order.amountPaise, it) }
         if (poll <= config.pendingPolls) return PspPaymentStatus.Pending(txnRef)
         return when (order.finalOutcome) {
             FakeOutcome.PENDING_UNTIL_SETTLED -> PspPaymentStatus.Pending(txnRef)
             FakeOutcome.SUCCESS -> PspPaymentStatus.Success(txnRef, order.pspTxnId, "UPI${order.pspTxnId}", order.amountPaise, order.payeeVpa)
-            FakeOutcome.FAILED -> PspPaymentStatus.Failed(txnRef, "U30", "Declined by the sandbox bank")
+            FakeOutcome.FAILED -> PspPaymentStatus.Failed(txnRef, "ZA", "Declined by the payer (sandbox)")
         }
     }
 
@@ -189,6 +191,24 @@ class FakePsp(
         return initiatePayment(PspInitiateRequest(txnRef, amountPaise, mandate.payeeVpa, "", "mandate $umn", idempotencyKey = txnRef))
     }
 
+    private val refunds = ConcurrentHashMap<String, PspRefund>()
+
+    override suspend fun refund(txnRef: String, amountPaise: Long, refundKey: String): PspRefund {
+        simulateLatency()
+        injectTransientFailure()
+        refunds[refundKey]?.let { return it }
+        val order = orders[txnRef] ?: throw PspException.ClientError(404, "unknown order")
+        return mutex.withLock {
+            refunds[refundKey]?.let { return it }
+            val captured = order.finalOutcome == FakeOutcome.SUCCESS && order.polls.get() > config.pendingPolls && order.refundId == null
+            if (!captured || amountPaise != order.amountPaise) throw PspException.ClientError(409, "order not refundable")
+            val refund = PspRefund("RF${refunds.size + 1}${txnRef.takeLast(6)}", txnRef, amountPaise)
+            order.refundId = refund.refundId
+            refunds[refundKey] = refund
+            refund
+        }
+    }
+
     /** Simulates a payee sending this device a collect request. */
     fun simulateIncomingCollect(id: String, payeeVpa: String, payeeName: String, amountPaise: Long, note: String, ttlMillis: Long) {
         val now = clock.millis()
@@ -219,6 +239,7 @@ class FakePsp(
             "bob@upi" to "Bob Mathew",
             "landlord@ybl" to "Mr Rao",
             "9876543210@upi" to "Ravi Sharma",
+            "payflow.store@okbank" to "PayFlow Store",
         )
 
         /** Order reference the sandbox uses for an approved collect request (alphanumeric, ≤ 35 chars). */

@@ -190,4 +190,17 @@ class HttpPspClientTest {
         server.takeRequest()
         assertThat(server.takeRequest().url.encodedPath).isEqualTo("/v1/mandates/UMN-1/execute")
     }
+
+    @Test
+    fun `refund endpoint`() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(200).body("""{"refundId":"rf-9","txnRef":"PF1","amountPaise":12300}""").build())
+        server.enqueue(MockResponse.Builder().code(409).body("""{"error":"not captured"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"txnRef":"PF1","status":"REFUNDED","pspTxnId":"p1","amountPaise":12300,"payeeVpa":"alice@okbank","refundId":"rf-9"}""").build())
+        assertThat(client.refund("PF1", 12_300, "rf-key")).isEqualTo(PspRefund("rf-9", "PF1", 12_300))
+        assertThat((runCatching { client.refund("PF1", 12_300, "rf-key") }.exceptionOrNull() as PspException.ClientError).status).isEqualTo(409)
+        assertThat(client.getPaymentStatus("PF1")).isEqualTo(PspPaymentStatus.Refunded("PF1", "p1", 12_300, "rf-9"))
+        val req = server.takeRequest()
+        assertThat(req.url.encodedPath).isEqualTo("/v1/payments/PF1/refund")
+        assertThat(req.headers["Idempotency-Key"]).isEqualTo("rf-key")
+    }
 }

@@ -51,7 +51,24 @@ class HttpPspClient(
         val payeeVpa: String? = null,
         @SerialName("failureCode") val failureCode: String? = null,
         @SerialName("failureReason") val failureReason: String? = null,
+        val refundId: String? = null,
     )
+
+    @Serializable
+    private data class RefundBody(val amountPaise: Long)
+
+    @Serializable
+    private data class RefundDto(val refundId: String, val txnRef: String, val amountPaise: Long)
+
+    override suspend fun refund(txnRef: String, amountPaise: Long, refundKey: String): PspRefund {
+        val http = Request.Builder()
+            .url(baseUrl.newBuilder().addPathSegments("v1/payments").addPathSegment(txnRef).addPathSegment("refund").build())
+            .post(json.encodeToString(RefundBody(amountPaise)).toRequestBody(JSON))
+            .header("Idempotency-Key", refundKey)
+            .auth()
+            .build()
+        return execute(http) { text -> json.decodeFromString<RefundDto>(text).let { PspRefund(it.refundId, it.txnRef, it.amountPaise) } }
+    }
 
     override suspend fun initiatePayment(request: PspInitiateRequest): PspInitiateResponse {
         val body = json.encodeToString(InitiateBody(request.txnRef, request.amountPaise, request.payeeVpa, request.payeeName, request.note))
@@ -188,6 +205,12 @@ class HttpPspClient(
                     payeeVpa = dto.payeeVpa ?: throw PspException.Malformed("missing payeeVpa"),
                 )
                 "FAILED" -> PspPaymentStatus.Failed(txnRef, dto.failureCode ?: "UNKNOWN", dto.failureReason ?: "Payment failed")
+                "REFUNDED" -> PspPaymentStatus.Refunded(
+                    txnRef = txnRef,
+                    pspTxnId = dto.pspTxnId ?: throw PspException.Malformed("missing pspTxnId"),
+                    amountPaise = dto.amountPaise ?: throw PspException.Malformed("missing amountPaise"),
+                    refundId = dto.refundId ?: throw PspException.Malformed("missing refundId"),
+                )
                 else -> throw PspException.Malformed("unknown status ${dto.status.take(20)}")
             }
         }

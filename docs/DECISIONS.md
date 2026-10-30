@@ -117,6 +117,34 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Hilt test module** (`FakeSecurityModule`, `@TestInstallIn`) swaps Keystore/Biometric/Integrity for fakes in Robolectric Hilt tests.
 - `EXPECTED_SIGNING_SHA256` is optional in `local.properties`; without it the signature check is skipped (debug builds differ per machine).
 
+## Feature 8: CheckoutKit integration
+- **Dependency**: `com.github.Darshan-05032003.CheckoutKit:checkoutkit-ui:v1.0.0` from JitPack (resolved on the first attempt;
+  brings `checkoutkit-core` → `checkoutkit-core-android` through Gradle module metadata). The aggregate coordinate is avoided (duplicate
+  classes with the JVM core variant). The `includeBuild` fallback was not needed.
+- **Adapter, not a second PSP**: `PayFlowPaymentGateway` implements the SDK's `PaymentGateway` on top of the existing `PspClient`, so
+  CheckoutKit payments go through the same sandbox, the same history and the same reconciler. The SDK idempotency key becomes the PSP
+  `txnRef` (`CK` + UUID without dashes), the merchant is the payee, the payer's method type goes into the note.
+- **Refund endpoint added to `PspClient`** (`refund(txnRef, amount, refundKey)`, `PspPaymentStatus.Refunded`) because the SDK's gateway
+  contract requires `refund`; `ConfirmPaymentUseCase` walks a refunded order through SUCCESS → REFUND_PENDING → REFUNDED locally.
+- **Recording rules**: Success → SUCCESS, Pending → PENDING (under the SDK transaction id), Unresolved → PENDING under the gateway's
+  order reference (reconciled later), Failed/Rejected → FAILED with the typed error code, Cancelled → nothing. Idempotent per order.
+- **Sheet result timing**: the SDK delivers `onResult` once when the sheet closes; the Checkout screen keeps the active order in
+  `SavedStateHandle` so a late result after process death is still recorded.
+- **Sandbox decline code** changed from `U30` to `ZA` so CheckoutKit maps it to `Declined` (see API feedback).
+
+## CheckoutKit API feedback (found while integrating v1.0.0; not changed here, CheckoutKit is read-only for this build)
+1. `CheckoutResult.Unresolved(lastError)` carries no `transactionId`/order reference, so a host cannot store the attempt under the PSP
+   reference it needs for reconciliation. Worked around by remembering `orderId → txnRef` inside the gateway adapter. Suggestion: add
+   `transactionId: String?` (or the idempotency key) to `Unresolved`.
+2. `GatewayErrorCodes` lacks NPCI `U30` ("debit has failed") and several other `Uxx` bank-side declines; they surface as a generic
+   `GatewayError(code)` instead of `Declined`. Suggestion: extend the table or document the expected code set for gateway authors.
+3. `GatewayResult.Pending` requires `amountPaise`, but a PSP's pending status usually carries no amount; the adapter has to remember the
+   charged amount per order. Suggestion: make it optional or derive it from the `ChargeRequest`.
+4. `onResult` for `Pending` fires only when the payer closes the sheet; a host that wants to start its own polling while the sheet is
+   still open has no hook. Suggestion: an optional `onStateChange` / exposing `CheckoutSession.state` from `CheckoutSheetState`.
+5. Positive: the explicit-API surface, `CheckoutSheetTestTags` and the `PaymentGateway` KDoc contract made the Robolectric integration
+   tests straightforward; the aggregate-coordinate pitfall is documented in the SDK README.
+
 ## Compromises
 - Play Integrity token **verification** is a fake (no server). SMS OTP **delivery** is simulated (no gateway). Both are labelled in
   the UI and README; the surrounding logic is real and tested.
