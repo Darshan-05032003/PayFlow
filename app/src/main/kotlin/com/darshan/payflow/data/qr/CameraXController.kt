@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -71,9 +72,11 @@ class CameraXController @Inject constructor(
         val input = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
         scope.launch {
             try {
-                scanner.scan(input).firstOrNull()?.let { raw -> ContextCompat.getMainExecutor(context).execute { onBarcode(raw) } }
+                // scan() waits for ML Kit even after stop() cancelled the scope, so the frame is closed only once ML Kit is done with it.
+                val raw = scanner.scan(input).firstOrNull()
+                if (raw != null && isActive) ContextCompat.getMainExecutor(context).execute { onBarcode(raw) }
             } catch (e: Exception) {
-                ContextCompat.getMainExecutor(context).execute { onError(e) }
+                if (isActive && e !is kotlinx.coroutines.CancellationException) ContextCompat.getMainExecutor(context).execute { onError(e) }
             } finally {
                 proxy.close()
                 analysing.set(false)

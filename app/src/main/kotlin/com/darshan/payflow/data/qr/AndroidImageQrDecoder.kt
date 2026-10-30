@@ -14,7 +14,7 @@ import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.withContext
 
 /**
@@ -41,8 +41,10 @@ class AndroidImageQrDecoder @Inject constructor(
 
     private fun loadUpright(uri: Uri): Bitmap? {
         val resolver = context.contentResolver
+        // Bounds only: decodeStream returns null by design here, the size lands in `bounds`. Only a missing stream means unreadable.
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        val stream = resolver.openInputStream(uri) ?: return null
+        stream.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         val options = BitmapFactory.Options().apply {
             inSampleSize = ImageSampling.sampleSize(bounds.outWidth, bounds.outHeight)
@@ -62,11 +64,12 @@ class AndroidImageQrDecoder @Inject constructor(
     private suspend fun mlKit(bitmap: Bitmap): List<String> {
         val client = BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())
         return try {
-            suspendCancellableCoroutine { cont ->
-                client.process(InputImage.fromBitmap(bitmap, 0))
-                    .addOnSuccessListener { barcodes -> cont.resume(barcodes.sortedWith(readingOrder).mapNotNull { it.rawValue }) }
-                    .addOnFailureListener { if (cont.isActive) cont.resume(emptyList()) }
-                    .addOnCanceledListener { if (cont.isActive) cont.resume(emptyList()) }
+            // Not cancellable on purpose (see MlKitBarcodeScanner): the bitmap is recycled and the client closed only after ML Kit's
+            // native recognize has finished with them, even if the user leaves the screen mid-decode.
+            suspendCoroutine { cont ->
+                client.process(InputImage.fromBitmap(bitmap, 0)).addOnCompleteListener { task ->
+                    cont.resume(if (task.isSuccessful) task.result.orEmpty().sortedWith(readingOrder).mapNotNull { it.rawValue } else emptyList())
+                }
             }
         } finally {
             client.close()
