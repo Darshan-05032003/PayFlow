@@ -164,3 +164,21 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
   `txnRef` → PSP dedupes → status call confirms → one order, one history row.
 - Fix applied / recommendation: none needed; for production, wire the SDK `Pending` outcome straight into the feature 6 poller
   rather than waiting for the 30 s reconciler window.
+
+## Feature: Real UPI apps (UPI-apps mode) and incoming links
+- Scenario and scale:
+  - `UpiAppModeStressTest.tenThousandSpoofedAppResponsesForOtherReferencesNeverSettleThePayment`: one pending UPI-app payment,
+    10,000 concurrent app responses (five hostile variants: other `txnRef` in mixed case, FAILURE for another ref, SUBMITTED,
+    `%00` / bidi / 5 KB padding) through `RecordUpiAppResultUseCase` against Room.
+  - `aThousandReplayedDeliveriesOfOneSuccessSettleExactlyOnce`: 1,000 concurrent settlements of one payment (app SUCCESS, app
+    FAILURE, user "I paid", user "not paid" in equal shares).
+  - `tenThousandHostileIncomingLinksNeverThrowAndOnlyValidOnesAreOffered`: 10,000 fuzzed `upi://` strings through `IncomingUpiLinkStore`.
+- Results (numbers):
+  - 10,000 spoofs: **757 ms**, `Mismatch=6000, Unknown=4000`, payment still PENDING, zero settlements, zero PSP calls.
+  - 1,000 racing settlements: **289 ms**, exactly **1** settlement (`Marked=1`), 500 `AlreadySettled`, 499 `NotAllowed`.
+  - 10,000 hostile links: **72 ms**, 384 valid links offered and consumed, 0 exceptions, nothing left pending.
+- What broke: nothing. The compare-and-set on `payments.status` is what makes "exactly one" hold whether the writer is the UPI
+  app's response or the user's tap.
+- Failure flow (step by step): user pays in GPay → returns → PayFlow records the response (one CAS) → a stale second delivery or a
+  tap on "I paid" after the fact hits a settled row → refused, status unchanged.
+- Fix applied / recommendation: none needed. On a device the cost is dominated by the app switch, not by PayFlow.

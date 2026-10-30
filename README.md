@@ -1,14 +1,15 @@
 # PayFlow
 
 **A UPI payments app for Android, built the way a payments team would build it: a payment state machine that
-cannot be pushed into an illegal state, idempotent submits, PSP-confirmed success, and a hardened client.**
-Pay by UPI intent or QR, validate UPI IDs, handle collect requests and AutoPay mandates, all against a
-realistic **sandbox PSP** (no real money moves).
+cannot be pushed into an illegal state, idempotent submits, a hardened client, and an honest line between what
+the app knows and what it is told.**
+Pay through the UPI apps installed on the phone (GPay, PhonePe, Paytm, BHIM) or against a realistic
+**sandbox PSP**; scan or receive UPI QRs, validate UPI IDs, handle collect requests and AutoPay mandates.
 
-> **Sandbox disclaimer.** An individual developer cannot get a bank/PSP backend, so PayFlow talks to an
-> in-memory `FakePsp` behind a `PspClient` interface. The HTTP client (`HttpPspClient`, OkHttp) is real code
-> exercised against MockWebServer, but no production PSP endpoint exists. The UPI intent flow does open real
-> UPI apps on a device (see "Real UPI apps" below).
+> **Two modes.** *UPI apps* (default on a real phone): PayFlow hands `upi://pay` to the UPI app you pick and
+> records what that app reports back. Real money moves; PayFlow has no bank or PSP behind it, so it never
+> calls such a result "verified". *Sandbox*: every payment is settled by an in-app `FakePsp` behind the
+> `PspClient` interface and no money moves. See [Real UPI apps vs sandbox](#real-upi-apps-vs-sandbox).
 
 ## Features
 
@@ -22,6 +23,7 @@ realistic **sandbox PSP** (no real money moves).
 | 6 | Status polling with exponential backoff + jitter and idempotency keys stored in Room before the PSP call | done |
 | 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | done (Keystore / BiometricPrompt / Play Integrity request are device-only) |
 | 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | done |
+| 9 | **UPI-apps mode**: pay through installed UPI apps (own app sheet, pinned intent, app-reported result, manual settlement), incoming `upi://` links, Receive-money QR, sandbox/UPI-apps switch | done |
 
 ## Screenshots
 
@@ -52,7 +54,8 @@ flowchart TB
         home["HomeRoute → HomeViewModel"]
         history["HistoryRoute → HistoryViewModel"]
         detail["PaymentDetailRoute → PaymentDetailViewModel"]
-        pay["PayRoute → PayViewModel<br/>(ActivityResult → UpiAppLauncher)"]
+        pay["PayRoute → PayViewModel<br/>(own UPI-app sheet, ActivityResult → UpiAppLauncher)"]
+        receive["ReceiveRoute → ReceiveViewModel<br/>(zxing QR of the encrypted UPI profile)"]
         scan["ScanRoute → ScanViewModel<br/>(camera permission)"]
         collect["CollectRoute → CollectViewModel"]
         mandates["Mandates / CreateMandate / MandateDetail routes → ViewModels"]
@@ -63,17 +66,18 @@ flowchart TB
     subgraph domain["domain"]
         model["Payment · PaymentStatus · PaymentEvent<br/>PaymentStateMachine (pure)"]
         repo["PaymentRepository (interface)"]
-        usecases["PayViaUpiIntentUseCase (idempotent) · ConfirmPaymentUseCase · VerifyVpaUseCase<br/>PollPaymentStatusUseCase (single-flight) · ReconcilePendingPaymentsUseCase<br/>RefreshCollectRequestsUseCase · RespondToCollectUseCase<br/>Create/Update/Execute/ExpireMandateUseCase<br/>UpiPayRequest · VpaValidator · MandateRules · BackoffPolicy · RetryExecutor"]
+        usecases["PayViaUpiIntentUseCase (idempotent, mode-aware) · ConfirmPaymentUseCase<br/>RecordUpiAppResultUseCase · MarkPaymentManuallyUseCase · VerifyVpaUseCase<br/>PollPaymentStatusUseCase (single-flight) · ReconcilePendingPaymentsUseCase<br/>RefreshCollectRequestsUseCase · RespondToCollectUseCase<br/>Create/Update/Execute/ExpireMandateUseCase<br/>UpiPayRequest · VpaValidator · MandateRules · BackoffPolicy · RetryExecutor"]
         mrepo["MandateRepository (interface)"]
         crepo["CollectRepository (interface)"]
     end
     subgraph data["data"]
         repoImpl["PaymentRepositoryImpl<br/>(compare-and-set transitions)"]
-        room["Room: PayFlowDatabase (v3) · PaymentDao · CollectDao · MandateDao"]
+        room["Room: PayFlowDatabase (v4) · PaymentDao · CollectDao · MandateDao"]
+        settings["PaymentModeRepository (DataStore) · UpiProfileRepository (SecureStore)<br/>IncomingUpiLinkStore"]
         crepoImpl["CollectRepositoryImpl"]
         psp["PspClient → FakePsp (sandbox) · HttpPspClient (OkHttp)"]
         ckgw["PayFlowPaymentGateway (CheckoutKit PaymentGateway → PspClient)"]
-        upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher"]
+        upi["UpiLinkBuilder · UpiResponseParser · AndroidUpiAppLauncher (installed apps, pinned intents)<br/>ReceiveQrBuilder · QrCodeGenerator"]
         qr["UpiQrPayloadParser · CameraController → CameraXController<br/>BarcodeScanner → MlKitBarcodeScanner"]
         sec["CryptoBox → KeystoreCryptoBox (AES-GCM) · EncryptedSecureStore<br/>PinManager (PBKDF2 + lockout) · AppLock · BiometricAuthenticator<br/>DeviceBindingManager · TamperDetector · IntegrityGate → PlayIntegrityChecker<br/>PaymentGuard"]
     end
@@ -82,7 +86,10 @@ flowchart TB
     pay --> sec
     checkout --> ckgw --> psp
     checkout --> usecases
-    nav --> home & history & detail & pay & scan & collect & mandates & security & checkout
+    nav --> home & history & detail & pay & scan & collect & mandates & security & checkout & receive
+    receive --> settings
+    pay --> settings
+    security --> settings
     mandates --> usecases
     usecases --> mrepo -. implemented by .-> room
     collect --> usecases
@@ -107,7 +114,7 @@ stateDiagram-v2
     [*] --> CREATED
     CREATED --> PENDING: Initiate (handed to PSP / UPI app)
     CREATED --> FAILED: Fail
-    PENDING --> SUCCESS: Confirm (PSP status check)
+    PENDING --> SUCCESS: Confirm (PSP check · UPI app report · user mark; source is persisted)
     PENDING --> FAILED: Fail
     SUCCESS --> REFUND_PENDING: RequestRefund
     REFUND_PENDING --> REFUNDED: RefundConfirmed
@@ -153,13 +160,35 @@ unresolved → PENDING under the PSP order reference (settled later by the recon
 tests drive the real sheet through all six outcomes. API issues found while integrating are listed in
 [`docs/DECISIONS.md`](docs/DECISIONS.md) under "CheckoutKit API feedback".
 
-### Real UPI apps
+### Real UPI apps vs sandbox
 
-The UPI intent flow (feature 2) builds a real `upi://pay` link and opens the installed UPI apps (GPay, PhonePe,
-Paytm, …) through the system chooser. On a device this starts a **real payment**. Test with tiny amounts (₹1) to
-**your own VPA**. The app only marks a payment successful after the PSP status check confirms it; in this
-sandbox build that confirmation comes from `FakePsp`, so the in-app result will not reflect what the UPI app
-actually did with your money.
+An individual developer cannot get a bank or PSP licence, so PayFlow offers two clearly labelled modes
+(Security → Payment mode; the default is *UPI apps* when at least one UPI app is installed, *Sandbox* otherwise, e.g. on an emulator):
+
+| | UPI apps mode | Sandbox mode |
+|---|---|---|
+| Who moves the money | The UPI app you pick (GPay, PhonePe, Paytm, BHIM, …) and your bank. **Real money.** | Nobody. `FakePsp` in memory. |
+| How a payment starts | `Pay ₹X` → PayFlow's own sheet lists the installed UPI apps (icons from `PackageManager`) → `upi://pay?pa&pn&am&cu=INR&tn&tr` is launched **pinned to that app**; the system chooser is the fallback | `upi://pay` through the system chooser after the order is registered with the sandbox PSP |
+| How the result is decided | The app's `response` extra (`txnId`, `responseCode`, `Status`, `txnRef`, `ApprovalRefNo`) is parsed defensively and matched against **our** `txnRef`. SUCCESS / FAILURE are stored with `statusSource = UPI_APP`; another reference → refused; no answer (back press, app killed, SUBMITTED) → **PENDING** with "Check in your UPI app" | PSP status check; only a PSP success matching `txnRef`, amount and payee becomes SUCCESS |
+| What the UI says | **"Reported by GPay. Not verified by PayFlow."** or **"Marked by you"**, on the result screen, the detail screen and the shared receipt. Never "verified". | "Confirmed by the sandbox payment provider" |
+| Pending payments | The user checks the UPI app and marks the payment paid / not paid (`statusSource = USER`) | Polled with exponential backoff; reconciled on Home start / History refresh |
+| Payee verification | Skipped: the UPI app shows the bank-registered name before you confirm | Sandbox directory lookup; registered name wins |
+| Collect, AutoPay, Checkout | Always sandbox (no PSP exists for them) | Sandbox |
+| Badge | none | amber **Sandbox** pill in every top bar |
+
+What stays the same in both modes: one idempotency key per attempt written on the payment row *before* anything is launched (a
+double tap, retry or process death can never create a second payment), the `txnRef` on the link, the payment state machine with
+its SQL compare-and-set, and the device checks (root / hooking / tampered build block a payment).
+
+**The honest limitation.** In UPI-apps mode PayFlow has nothing independent to confirm against. A UPI app's answer, or the
+user's own mark, *is* the stored outcome. The mitigations are structural (pinned package, `txnRef` match, idempotency, PENDING by
+default, status source persisted and shown) rather than cryptographic; a real deployment replaces manual marking with a PSP
+status API. Test with ₹1 to your own VPA.
+
+PayFlow also registers as a handler for `upi://pay` links (`VIEW` + `BROWSABLE`): a UPI link from a browser, chat app or another QR
+reader opens the Pay screen prefilled and locked, after the same hostile-input-safe parser that checks scanned QRs. The Receive
+screen stores your own name + UPI ID encrypted (Keystore AES-GCM) and renders a `upi://pay?pa=&pn=[&am=]` QR (zxing) that any UPI
+app can scan; copy the ID or share the link / PNG. PayFlow cannot see incoming money and says so.
 
 ## Tests
 
@@ -172,16 +201,16 @@ actually did with your money.
 
 | Suite | Count |
 |---|---|
-| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, use cases, ViewModels, Compose screens) | 266 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet) | 51 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 20 |
+| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, use cases, ViewModels, Compose screens) | 328 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity incl. an incoming `upi://` link, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet) | 56 |
+| Stress (`stress` package, `./gradlew stressTest` only) | 23 |
 
-Domain + data line coverage (Kover): **88.0 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
+Domain + data line coverage (Kover): **88.8 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
 `PlayIntegrityChecker`, `AndroidTamperProbe`, `CameraXController` and `MlKitBarcodeScanner` are counted and untested on the JVM). (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
 untested on the JVM).
 
-No device or emulator was available during the build: camera, real UPI apps and `connectedAndroidTest` are
-compile-only and marked "not run: no device". Everything else is proven on the JVM with Robolectric and fakes.
+Everything is proven on the JVM with Robolectric and fakes (installed UPI apps are faked through the `UpiAppLauncher` interface).
+`connectedAndroidTest` and the camera path remain compile-only.
 
 ## Security highlights
 
@@ -191,8 +220,15 @@ Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
   confirmations of one payment succeed exactly once.
 - Amounts are `Long` paise bounded to 1 paisa … ₹1,00,000; history search parameters are bound and stripped of
   control / invisible characters (a leading NUL or BOM used to collapse the SQLite `LIKE` filter to match-all).
-- **The UPI app's answer is never trusted.** After the app returns, the PSP is asked; only a PSP success whose `txnRef`,
-  amount and payee match the stored payment marks it SUCCESS. 10,000 spoofed `Status=SUCCESS` responses never produced one.
+- **The UPI app's answer is never trusted as verification.** Sandbox: after the app returns, the PSP is asked; only a PSP success
+  whose `txnRef`, amount and payee match the stored payment marks it SUCCESS (10,000 spoofed `Status=SUCCESS` responses never
+  produced one). UPI-apps mode: the answer must name *our* `txnRef` (10,000 responses for other references never settled the
+  payment), it is stored as `UPI_APP`-reported, the launch intent is pinned to the app the user picked, and 1,000 racing
+  deliveries / manual marks settle a payment exactly once.
+- **Incoming `upi://` links** go through the same bounded parser as scanned QRs (10,000 hostile links, 0 exceptions, only
+  well-formed `upi://pay` reaches the Pay screen with payee and amount locked); the link is consumed once and only while unlocked.
+- **Receive QR**: the profile is AES-GCM encrypted at rest; name and VPA are percent-encoded so nothing can inject a parameter.
+- **Payment mode** can only be changed on the Security screen (behind the app lock) and UPI-apps mode needs an installed handler.
 - A PSP outage after the app was opened is "unresolved" (payment stays pending; "do not pay again"), never "failed".
 - Hostile link inputs are rejected before a link is built (homoglyph/bidi VPAs, `javascript:`, amounts out of range, 35-char
   `tr`), and the `response` extra from the UPI app is bounded and parsed defensively.
@@ -248,6 +284,8 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
   **Backoff jitter**: peak retries per 10 ms window 10,000 → 45.
 - **PIN brute force**: 1,000 guesses in 332 ms total, 997 refused by the lockout before any hashing (one PBKDF2 verify ≈ 97 ms).
   **AES-GCM**: 10,000 × 1 KB round trips in 120 ms.
+- **UPI-apps mode**: 10,000 spoofed app responses for other references in 757 ms, payment still pending; 1,000 racing
+  settlements (app success / failure / user marks) in 289 ms → exactly 1; 10,000 hostile incoming links in 72 ms, 0 exceptions.
 - **1,000 concurrent CheckoutKit sessions** through the gateway adapter against a flaky PSP: 915 ms, 1,000 history rows, 1,000
   distinct orders despite 1,225 PSP initiate calls (SDK retries deduped by key), every success matched to a captured order.
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.

@@ -148,3 +148,26 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 ## Compromises
 - Play Integrity token **verification** is a fake (no server). SMS OTP **delivery** is simulated (no gateway). Both are labelled in
   the UI and README; the surrounding logic is real and tested.
+
+## Real UPI apps: UPI-apps mode vs sandbox
+- **Two modes, one code path.** `PaymentMode { UPI_APPS, SANDBOX }` is a DataStore setting; the default is `UPI_APPS` when
+  `PackageManager` sees a `upi://pay` handler, else `SANDBOX` (emulators, JVM tests). `PayViaUpiIntentUseCase` takes the mode: in
+  sandbox it registers the order with the PSP, in UPI-apps mode it moves the row to PENDING and records the chosen app, nothing else
+  changes (same idempotency key, same `txnRef`, same state machine).
+- **PayFlow's own app sheet** (built from `queryIntentActivities`, PayFlow excluded) instead of the system chooser, so the user sees
+  icons and names and the launch intent can be pinned to that package; the system chooser remains the fallback when package
+  visibility hides the list. Nothing is stored until an app is picked.
+- **"Reported", never "verified".** `StatusSource { PSP, UPI_APP, USER }` is persisted on the row (Room v4) and drives every status
+  line, the detail screen and the shared receipt. There is no PSP to ask in UPI-apps mode, so "Check status" is not offered;
+  a payment with no usable answer stays PENDING with "Check in <app>" and the user can mark it paid / not paid (`USER`).
+- **`txnRef` matching stays.** A response that names another reference is refused (`Mismatch`); an absent `txnRef` is accepted
+  because some apps omit it, and the response still cannot name a different payment.
+- **Incoming links reuse the QR parser.** `IncomingUpiLinkStore` holds one parsed payload; the NavHost consumes it once and only
+  while unlocked. The Pay screen treats `source = "link"` like a QR (payee + amount locked, method `DEEP_LINK`).
+- **Receive = profile + QR, nothing more.** PayFlow cannot see incoming money (no bank connection); the screen says so. The profile
+  is stored through the encrypted `SecureStore`. zxing `core` renders the matrix; the Compose `Canvas` draws it black-on-white
+  regardless of theme so scanners work in dark mode.
+- **Sandbox-only features stay sandbox.** Collect requests, AutoPay mandates and Checkout talk to the fake PSP in both modes; the
+  mode only changes how a `Pay` / QR / link payment is executed. The Sandbox badge appears in top bars whenever sandbox is active.
+- **No bottom navigation.** The dashboard grid (two rows of four) plus the Pay FAB already makes every screen one tap away; a bottom
+  bar would have duplicated Home / Scan / History and cost vertical space on the Pay form.

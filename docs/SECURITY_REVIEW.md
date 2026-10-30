@@ -250,3 +250,46 @@ Severity scale: Critical / High / Medium / Low.
 - Fixed now: order-reference mapping for `Unresolved`; sandbox decline code.
 - Scope for improvement: pass the SDK's `Pending` through the feature 6 poller immediately (today the reconciler picks it up after
   30 s); refunds from the history screen via `CheckoutKit.refund`; PSP-side card tokenisation.
+
+## Feature: Real UPI apps (UPI-apps mode), incoming `upi://` links, receive QR
+- Attacks tried:
+  - **Spoofed / replayed app responses in UPI-apps mode**: `Status=SUCCESS` for *another* `txnRef` (upper/lower case, `%00`,
+    bidi prefix, 5 KB padding) 10,000× concurrently against the real Room compare-and-set → every one refused as `Mismatch` or
+    `Unknown`, payment still PENDING, nothing settled (`UpiAppUseCasesTest`, `UpiAppModeStressTest.tenThousandSpoofedAppResponses…`).
+    A FAILURE for another reference must not fail *our* payment either (tested).
+  - **Double delivery / racing settlements**: 1,000 concurrent deliveries mixing the app's SUCCESS, the app's FAILURE and the user's
+    "I paid" / "not paid" → exactly one settles; the rest are `AlreadySettled` / `NotAllowed` (`aThousandReplayedDeliveriesOfOneSuccessSettleExactlyOnce`).
+  - **Wrong app answering**: the chosen package is pinned on the launch intent (`setPackage`) *and* stored on the row; the sheet only
+    accepts a package it listed (`PayViewModelTest.picking an app…`: an unlisted package is ignored, nothing created).
+  - **Response-code trust**: the app's `Status` is never shown as "verified". UI, detail screen and the shared receipt say
+    "Reported by <app>" or "Marked by you"; `statusSource` is persisted so the history can never upgrade it later.
+  - **Hostile incoming `upi://` links** (VIEW intent from browsers / chat apps): `javascript:` VPAs, homoglyph/bidi VPAs, negative /
+    oversized / `1e9` amounts, `cu=USD`, `upi://mandate`, `intent://`, 20 KB payloads, 10,000 fuzzed links → zero exceptions, only
+    well-formed `upi://pay` links reach the Pay screen, where payee and amount are locked (`IncomingUpiLinkStoreTest`,
+    `IncomingUpiLinkTest` (Hilt activity launched with the intent), `UpiAppModeStressTest.tenThousandHostileIncomingLinks…`).
+    The link is consumed exactly once (a rotation cannot re-open Pay) and only while the app is unlocked.
+  - **Receive QR injection**: `&`, `=`, unicode in the profile name cannot add parameters (percent-encoded; parses back with the
+    scanner's parser), the amount is formatted from paise, the VPA has passed `VpaValidator` (`UpiProfileTest`).
+  - **Profile at rest**: name and VPA are AES-GCM encrypted through `SecureStore` (AAD = key name); the ciphertext never contains
+    the VPA; a corrupt record reads as "no profile" (`UpiProfileTest`).
+  - **Mode toggle abuse**: the only UI that changes `PaymentMode` is the Security screen, which the lock gate covers when a PIN is
+    set; `UPI_APPS` cannot be selected without an installed handler (`SecurityViewModelTest`, `SecurityScreenTest`); garbage in the
+    preference falls back to the device default (`PaymentModeRepositoryTest`).
+  - **Shared QR image**: written to `cache/qr/` and exposed through a non-exported `FileProvider` with a read-only grant on the
+    share intent; no world-readable file.
+  - **Intent surface**: `MainActivity` is `singleTop`; the new filter is `VIEW` + `BROWSABLE` on `upi://pay` only; the `FileProvider`
+    is `exported=false`; no other component was added.
+- What broke:
+  - **Medium (accepted, inherent to a non-PSP app)**: in UPI-apps mode PayFlow has no bank or PSP to confirm against, so a UPI app's
+    answer (or the user's manual mark) *is* the stored outcome. Mitigations: `txnRef` matching, idempotency key per attempt, pinned
+    package, "reported / marked" wording everywhere, PENDING by default when no answer arrives, manual settlement recorded as
+    `USER`. This is documented in the README as the honest limitation.
+  - **Low (fixed during build)**: a prefilled payee was verified on `init` regardless of mode, so in UPI-apps mode a real VPA
+    would have been checked against the sandbox directory and blocked as "not found". Verification is now skipped in UPI-apps mode
+    (`VpaVerificationState.Skipped`) and only route-prefilled payees are verified on open (`PayViewModelTest.upi apps mode skips…`).
+  - **Low (fixed)**: a Home "History" icon and a "History" tile both carried the same content description; the icon was removed.
+  - **Low (open)**: the recent-payees row shows names as stored from earlier payments; in UPI-apps mode those names are what the user
+    typed (or the VPA handle), not bank-registered names.
+- Fixed now: mode-aware verification; duplicate accessibility label.
+- Scope for improvement: ask the user to re-authenticate (biometric) before switching to UPI-apps mode; a real PSP/backend would
+  replace manual marking; show the UPI app's `txnId` on the History row for support.
