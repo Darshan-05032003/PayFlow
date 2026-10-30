@@ -122,6 +122,7 @@
     <string name="pay_vpa_hint">The registered name is checked before you pay.</string>
     <string name="pay_vpa_hint_real">Your UPI app shows the registered name before you confirm.</string>
     <string name="pay_field_locked">Filled from the payment QR or link</string>
+    <string name="pay_name_registered">Registered name, verified with the payment provider</string>
     <string name="pay_amount_hint">Up to %1$s per payment</string>
     <string name="pay_confirming_hint">This usually takes a few seconds. Please keep the app open.</string>
     <string name="pay_done_success_hint">Confirmed by the payment provider.</string>

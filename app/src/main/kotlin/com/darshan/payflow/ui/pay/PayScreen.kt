@@ -342,7 +342,11 @@ private fun PayForm(state: PayUiState, callbacks: PayCallbacks) {
             value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.nameLocked, singleLine = true,
             label = { Text(stringResource(if (realMode) R.string.pay_payee_name_optional else R.string.pay_payee_name)) },
             leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-            trailingIcon = if (state.nameLocked) ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) }) else null,
+            trailingIcon = when {
+                state.payeeLocked -> ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) })
+                state.nameLocked -> ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_name_registered)) })
+                else -> null
+            },
             isError = state.errors.name != null,
             supportingText = state.errors.name?.let { { Text(it.message()) } },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),

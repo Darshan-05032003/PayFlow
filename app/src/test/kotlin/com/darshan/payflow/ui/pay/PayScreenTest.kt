@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performScrollTo
 import com.darshan.payflow.ui.PayFlowTestTags
@@ -175,5 +176,13 @@ class PayScreenTest {
         holder.value = PayUiState(phase = PayPhase.Unresolved("p1"))
         rule.onNodeWithText("We could not reach the payment provider").assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.PAY_CHECK_STATUS).assertIsDisplayed()
+    }
+
+    @Test
+    fun lockedFieldsSayWhyTheyAreLocked() {
+        show(PayUiState(vpa = "alice@okbank", name = "Alice Kumar", verification = VpaVerificationState.Verified("Alice Kumar"), paymentMode = PaymentMode.SANDBOX))
+        rule.onNodeWithContentDescription("Registered name, verified with the payment provider").assertExists()
+        holder.value = PayUiState(vpa = "shop@okbank", name = "Chai Point", amountText = "45.00", payeeLocked = true, amountLocked = true)
+        rule.onAllNodesWithContentDescription("Filled from the payment QR or link").assertCountEquals(3)
     }
 }

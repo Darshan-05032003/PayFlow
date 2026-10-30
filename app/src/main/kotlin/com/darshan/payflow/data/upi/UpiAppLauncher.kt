@@ -74,9 +74,11 @@ class AndroidUpiAppLauncher @Inject constructor(@ApplicationContext private val 
             .sortedBy { it.label.lowercase() }
     }
 
+    /** System chooser over every handler except PayFlow's own link entry point (picking it would loop the link back into PayFlow). */
     override fun chooserIntent(upiUri: String): Intent {
         val view = Intent(Intent.ACTION_VIEW, upiUri.toUri())
         return Intent.createChooser(view, context.getString(R.string.pay_chooser_title))
+            .putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(android.content.ComponentName(context.packageName, ownLinkHandler)))
     }
 
     /**

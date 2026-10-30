@@ -66,6 +66,9 @@ class AndroidUpiAppLauncherTest {
         assertThat(target.action).isEqualTo(Intent.ACTION_VIEW)
         assertThat(target.dataString).isEqualTo("upi://pay?pa=a%40b&am=1.00&cu=INR&tr=T1")
         assertThat(target.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION).isEqualTo(0)
+        // PayFlow handles upi://pay itself (incoming links); the system chooser must never offer it as the app to pay with.
+        val excluded = chooser.getParcelableArrayExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, android.content.ComponentName::class.java)!!.toList()
+        assertThat(excluded).contains(android.content.ComponentName(context.packageName, "${context.packageName}.MainActivity"))
     }
 
     @Test
