@@ -194,3 +194,8 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
   on the emulator when the camera stopped mid-frame).
 - **The system chooser excludes PayFlow itself** (`EXTRA_EXCLUDE_COMPONENTS`).
 
+
+## UPI app visibility: `<queries>` must declare `upi://pay` (2026-10-30)
+- **Bug (found on a real phone):** PayFlow's "Pay with" sheet listed only the preinstalled Amazon app and PayFlow's own debug Sandbox UPI, never GPay, PhonePe, Paytm or BHIM. Android 11+ package visibility only exposes apps matched by the manifest `<queries>`, and the old query declared `<data android:scheme="upi"/>` with no host. UPI apps register `upi://pay` (scheme **and** host), and a host-less query intent does not match a filter that requires a host, so they were invisible. Preinstalled apps are force-queryable, which is why Amazon still appeared.
+- **Fix:** `<queries>` now declares `VIEW upi://pay`, keeps the scheme-only form for apps that register the scheme alone, and lists the major UPI apps by package as a fallback. Regression test `UpiPackageVisibilityTest` checks the manifest.
+- **Verified on the emulator** with a stand-in app (`com.example.fakeupi`, not in the package list) that registers `upi://pay` exactly like the real apps: invisible to the old build's sheet, listed after the fix, and the hand-off → app response → "Reported by …" result path worked through it. The real apps on a phone need the new build installed; the payment path itself is unchanged.

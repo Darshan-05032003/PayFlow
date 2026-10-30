@@ -1,12 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Package visibility (Android 11+): lets the app see which UPI apps can handle upi:// links. -->
+    <!-- Package visibility (Android 11+): lets the app see which UPI apps can handle upi:// links.
+         UPI apps register upi://pay (scheme + host); a host-less query does not match a filter that requires a host,
+         so both forms are declared, plus the major UPI apps by package as a fallback. -->
     <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" android:host="pay" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="upi" />
         </intent>
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
+        <package android:name="com.phonepe.app" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
+        <package android:name="in.amazon.mShop.android.shopping" />
+        <package android:name="com.dreamplug.androidapp" />
+        <package android:name="com.mobikwik_new" />
+        <package android:name="com.freecharge.android" />
+        <package android:name="money.jupiter" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.sbi.upi" />
+        <package android:name="com.csam.icici.bank.imobile" />
+        <package android:name="com.axis.mobile" />
+        <package android:name="com.snapwork.hdfc" />
     </queries>
 
     <uses-permission android:name="android.permission.CAMERA" />
