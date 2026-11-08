@@ -1,3 +1,4 @@
+import com.android.build.api.variant.BuildConfigField
 import java.util.Properties
 
 plugins {
@@ -8,6 +9,7 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
     alias(libs.plugins.kover)
+    alias(libs.plugins.baselineprofile)
 }
 
 // Local, gitignored configuration. PLAY_INTEGRITY_CLOUD_PROJECT is the Google Cloud project number
@@ -52,6 +54,17 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("boolean", "ALLOW_SCREENSHOTS", "false")
         }
+        // Release-like, debug-signed build the :baselineprofile and :macrobenchmark modules run against.
+        // Same code path as release: R8 on, non-debuggable, FLAG_SECURE on, real tamper checks and PaymentGuard.
+        // Its source set (src/benchmark) adds only the seed-data receiver; none of it reaches the release APK.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            isProfileable = true
+            buildConfigField("boolean", "ALLOW_SCREENSHOTS", "false")
+        }
     }
 
     buildFeatures {
@@ -67,6 +80,16 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = false
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        // UI Automator finds Compose test tags only as resource ids. The tags include payment ids, so the release APK keeps them private.
+        variant.buildConfigFields?.put(
+            "EXPOSE_TEST_TAGS",
+            BuildConfigField("boolean", (variant.buildType != "release").toString(), "Expose Compose test tags as resource ids"),
+        )
     }
 }
 
@@ -103,6 +126,8 @@ dependencies {
     implementation(libs.play.integrity)
     implementation(libs.checkoutkit.ui)
     implementation(libs.zxing.core)
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)

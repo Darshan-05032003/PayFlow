@@ -4,6 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.darshan.checkoutkit.core.CheckoutKit
@@ -39,7 +43,14 @@ class MainActivity : FragmentActivity() {
         window.decorView.filterTouchesWhenObscured = true
         // Only a cold start carries the link; after a rotation the saved state already holds the Pay screen.
         if (savedInstanceState == null) offerLink(intent)
-        setContent { PayFlowTheme { AppRoot(upiAppLauncher, cameraController, cameraPermission, checkoutKit, incomingLinks) } }
+        setContent {
+            PayFlowTheme {
+                // No visual effect. Off in release; the benchmark build uses it to find screens by test tag.
+                Box(if (BuildConfig.EXPOSE_TEST_TAGS) Modifier.semantics { testTagsAsResourceId = true } else Modifier) {
+                    AppRoot(upiAppLauncher, cameraController, cameraPermission, checkoutKit, incomingLinks)
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

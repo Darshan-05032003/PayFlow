@@ -18,3 +18,5 @@ dependencyResolutionManagement {
 rootProject.name = "PayFlow"
 
 include(":app")
+include(":baselineprofile")
+include(":macrobenchmark")
