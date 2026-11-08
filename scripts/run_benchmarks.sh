@@ -2,7 +2,7 @@
 # Runs the macrobenchmarks one test at a time and collects the results, so an interrupted run loses at most one test.
 # Finished tests are skipped when the same output directory is used again.
 #
-# Usage: ANDROID_SERIAL=emulator-5554 scripts/run_benchmarks.sh <output-dir>
+# Usage: ANDROID_SERIAL=emulator-5554 [BENCHMARK_TESTS="Class#test ..."] scripts/run_benchmarks.sh <output-dir>
 set -u
 : "${ANDROID_SERIAL:?Set ANDROID_SERIAL to the device to measure on}"
 out="$(realpath -m "${1:?Output directory required}")"
@@ -10,9 +10,9 @@ mkdir -p "$out"
 cd "$(dirname "$0")/.."
 
 package=com.darshan.payflow
-tests="StartupBenchmark#startupNoCompilation StartupBenchmark#startupPartial
+tests="${BENCHMARK_TESTS:-StartupBenchmark#startupNoCompilation StartupBenchmark#startupPartial
 ScrollBenchmark#homeScrollNoCompilation ScrollBenchmark#homeScrollPartial
-ScrollBenchmark#historyScrollNoCompilation ScrollBenchmark#historyScrollPartial"
+ScrollBenchmark#historyScrollNoCompilation ScrollBenchmark#historyScrollPartial}"
 
 # Flings decay through the animation system, so the scale must match between runs.
 for scale in window_animation_scale transition_animation_scale animator_duration_scale; do

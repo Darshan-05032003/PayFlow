@@ -193,3 +193,50 @@ Robolectric SDK 35 with its native SQLite). Stress tests live in `app/src/test/.
 - Failure flow (step by step): user picks a 50 MP photo → bounds read (no pixels) → decoded at 1/4 scale (≈ 2,040 × 1,530, ~12 MB ARGB)
   → ML Kit → (zxing) → result; peak memory is bounded by the 2,048 px cap, not by the photo.
 - Fix applied / recommendation: keep the cap; the decode runs on the IO dispatcher so the UI shows a progress state, not jank.
+
+## UI overhaul baseline (before)
+**Emulator, software rendering, not a mid-range phone.** These numbers are only for comparing before and after on this setup. They say nothing about real-device speed.
+
+- Commit: `9c48cc2` (the current UI, before any overhaul screen work).
+- Device: `Pixel_7` AVD, API 37, x86_64 (`sdk_gphone16k_x86_64`), 4 vCPUs, `-gpu swiftshader_indirect`. Guest RAM is 4 GB: the emulator raises `-memory 2048` to 4096 MB. Animation scales 1.
+- Host: 15 GB RAM with other applications open, so runs are noisy. Treat small differences as no change.
+- Build type: `benchmark` (`initWith(release)`: R8 and resource shrinking on, non-debuggable, debug-signed, profileable). No Baseline Profile is in the APK yet.
+- Method: Macrobenchmark 1.5.0 with `androidx.benchmark.suppressErrors=EMULATOR`. `StartupTimingMetric` over 10 cold starts; `FrameTimingMetric` over 5 iterations of 3 flings down and 3 up, with a new process each iteration.
+- Data: 200 payments (settled statuses only) inserted through `PaymentRepository`. Home shows at most 5 recent rows, so its scroll is short by design.
+- Scenarios: `homeScroll*` flings the home screen; `historyScroll*` opens History and flings the list.
+- Reading the tables: CPU is `frameDurationCpuMs`. Overrun is `frameOverrunMs`, how far a frame missed its deadline (negative means early). Jank % is the share of frames with an overrun above 0. Software rendering pushes nearly every frame over budget here, so compare the frame times rather than expecting low jank.
+- `NoCompilation` is the fair before/after comparison. `Partial` compiles from a 3-iteration warm-up and will also use a Baseline Profile once one ships.
+- **Not run:** `homeScrollPartial`, `historyScrollPartial`. Sessions on this machine were restarting every 10 to 60 minutes, so the `NoCompilation` tests came first. Compare only tests that exist on both sides.
+
+| Cold start (time to initial display, ms) | min | median | max | iterations |
+|---|---|---|---|---|
+| startupNoCompilation | 778 | 876 | 1042 | 10 |
+| startupPartial | 514 | 573 | 736 | 10 |
+
+| Scroll | CPU P50 ms | CPU P90 ms | CPU P99 ms | Overrun P50 ms | Overrun P90 ms | Overrun P99 ms | Jank % | frames |
+|---|---|---|---|---|---|---|---|---|
+| historyScrollNoCompilation | 29.7 | 52.9 | 103.5 | 20.6 | 55.4 | 138.9 | 97.3 | 2391 |
+| homeScrollNoCompilation | 55.3 | 95.6 | 258.8 | 60.3 | 115.8 | 314.6 | 99.3 | 613 |
+
+Release APK size: 25,265,073 bytes (24.1 MiB), from `./gradlew assembleRelease` (unsigned).
+
+Seed data is benchmark-only. `aapt2 dump xmltree` shows `SeedDataReceiver` in the `benchmark` manifest and not in the debug or release manifests, and the release dex has no reference to it.
+
+Reproduce (run on an emulator, and set the serial explicitly so no other connected device is used):
+
+    ./gradlew --stop
+    emulator -avd Pixel_7 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot-load -memory 2048
+    ANDROID_SERIAL=emulator-5554 scripts/run_benchmarks.sh /path/to/results
+    ./gradlew assembleRelease
+
+The script installs a fresh copy per test and skips tests that already have a result in that directory, so it can be re-run after an interruption. `BENCHMARK_TESTS="ScrollBenchmark#homeScrollNoCompilation"` limits it to named tests.
+
+To keep these benchmarks working as the UI changes:
+
+- `PayFlowTestTags.HOME_HISTORY` (`payflow:home:history`) stays on a control visible on the first screen that opens History.
+- `PayFlowTestTags.PAYMENT_LIST` (`payflow:history:list`) stays on the history list.
+- The `EXPOSE_TEST_TAGS` wrapper in `MainActivity` stays at the root of the composition, above the lock and navigation.
+- Home stays vertically scrollable with seeded data: the benchmark picks the tallest scrollable node, whichever component draws it.
+- No new first-launch screen may block a fresh install. If one is added, `SeedDataReceiver` must mark it done.
+- `SeedDataReceiver` keeps writing through `PaymentRepository`; update it if the `Payment` model changes.
+
