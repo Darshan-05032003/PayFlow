@@ -35,6 +35,7 @@ import com.darshan.payflow.ui.home.HomeUiState
 import com.darshan.payflow.ui.home.HomeViewModel
 import com.darshan.payflow.ui.theme.PayFlowTheme
 import com.google.common.truth.Truth.assertThat
+import java.time.ZoneOffset
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -64,7 +65,8 @@ class HomeHistoryFlowIntegrationTest {
 
     @Test
     fun homeGoesFromEmptyToContentWhenAPaymentIsStored() {
-        val vm = HomeViewModel(repo, reconcileNoop(repo), DefaultDispatcherProvider())
+        // Same fixed clock as the payments: the "this month" summary must not depend on today's date.
+        val vm = HomeViewModel(repo, reconcileNoop(repo), DefaultDispatcherProvider(), fixedClock, ZoneOffset.UTC)
         rule.setContent {
             PayFlowTheme {
                 val state by vm.uiState.collectAsStateWithLifecycle()
