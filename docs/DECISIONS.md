@@ -199,3 +199,20 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Bug (found on a real phone):** PayFlow's "Pay with" sheet listed only the preinstalled Amazon app and PayFlow's own debug Sandbox UPI, never GPay, PhonePe, Paytm or BHIM. Android 11+ package visibility only exposes apps matched by the manifest `<queries>`, and the old query declared `<data android:scheme="upi"/>` with no host. UPI apps register `upi://pay` (scheme **and** host), and a host-less query intent does not match a filter that requires a host, so they were invisible. Preinstalled apps are force-queryable, which is why Amazon still appeared.
 - **Fix:** `<queries>` now declares `VIEW upi://pay`, keeps the scheme-only form for apps that register the scheme alone, and lists the major UPI apps by package as a fallback. Regression test `UpiPackageVisibilityTest` checks the manifest.
 - **Verified on the emulator** with a stand-in app (`com.example.fakeupi`, not in the package list) that registers `upi://pay` exactly like the real apps: invisible to the old build's sheet, listed after the fix, and the hand-off → app response → "Reported by …" result path worked through it. The real apps on a phone need the new build installed; the payment path itself is unchanged.
+
+## UI overhaul: library decisions (2026-11-09)
+| Library | Latest stable checked 2026-11-09 | Decision |
+|---|---|---|
+| Compose BOM | 2026.09.00 (Compose 1.12.1, Material3 1.4.0) | **Keep.** Already on the latest. |
+| Material 3 Expressive | Expressive APIs are still graduating inside `material3` 1.5.0-rc01 (Nov 2026), not in stable 1.4.0 | **Do not adopt.** Both apps use a custom design system on top of plain Material 3 slots, so nothing depends on it. Revisit when 1.5.0 is stable. |
+| `SharedTransitionLayout`, shared elements | Compose Animation 1.12.1 | **Adopt** for container transforms. |
+| Predictive back | Navigation Compose 2.10.2 | **Adopt** with `android:enableOnBackInvokedCallback`. |
+| `core-splashscreen` | 1.2.0 | **Adopt** for the icon → home hand-off. |
+| Lottie Compose | 6.7.1 | **Do not adopt by default.** Every animation is code-drawn (Canvas/AGSL), which keeps the APK small and gives full control. Only added if you supply Lottie files. |
+| Haze | 2.1.0 (Compose 1.12) | **Adopt only where glass adds depth** (bottom bar, sheets), API 31+, with a dim scrim below. |
+| Roborazzi | 1.78.0 (`roborazzi`, `roborazzi-compose`, `roborazzi-junit-rule`, `roborazzi-gradle-plugin`) | **Adopt** for screenshot tests. It runs on the existing Robolectric 4.17 setup. Fallback: Paparazzi 1.3.5. |
+| Macrobenchmark, Baseline Profile plugin | 1.5.0 | **Adopt** (SplitSmart already has both modules; PayFlow gets them in Wave 2). |
+| CRED `neopop` | Apache-2.0, View/XML based, repo last active July 2024, no `club.cred:neopop` artifact on Maven Central | **Reject.** Not Compose, unmaintained, and the brief rules out a NeoPOP look. |
+
+- **Baseline before the overhaul:** `testDebugUnitTest` 407 tests after pinning one date-dependent test to a fixed clock (F0, `a1d2301`), 24 stress tests, `assembleDebug` and `lintDebug` with no errors.
+- **Order and worktrees:** this machine has 15 GB of RAM, and only one Gradle build runs safely at a time. PayFlow is done first, then SplitSmart. Feature work is integrated one at a time.
