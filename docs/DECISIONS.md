@@ -216,3 +216,8 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 
 - **Baseline before the overhaul:** `testDebugUnitTest` 407 tests after pinning one date-dependent test to a fixed clock (F0, `a1d2301`), 24 stress tests, `assembleDebug` and `lintDebug` with no errors.
 - **Order and worktrees:** this machine has 15 GB of RAM, and only one Gradle build runs safely at a time. PayFlow is done first, then SplitSmart. Feature work is integrated one at a time.
+
+## UI overhaul: chosen direction (2026-11-09)
+- **Aurum Noir** (see `DESIGN_DIRECTION.md`), no tweaks. No Lottie: all motion is code-drawn.
+- Features are built one at a time on `main`, because this machine runs one Gradle build safely at a time; no parallel worktrees are needed.
+- Performance numbers come from the Pixel 7 emulator with software rendering and are labelled as such. They show before/after differences, not what a real mid-range phone would measure.
