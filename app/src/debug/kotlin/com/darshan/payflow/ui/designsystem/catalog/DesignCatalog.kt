@@ -497,7 +497,7 @@ private val SampleNav = listOf(
     NavItem("home", "Home", NavGlyphs.Home),
     NavItem("scan", "Scan", NavGlyphs.Scan),
     NavItem("history", "History", NavGlyphs.History),
-    NavItem("me", "You", NavGlyphs.Profile),
+    NavItem("me", "Me", NavGlyphs.Profile),
 )
 
 @Composable

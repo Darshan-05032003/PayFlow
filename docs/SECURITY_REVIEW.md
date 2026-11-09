@@ -533,3 +533,22 @@ Severity scale: Critical / High / Medium / Low.
   - The device check on the security centre runs when it opens; the guard's own check per payment is what blocks. A live signal (for example a Frida port opened after the screen was drawn) shows on the next scan.
   - Biometric removal accepts the phone's screen lock as a fallback (`DEVICE_CREDENTIAL`), the same as the lock screen. A stricter build could require `BIOMETRIC_STRONG` alone for this one action.
 - Not checked on a device: the real BiometricPrompt over the removal sheet, a rooted phone, Play Integrity with a configured project, CheckoutKit's sheet over the receded store. No emulator look in this row.
+
+## UI Feature: Whole-app design QA, token audit, stability, LeakCanary (QA row)
+- Attacks tried:
+  - A debug-only tool reaching release: LeakCanary added to debug builds, and the debug design catalog after the catalog label change.
+  - Sample data leaking real businesses into the shipped app: the in-app sandbox directory and demo collect request used a real café chain's name.
+  - The payment detail's wording: Method read "UPI app" under "Confirmed by the sandbox payment provider", which could make a reader think the UPI app had confirmed it.
+  - The "Copy reference" action after its rebuild: is the reference still flagged sensitive on the clipboard?
+  - Hero surfaces taking the dark palette: does any status or warning lose meaning or contrast in light theme?
+- What broke:
+  - Low: the payment detail's Method label echoed the status-source wording ("UPI app"), so a provider-confirmed payment could read as app-reported. Wording only; the stored status source was always right.
+  - Low: real brand names in sandbox data shipped in the app (the sandbox directory and a demo collect request).
+- Fixed now:
+  - Method `UPI_INTENT` reads "UPI ID"; the receipt's status-source line is now the only place that says who confirmed a payment (`detailMethodNamesHowThePaymentStartedNotWhoConfirmedIt`).
+  - Sandbox data, fixtures and screenshots use invented names.
+  - LeakCanary is `debugImplementation` only: 0 `leakcanary`/`shark` classes in the release APK (`dexdump`), no entry in the merged release or benchmark manifests.
+  - "Copy reference" still copies through `copySensitive` (`copiedReferencesAreMarkedSensitiveOnTheClipboard` passes against the rebuilt button).
+  - Pills, buttons and the Security verdict bar on a hero now use the dark palette. The verdict bar's light-theme tones (for example `#855B00` for "needs you") sat near 2:1 against graphite, under the 3:1 a status graphic needs; the dark tones clear it. Pills carry their own container, so their text contrast was never at risk.
+- Scope for improvement:
+  - LeakCanary's own leak notifications need a device run (row 7b). Its heap dumps stay on the debug device and never reach a release build.

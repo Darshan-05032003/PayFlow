@@ -17,6 +17,18 @@ pyftsubset <font>.ttf --unicodes="U+0020-007E,U+00A0-017F,U+2010-2015,U+2018-201
 
 Scripts outside this range, such as Devanagari, fall back to the system font.
 
+## Icons
+Material Icons from `androidx.compose.material:material-icons-core` and `-extended`, Apache License 2.0.
+
+## Illustrations, animation and sound
+No Lottie files and no third-party artwork, illustrations or sounds are used. The empty and error illustrations, outcome glyphs
+(checkmark, cross, clock, refund arrow), the coin burst, metallic sheen, film grain, scan beam, scratch-card foil, receipt
+perforation and the success chime are all drawn, shaded or synthesised in code in this repository. Sample names in tests,
+screenshots and the sandbox are invented.
+
+Motion and craft inspired by best-in-class Indian consumer apps; not affiliated with any of them. No logo, name, illustration,
+icon, sound or screen from any of them is used.
+
 ### SIL Open Font License 1.1
 
     -----------------------------------------------------------

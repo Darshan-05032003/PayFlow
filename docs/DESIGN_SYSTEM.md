@@ -4,7 +4,7 @@ Code lives in `app/src/main/kotlin/com/darshan/payflow/ui/designsystem/`. The di
 
 ![Design catalog, light and dark](screenshots/design-catalog.png)
 
-Rendered on the JVM from the debug-only catalog. The per-component baselines are in `app/src/test/screenshots/`.
+Rendered on the JVM from the debug-only catalog: the current `ds_*` screenshot baselines, light and dark side by side. The per-component baselines are in `app/src/test/screenshots/`.
 
 ## Rules for screens
 - Use only these tokens and components: no raw hex, `dp`, `sp`, durations or easing in screen code. `scripts/token_audit.py` and `TokenAuditTest` check this; a deliberate exception carries `// token-audit: allow (reason)`.
@@ -103,12 +103,19 @@ Modifiers in `ui/designsystem/modifiers/`:
 
 - `DesignCatalogScreenshotTest` (`src/testDebug`): every catalog section in light and dark, some at 1.3× font scale. Adding a section to `CatalogSections` and a test line covers a new component.
 - `MotionScreenshotTest`: frozen frames from the middle of animations.
+- Roborazzi's default compare threshold passes changes under 1 % of the pixels, so after an intended change to a small element (a label colour, a badge), re-record the classes that show it rather than relying on verification to fail.
 
 ## Adding to the system
 1. Put pure rules in a plain class and test them on the JVM.
 2. Build the component from tokens, reading animated values in the draw or layer phase.
 3. Add it to the catalog in every state, in both themes.
 4. Test it with `mainClock.autoAdvance = false` at 1.0× and 1.3×, with reduced motion on and off. Wrap state changes in `commitState { }`: with a paused clock nothing else delivers them to the recomposer, and an animation test would pass without animating.
+
+## Title rule
+A tab root (Home's wordmark, History, Me) names itself in the serif `display` face: `PayFlowTopBar(title, large = true)`. Screens pushed on top of it, and sheets, use the sans `title`. Serif is otherwise for money and hero headlines.
+
+## Hero surfaces
+`PayFlowSurface(level = SurfaceLevel.Hero)` is graphite in both themes. Its text is `onHero` (ivory in both), and everything placed on it reads `HeroPalette`, the dark palette, so a button, pill or avatar on a hero looks the same in light and dark.
 
 ## App shell
 Lives outside the design system, built only from it.

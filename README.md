@@ -11,6 +11,31 @@ Pay through the UPI apps installed on the phone (GPay, PhonePe, Paytm, BHIM) or 
 > calls such a result "verified". *Sandbox*: every payment is settled by an in-app `FakePsp` behind the
 > `PspClient` interface and no money moves. See [Real UPI apps vs sandbox](#real-upi-apps-vs-sandbox).
 
+<p align="center">
+  <img src="docs/screenshots/home-dark.png" width="200" alt="Home, dark">
+  <img src="docs/screenshots/pay-swipe-dark.png" width="200" alt="Swipe to pay, dark">
+  <img src="docs/screenshots/pay-success-light.png" width="200" alt="Payment success with printed receipt, light">
+  <img src="docs/screenshots/payment-sheet-dark.png" width="200" alt="Payment sheet with the demo scratch card, dark">
+</p>
+
+**Aurum Noir**, PayFlow's own design system: layered graphite, one champagne accent, serif numerals, tactile press physics
+and motion that answers every touch. Every drawing and effect is made in code.
+
+### In motion
+
+The recordings come from the emulator and will be added to `docs/media/`. Until then, this table lists what each one shows.
+
+| Flow | What to watch | File |
+|---|---|---|
+| Scan to pay | Scan & Pay's breathing ring opens into the scanner; the payee card moves into Pay; swipe with detent ticks; checkmark draws, coin burst, receipt prints | `docs/media/scan-to-pay.webp` (to record) |
+| Unlock | PIN dots fill on springs; a wrong PIN shakes and pulses; the app opens with a circular reveal | `docs/media/unlock.webp` (to record) |
+| Home | Header docks into the top bar on scroll; hide amounts blurs and scrambles; pull to refresh flips the coin | `docs/media/home.webp` (to record) |
+| History | Search grows out of its button; swipe tray; a row grows into the payment sheet; the demo scratch card | `docs/media/history.webp` (to record) |
+| Collect request | Heads-up entrance, countdown ring, approve by swipe | `docs/media/collect.webp` (to record) |
+| AutoPay | Card stack fling; pause and resume morph | `docs/media/autopay.webp` (to record) |
+| Security centre | Five checks tick in sequence | `docs/media/security.webp` (to record) |
+| Reduce motion | The same payment with essential motion only | `docs/media/reduce-motion.webp` (to record) |
+
 ## Features
 
 | # | Feature | Status |
@@ -24,30 +49,61 @@ Pay through the UPI apps installed on the phone (GPay, PhonePe, Paytm, BHIM) or 
 | 7 | Security: Keystore AES-GCM, biometric/PIN lock (PBKDF2 + lockout), simulated device binding, root/tamper detection, Play Integrity, `FLAG_SECURE` | done (Keystore / BiometricPrompt / Play Integrity request are device-only) |
 | 8 | CheckoutKit integration: the [CheckoutKit](https://github.com/Darshan-05032003/CheckoutKit) payment sheet from JitPack for merchant checkout | done |
 | 9 | **UPI-apps mode**: pay through installed UPI apps (own app sheet, pinned intent, app-reported result, manual settlement), incoming `upi://` links, Receive-money QR, sandbox/UPI-apps switch | done |
+| 10 | **UI/UX overhaul**: Aurum Noir design system and debug catalog, animated shell, Home, Scan, Pay with swipe-to-pay and outcomes, History, Collect, AutoPay, demo scratch card, Security centre and Me settings (haptics, sound, reduce motion, theme) | done (device recordings and frame timings pending) |
+
+## Design system and motion
+
+Full guide: [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md). Direction and reasoning: [`docs/DESIGN_DIRECTION.md`](docs/DESIGN_DIRECTION.md).
+
+- **Tokens only.** Screens read colour, type, spacing, radii, sizes and motion from the design system. No raw hex, `dp`, `sp`,
+  duration or easing appears in screen code; `scripts/token_audit.py` and `TokenAuditTest` check it on every test run.
+- **Colour.** Warm paper or near-black pages, a graphite hero in both themes, champagne as the single accent. Every text pair
+  meets WCAG AA in both themes (enforced by a test).
+- **Type.** Newsreader for display and money (tabular serif numerals), Geist for everything else. Tab roots name themselves in
+  the serif; pushed screens and sheets use the sans title.
+- **Depth.** Three tone steps and a 1dp hairline. No drop shadows. Film grain on hero surfaces only.
+- **Motion.** One vocabulary of tokens: springs for anything touched or dragged (Snappy, Bouncy, Gentle), timed motion in three
+  bands (micro 90 to 150 ms, small 200 to 300 ms, screen 350 to 500 ms) on emphasized curves, 40 ms stagger. No linear easing.
+  Animated values are read in the draw or layer phase, so a moving frame recomposes nothing.
+- **Delight is earned.** The coin burst, sheen and scratch-card glints play only for a provider-confirmed payment.
+- **Haptics.** Ticks for detents, a light tap per press, confirm and reject for outcomes, through the view's haptic channel (no
+  permission). A setting turns them off.
+- **Effects in code.** Metallic sheen and the scan beam are AGSL shaders on API 33+ with gradient fallbacks; checkmarks, crosses,
+  receipts, illustrations and the success chime are drawn or synthesised in code.
+
+![Design catalog, light and dark](docs/screenshots/design-catalog.png)
 
 ## Screenshots
 
-Debug build on a Pixel 7 emulator (API 37) in UPI-apps mode. The UPI app here is the debug-only **Sandbox UPI** test app
-(see [Testing without a real UPI app](#testing-without-a-real-upi-app)); on a phone the same sheet lists GPay, PhonePe, Paytm and BHIM.
+Before: the app at the start of the UI overhaul, on the Pixel 7 emulator. After: Roborazzi renders of the same screens from the
+screenshot tests (JVM, 411 × 891 dp). Sample names are invented.
 
-| Home | Pay | Choose a UPI app | Result (reported by the app) |
-|---|---|---|---|
-| ![Home](docs/screenshots/home.png) | ![Pay](docs/screenshots/pay.png) | ![UPI app sheet](docs/screenshots/upi-app-sheet.png) | ![Result](docs/screenshots/result-reported.png) |
+| | Home | Pay | Result | History |
+|---|---|---|---|---|
+| **Before** | ![Home before](docs/screenshots/before/home.png) | ![Pay before](docs/screenshots/before/pay.png) | ![Result before](docs/screenshots/before/result-reported.png) | ![History before](docs/screenshots/before/history.png) |
+| **After** | ![Home after](docs/screenshots/home-light.png) | ![Pay after](docs/screenshots/pay-swipe-dark.png) | ![Result after](docs/screenshots/result-reported.png) | ![History after](docs/screenshots/history-light.png) |
 
-| Pending: mark by hand | History | Receive QR | Scan |
-|---|---|---|---|
-| ![Pending](docs/screenshots/pending-manual-mark.png) | ![History](docs/screenshots/history.png) | ![Receive](docs/screenshots/receive-qr.png) | ![Scan](docs/screenshots/scan.png) |
+| | Choose a UPI app | Pending: mark by hand | Scan | Security |
+|---|---|---|---|---|
+| **Before** | ![App sheet before](docs/screenshots/before/upi-app-sheet.png) | ![Pending before](docs/screenshots/before/pending-manual-mark.png) | ![Scan before](docs/screenshots/before/scan.png) | ![Security before](docs/screenshots/before/security-mode.png) |
+| **After** | ![App sheet after](docs/screenshots/upi-app-sheet.png) | ![Pending after](docs/screenshots/pending-manual-mark.png) | ![Scan after](docs/screenshots/scan-found-dark.png) | ![Security after](docs/screenshots/security-light.png) |
 
-| QR from a gallery image | Incoming `upi://pay` link | Payment mode | Sandbox UPI (debug only) |
-|---|---|---|---|
-| ![Gallery QR](docs/screenshots/gallery-qr-pay.png) | ![Incoming link](docs/screenshots/incoming-link.png) | ![Security](docs/screenshots/security-mode.png) | ![Sandbox UPI](docs/screenshots/sandbox-upi-debug.png) |
+More after screens:
+
+| Collect request | AutoPay | Me | Receive | Lock |
+|---|---|---|---|---|
+| ![Collect](docs/screenshots/collect-dark.png) | ![AutoPay](docs/screenshots/autopay-light.png) | ![Me](docs/screenshots/me-dark.png) | ![Receive](docs/screenshots/receive-light.png) | ![Lock](docs/screenshots/lock-dark.png) |
+
+The remaining "before" emulator shots (gallery QR, incoming link, the debug Sandbox UPI app) are in
+[`docs/screenshots/before/`](docs/screenshots/before/). All 202 current renders are in `app/src/test/screenshots/`.
 
 ## Tech stack
 
 Kotlin 2.4 · Jetpack Compose (BOM 2026.09) + Material 3 · Navigation Compose (type-safe routes) · Hilt (KSP) · Room 2.8 ·
 DataStore · kotlinx.coroutines / Flow · kotlinx.serialization · OkHttp 5 · CameraX · ML Kit Barcode Scanning ·
 AndroidX Biometric · Android Keystore · Play Integrity · AGP 9.5 (built-in Kotlin) · Gradle 9.6 · JUnit 4 · Truth ·
-MockK · Turbine · Robolectric 4.17 · MockWebServer · Kover.
+MockK · Turbine · Robolectric 4.17 · MockWebServer · Kover · Roborazzi (screenshot tests) · Macrobenchmark + Baseline Profile ·
+LeakCanary (debug only) · Splash Screen API · AGSL shaders · Newsreader + Geist (OFL, bundled).
 
 minSdk 26, compileSdk/targetSdk 37, JDK 17 toolchain.
 
@@ -55,6 +111,9 @@ minSdk 26, compileSdk/targetSdk 37, JDK 17 toolchain.
 
 MVVM + Clean Architecture (`ui` / `domain` / `data`). Every ViewModel exposes one `StateFlow<UiState>` with
 loading / empty / error / content states; dispatchers and `java.time.Clock` are injected; money is `Long` paise.
+The UI is built only from `ui/designsystem` (tokens, components, motion, haptics). Animation and gesture rules live in plain,
+JVM-tested state holders (`SwipeToPayHolder`, `CardStackHolder`, `OdometerLogic`, `LockMotionLogic`, `CheckReveal`, …); one-off
+effects such as haptics go through a separate effect channel.
 
 ```mermaid
 flowchart TB
@@ -172,7 +231,7 @@ tests drive the real sheet through all six outcomes. API issues found while inte
 ### Real UPI apps vs sandbox
 
 An individual developer cannot get a bank or PSP licence, so PayFlow offers two clearly labelled modes
-(Security → Payment mode; the default is *UPI apps* when at least one UPI app is installed, *Sandbox* otherwise, e.g. on an emulator):
+(Me → Security centre → Payment mode; the default is *UPI apps* when at least one UPI app is installed, *Sandbox* otherwise, e.g. on an emulator):
 
 | | UPI apps mode | Sandbox mode |
 |---|---|---|
@@ -211,27 +270,67 @@ app can scan; copy the ID or share the link / PNG. PayFlow cannot see incoming m
 ## Tests
 
 ```bash
-./gradlew testDebugUnitTest        # unit + integration (Robolectric), stress excluded
+./gradlew testDebugUnitTest        # unit + integration (Robolectric); screenshot tests run without comparing images; stress excluded
+./gradlew verifyRoborazziDebug     # the same run, comparing every screenshot with its baseline
+./gradlew recordRoborazziDebug --tests '*HomeScreenshotTest*'   # re-record one class after an intended change
 ./gradlew stressTest               # load / stress simulations (prints STRESS [...] lines)
 ./gradlew koverLogDebug koverVerifyDebug   # line coverage of domain + data (rule: ≥ 80 %)
-./gradlew assembleDebug lintDebug  # the rest of the pre-commit gate
+./gradlew assembleDebug assembleRelease lintDebug   # the rest of the pre-commit gate
+scripts/token_audit.py             # raw colours, dp/sp, durations or easing in screen code
 ```
 
 | Suite | Count |
 |---|---|
-| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, QR image decoding, use cases, ViewModels, Compose screens) | 347 |
-| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity incl. an incoming `upi://` link, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet) | 57 |
-| Stress (`stress` package, `./gradlew stressTest` only) | 24 |
+| Unit (state machines, rules, money, parsers, validators, backoff, crypto, PIN, binding, tamper, integrity, gateway adapter, QR image decoding, use cases, ViewModels, motion and gesture state holders, design-system components, Compose screens at 1.0× and 1.3× with reduced motion on and off) | 1,035 |
+| Integration (Room + DAO + repository + ViewModel, Compose flows, Hilt activity incl. an incoming `upi://` link, `HttpPspClient` vs MockWebServer, the real CheckoutKit sheet, screenshot suites) | 216 |
+| Screenshot baselines (Roborazzi: every design-system component and every screen state, light and dark, 1.3× text, mid-animation frames) | 202 images |
+| Stress (`stress` package, `./gradlew stressTest` only) | 67 |
 
-Domain + data line coverage (Kover): **89.0 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
-`PlayIntegrityChecker`, `AndroidTamperProbe`, `CameraXController` and `MlKitBarcodeScanner` are counted and untested on the JVM). (the device-only `CameraXController` / `MlKitBarcodeScanner` are counted and
-untested on the JVM).
+Before the UI overhaul the suites were 350 unit, 57 integration and 24 stress tests.
+
+Domain + data line coverage (Kover): **90.7 %** (device-only classes such as `KeystoreCryptoBox`, `AndroidBiometricAuthenticator`,
+`PlayIntegrityChecker`, `AndroidTamperProbe`, `CameraXController` and `MlKitBarcodeScanner` are counted and untested on the JVM).
 
 Everything is proven on the JVM with Robolectric and fakes (installed UPI apps are faked through the `UpiAppLauncher` interface). On
 top of that, every flow was walked on a Pixel 7 emulator (API 37) in light and dark: the UPI-app sheet → Sandbox UPI → success,
 failure, pending + manual marking, cancel and a tampered `txnRef`; sandbox mode; incoming `upi://pay` links (cold and warm start);
 Receive QR (the on-screen QR was decoded back to the exact link); camera scan screen and gallery QR (valid, non-UPI); History refresh.
 The walkthrough found and fixed four bugs that unit tests had missed (see SECURITY_REVIEW). `connectedAndroidTest` is not used.
+
+## Performance
+
+**Emulator numbers, not a mid-range phone.** The Pixel 7 AVD runs with software rendering on a busy 15 GB laptop, so these
+numbers only compare before and after on the same setup. Method and raw tables: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
+
+| Metric (Macrobenchmark, `NoCompilation`) | Before (`9c48cc2`, 4 GB guest) | After |
+|---|---:|---:|
+| Cold start, time to initial display, median | 876 ms | pending |
+| Home scroll, frame CPU time P90 | 95.6 ms | pending |
+| Home scroll, jank (frames over deadline) | 99.3 % | pending |
+| History scroll, frame CPU time P90 | 52.9 ms | pending |
+| History scroll, jank | 97.3 % | pending |
+| Release APK | 25,265,073 bytes | 25,819,547 bytes (+2.2 %) |
+
+The "after" frame and startup numbers come from the next device session, which re-measures `9c48cc2` on the same emulator
+configuration (the emulator now runs with a 2 GB guest) so both columns share one setup. The Home scroll now measures a different,
+richer page, so its comparison is labelled as such. That session also generates the Baseline Profile and looks for leaks with
+LeakCanary. Measured on the JVM so far: a 600-step Home scroll in 6 recompositions, 300 History flings over 10,000 rows with no
+recomposition, and the release Compose compiler metrics in LOAD_TEST_REPORT ("Compose stability").
+
+## Accessibility
+
+- **TalkBack.** Every control has a label; each payment row reads as one sentence: direction, payee, amount and status. Swipe-to-pay, the
+  scratch card, the AutoPay stack and the history swipe tray all have TalkBack actions, and anything behind an open sheet is hidden
+  from TalkBack.
+- **No gesture is required.** Swipe-to-pay has "Pay with a button instead" and a confirmation sheet; collect requests can be paid
+  through a review sheet; history swipe actions are also row actions; the AutoPay stack has Next and Previous.
+- **Text up to 1.3×.** Compose tests run the screens at 1.3× and check their parts stay inside their bounds; the 1.3× screenshot
+  baselines were reviewed for clipping. Long names ellipsize by design.
+- **Reduce motion.** An in-app setting, also on when the system animator scale is 0. Decorative motion (ambient rings, sheen,
+  burst, glints) stops; essential transitions become 150 ms fades. No step depends on an animation finishing, and a collect request's
+  slider becomes a review button, because the slider's feedback is all motion.
+- **Touch targets** are at least 48dp (a token, checked by a test). **Contrast** meets WCAG AA for every text pair in both themes.
+- **Haptics and sound** can be turned off; sound is off by default.
 
 ## Security highlights
 
@@ -315,6 +414,9 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
   distinct orders despite 1,225 PSP initiate calls (SDK retries deduped by key), every success matched to a captured order.
 - **Gallery QR**: 1,000 generated images (valid, non-UPI, hostile, noise) decoded in 1.35 s (1.35 ms each), heap peak +33 MB.
 - **QR parser**: 10,000 fuzzed payloads in 75 ms; 1,000 × 100 KB payloads rejected in 1 ms; 1,000 concurrent parses in 39 ms.
+- **UI under load (JVM)**: 3,000 submits from the Pay screen → 1 payment; 1,000 injected swipes → 1; 1,000 collect approvals → 1
+  payment; 100,000 history rows grouped into days in 12 ms; a 1,000-guess PIN attack runs 5 PBKDF2 verifies. Compose release metrics:
+  unstable composable parameters 26 → 7.
 
 ## Project docs
 
@@ -322,6 +424,18 @@ Full report: [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 - [`docs/DECISIONS.md`](docs/DECISIONS.md): design decisions and compromises
 - [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md): per-feature attacks, findings and fixes
 - [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md): per-feature load scenarios and numbers
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md): tokens, components, motion rules and the catalog
+- [`docs/DESIGN_DIRECTION.md`](docs/DESIGN_DIRECTION.md): the two proposed directions and why Aurum Noir
+- [`docs/UI_AUDIT.md`](docs/UI_AUDIT.md): the audit the overhaul started from
+- [`docs/CREDITS.md`](docs/CREDITS.md): fonts and licences
+
+## Credits
+
+Fonts: Newsreader and Geist under the SIL Open Font License 1.1 (see [`docs/CREDITS.md`](docs/CREDITS.md)). Icons: Material
+Icons (Apache 2.0). Every illustration, effect, animation and sound is original and made in code; no Lottie files or third-party
+artwork are used.
+
+Motion and craft inspired by best-in-class Indian consumer apps; not affiliated with any of them.
 
 ## License
 
