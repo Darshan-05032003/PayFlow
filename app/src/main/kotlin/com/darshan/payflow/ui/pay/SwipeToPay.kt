@@ -135,8 +135,9 @@ fun SwipeToPay(
             .drawWithCache {
                 val radius = CornerRadius(size.height / 2)
                 val detent = (size.width - handlePx - insetPx * 2) / SwipeToPayHolder.DEFAULT_DETENTS
-                val dot = Hairline.width.toPx() * 1.5f
-                val cy = size.height / 2
+                val tick = Spacing.xxs.toPx()
+                val tickWidth = Hairline.width.toPx() * 1.5f
+                val tickBottom = size.height - Spacing.xs.toPx()
                 onDrawBehind {
                     drawRect(if (active) colors.raised else colors.primaryDisabled)
                     val filled = handlePx + insetPx * 2 + fraction * travel
@@ -147,7 +148,8 @@ fun SwipeToPay(
                     if (active) {
                         for (i in 1 until SwipeToPayHolder.DEFAULT_DETENTS) {
                             val x = insetPx + handlePx / 2 + detent * i
-                            drawCircle(colors.outline, radius = dot, center = Offset(if (rtl) size.width - x else x, cy))
+                            val at = if (rtl) size.width - x else x
+                            drawLine(colors.outline, Offset(at, tickBottom - tick), Offset(at, tickBottom), tickWidth)
                         }
                     }
                 }

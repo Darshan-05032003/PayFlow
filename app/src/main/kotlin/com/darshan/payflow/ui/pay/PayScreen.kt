@@ -222,6 +222,7 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, toasts: ToastHostState
     var confirmOpen by rememberSaveable { mutableStateOf(false) }
     var shareOpen by rememberSaveable { mutableStateOf(false) }
     var againOpen by rememberSaveable { mutableStateOf(false) }
+    var playedMoment by rememberSaveable { mutableStateOf("") }
     // A refused attempt closes the confirmation: the screen behind it says what went wrong.
     LaunchedEffect(state.attemptsRefused) { confirmOpen = false }
 
@@ -262,7 +263,11 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, toasts: ToastHostState
                     PayView.Awaiting -> (phase as? PayPhase.AwaitingApp)?.let { AwaitingAppView(it, state.paymentMode, callbacks) }
                     PayView.Confirming -> ConfirmingView(state.paymentMode, stage, callbacks)
                     PayView.Result -> (phase as? PayPhase.Done)?.let {
-                        ResultView(it, state.paymentMode, state.polling, stage, callbacks, onShareRequest = { shareOpen = true }, onPayAgainRequest = { againOpen = true })
+                        ResultView(
+                            it, state.paymentMode, state.polling, stage, callbacks,
+                            onShareRequest = { shareOpen = true }, onPayAgainRequest = { againOpen = true },
+                            playedKey = playedMoment, onPlayed = { key -> playedMoment = key },
+                        )
                     }
                     PayView.Unresolved -> (phase as? PayPhase.Unresolved)?.let { UnresolvedView(it, state.polling, stage, callbacks) }
                 }

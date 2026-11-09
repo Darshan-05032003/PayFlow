@@ -228,7 +228,8 @@
     <string name="scan_use_camera">Scan with camera</string>
 
     <!-- VPA verification -->
-    <string name="pay_title_row">Pay</string>
+    <string name="pay_share">Share</string>
+    <string name="pay_verified_short">Verified</string>
     <string name="pay_swipe">Swipe to pay</string>
     <string name="pay_swipe_description">Pay %1$s to %2$s. Asks you to confirm first.</string>
     <string name="pay_swipe_starting">Starting payment…</string>
@@ -284,6 +285,7 @@
     <string name="pay_receipt_title">Receipt</string>
     <string name="pay_receipt_sandbox">Sandbox payment. No real money moved.</string>
     <string name="pay_receipt_time">Time</string>
+    <string name="pay_source_psp_failed">The sandbox payment provider said this failed.</string>
     <string name="pay_source_refund">Refund recorded by the sandbox payment provider.</string>
     <string name="pay_processing_label">Payment in progress</string>
     <string name="pay_verifying">Checking UPI ID…</string>

@@ -119,7 +119,7 @@ class PayReadinessTest {
         assertThat(PayReadiness.blockOf(ready.copy(amountText = "0.00"))).isEqualTo(PayBlock.ENTER_AMOUNT)
         assertThat(PayReadiness.blockOf(ready.copy(amountText = "100000.01"))).isEqualTo(PayBlock.AMOUNT_TOO_LARGE)
         // A locked amount never comes from the keypad: the largest displayable value must still not get through.
-        assertThat(PayReadiness.blockOf(ready.copy(amountText = "99999999.99", amountLocked = true))).isEqualTo(PayBlock.AMOUNT_TOO_LARGE)
+        assertThat(PayReadiness.blockOf(ready.copy(amountText = "999999999.99", amountLocked = true))).isEqualTo(PayBlock.AMOUNT_TOO_LARGE)
     }
 
     @Test

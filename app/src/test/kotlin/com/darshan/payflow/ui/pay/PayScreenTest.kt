@@ -80,9 +80,10 @@ class PayScreenTest {
 
     @Test
     fun fieldErrorsAreShown() {
-        show(PayUiState(errors = PayFormErrors(vpa = PayFieldError.INVALID_VPA, amount = PayFieldError.AMOUNT_TOO_LARGE)))
+        show(PayUiState(errors = PayFormErrors(vpa = PayFieldError.INVALID_VPA, name = PayFieldError.REQUIRED, amount = PayFieldError.AMOUNT_TOO_LARGE)))
         rule.onNodeWithText("Enter a UPI ID like name@bank").assertIsDisplayed()
         rule.onNodeWithText("Maximum is ₹1,00,000.00 per payment").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_NAME).assertExists()
     }
 
     @Test
@@ -220,6 +221,20 @@ class PayScreenTest {
         rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).assertIsNotEnabled()
         // A fixed amount has no keypad to change it with.
         rule.onAllNodesWithTag(PayFlowTestTags.payKey(AmountKey.D1.name)).assertCountEquals(0)
+    }
+
+    @Test
+    fun theNameFieldAppearsOnlyWhenTheDirectoryCannotSupplyTheName() {
+        show(PayUiState(paymentMode = PaymentMode.SANDBOX))
+        rule.onAllNodesWithTag(PayFlowTestTags.PAY_NAME).assertCountEquals(0)
+        holder.value = PayUiState(vpa = "alice@okbank", paymentMode = PaymentMode.SANDBOX, verification = VpaVerificationState.Unavailable)
+        rule.onNodeWithTag(PayFlowTestTags.PAY_NAME).assertIsEnabled()
+        holder.value = PayUiState(vpa = "alice@okbank", name = "Alice Kumar", paymentMode = PaymentMode.SANDBOX, verification = VpaVerificationState.Verified("Alice Kumar"))
+        rule.onNodeWithTag(PayFlowTestTags.PAY_NAME).assertIsNotEnabled()
+        rule.onNodeWithText("Alice Kumar").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_VERIFIED).assertIsDisplayed()
+        holder.value = PayUiState(vpa = "alice@okbank", paymentMode = PaymentMode.UPI_APPS, verification = VpaVerificationState.Skipped)
+        rule.onNodeWithTag(PayFlowTestTags.PAY_NAME).assertIsEnabled()
     }
 
     @Test

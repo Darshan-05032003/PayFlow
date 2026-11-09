@@ -24,7 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,7 +76,7 @@ import com.darshan.payflow.ui.designsystem.tokens.Hairline
 import com.darshan.payflow.ui.designsystem.tokens.Sizes
 import com.darshan.payflow.ui.designsystem.tokens.Spacing
 import com.darshan.payflow.ui.theme.PayFlowTheme
-import kotlinx.coroutines.delay
+import androidx.compose.runtime.withFrameMillis
 
 @Composable
 private fun CenteredTitle(text: String, modifier: Modifier = Modifier) {
@@ -220,6 +219,7 @@ fun statusSourceLabel(payment: Payment, handlerLabel: String?): String {
         payment.statusSource == StatusSource.UPI_APP -> stringResource(R.string.pay_source_reported_by, app)
         payment.statusSource == StatusSource.USER -> stringResource(R.string.pay_source_marked_by_user)
         payment.status == PaymentStatus.REFUNDED || payment.status == PaymentStatus.REFUND_PENDING -> stringResource(R.string.pay_source_refund)
+        payment.status == PaymentStatus.FAILED -> stringResource(R.string.pay_source_psp_failed)
         else -> stringResource(R.string.pay_source_psp)
     }
 }
@@ -239,6 +239,8 @@ fun ResultView(
     onShareRequest: () -> Unit,
     onPayAgainRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    playedKey: String = "",
+    onPlayed: (String) -> Unit = {},
 ) {
     val motion = LocalMotion.current
     val outcome = PayOutcomes.of(phase)
@@ -250,9 +252,11 @@ fun ResultView(
     val failed = outcome.kind == OutcomeKind.FAILED || outcome.kind == OutcomeKind.REPORTED_FAILURE
 
     // The moment plays once for this outcome. A rotation shows the finished frame, so nothing fires twice.
-    var played by rememberSaveable(phase.paymentId, status) { mutableStateOf(false) }
-    val play = !played && !motion.reduced
-    LaunchedEffect(phase.paymentId, status) { played = true }
+    // Decided once per outcome: marking it played must not stop the moment that is playing now. The record of what has
+    // played is held by the screen, outside the cross-fade, so it survives a rotation.
+    val momentKey = "${phase.paymentId}:$status"
+    val play = remember(momentKey) { playedKey != momentKey && !motion.reduced }
+    LaunchedEffect(momentKey) { onPlayed(momentKey) }
 
     val title = when (outcome.kind) {
         OutcomeKind.SUCCESS -> stringResource(R.string.pay_done_success)
@@ -284,7 +288,7 @@ fun ResultView(
                 verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
             ) {
                 if (payment != null) {
-                    GhostButton(stringResource(R.string.pay_share_receipt), onShareRequest, outlined = false, leadingIcon = Icons.Outlined.Share, modifier = Modifier.testTag(PayFlowTestTags.PAY_SHARE))
+                    GhostButton(stringResource(R.string.pay_share), onShareRequest, outlined = false, leadingIcon = Icons.Outlined.Share, modifier = Modifier.testTag(PayFlowTestTags.PAY_SHARE))
                 }
                 if (phase.paymentId.isNotEmpty()) {
                     GhostButton(stringResource(R.string.pay_view_payment), { callbacks.onOpenPayment(phase.paymentId) }, outlined = false)
@@ -411,7 +415,8 @@ private fun PrintingReceipt(receipt: ReceiptContent, payment: Payment, handlerLa
     val printed = remember { Animatable(if (play) 0f else 1f) }
     LaunchedEffect(play) {
         if (play) {
-            delay(MotionDurations.Screen.toLong())
+            // Waits on the frame clock rather than `delay`, so the wait is part of the animation and tests see it as one.
+            holdForFrames(MotionDurations.Screen.toLong())
             printed.animateTo(1f, motion.spec(MotionToken.Settle))
         } else {
             printed.snapTo(1f)
@@ -466,4 +471,10 @@ private fun ReceiptRow(label: String, value: String) {
         Text(label, style = type.label, color = colors.textSecondary)
         Text(value, style = type.label, color = colors.text, textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     }
+}
+
+/** Suspends for [millis] measured on the frame clock. */
+private suspend fun holdForFrames(millis: Long) {
+    val start = withFrameMillis { it }
+    while (withFrameMillis { it } - start < millis) Unit
 }

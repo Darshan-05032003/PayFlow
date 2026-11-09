@@ -58,6 +58,7 @@ object ReceiptImage {
             receipt.source.statusSource == StatusSource.UPI_APP -> context.getString(R.string.pay_source_reported_by, app)
             receipt.source.statusSource == StatusSource.USER -> context.getString(R.string.pay_source_marked_by_user)
             receipt.status == PaymentStatus.REFUNDED || receipt.status == PaymentStatus.REFUND_PENDING -> context.getString(R.string.pay_source_refund)
+            receipt.status == PaymentStatus.FAILED -> context.getString(R.string.pay_source_psp_failed)
             else -> context.getString(R.string.pay_source_psp)
         }
     }

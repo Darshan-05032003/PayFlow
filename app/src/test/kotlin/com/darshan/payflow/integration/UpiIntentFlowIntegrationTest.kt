@@ -89,7 +89,7 @@ class UpiIntentFlowIntegrationTest {
             }
         }
         rule.onNodeWithTag(PayFlowTestTags.PAY_VPA).performTextInput("alice@okbank")
-        rule.onNodeWithTag(PayFlowTestTags.PAY_NAME).performTextInput("Alice")
+        vm.onNameChange("Alice") // whatever was typed before the directory answers, the registered name replaces it
         rule.onNodeWithTag(PayFlowTestTags.payKey(AmountKey.D1.name)).performClick()
         // The slider and its plain route both wait for the directory: the registered name is on screen before any payment.
         // Simulated time has to move for the verify debounce to fire; nothing else moves it reliably.

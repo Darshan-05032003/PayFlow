@@ -56,10 +56,10 @@ import com.darshan.payflow.core.Money
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentMode
 import com.darshan.payflow.domain.model.SandboxDemoPayees
+import com.darshan.payflow.domain.model.VpaValidator
 import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.designsystem.components.AmountDecimals
 import com.darshan.payflow.ui.designsystem.components.AmountOdometer
-import com.darshan.payflow.ui.designsystem.components.AvatarBadge
 import com.darshan.payflow.ui.designsystem.components.BrandLoader
 import com.darshan.payflow.ui.designsystem.components.DisplayText
 import com.darshan.payflow.ui.designsystem.components.DrawnCheckmark
@@ -190,7 +190,7 @@ private fun LockedPayeeCard(state: PayUiState) {
     PayFlowSurface(Modifier.fillMaxWidth().containerTransform(PAYEE_CONTAINER_KEY).testTag(PayFlowTestTags.PAY_PAYEE_CARD)) {
         Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                PayFlowAvatar(name, badge = if (state.verification is VpaVerificationState.Verified) AvatarBadge.Verified else null)
+                PayFlowAvatar(name)
                 Column(Modifier.weight(1f)) {
                     LockedRow(name, type.bodyStrong, colors.text, PayFlowTestTags.PAY_NAME, lockedLabel)
                     LockedRow(DisplayText.safe(state.vpa), type.label, colors.textSecondary, PayFlowTestTags.PAY_VPA, lockedLabel)
@@ -213,32 +213,17 @@ private fun LockedRow(text: String, style: androidx.compose.ui.text.TextStyle, c
     }
 }
 
-/** What the directory said. The check draws itself along its path, and the name fades in beside it. */
+/** What the directory said. The check draws itself along its path. */
 @Composable
 private fun VerificationLine(state: PayUiState) {
     val colors = PayFlowTheme.colors
     val type = PayFlowTheme.type
-    val motion = LocalMotion.current
-    when (val v = state.verification) {
+    when (state.verification) {
         VpaVerificationState.Verifying -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             BrandLoader(size = Sizes.iconSmall)
             Text(stringResource(R.string.pay_verifying), style = type.label, color = colors.textSecondary)
         }
-        is VpaVerificationState.Verified -> {
-            val draw = remember { Animatable(if (motion.reduced) 1f else 0f) }
-            LaunchedEffect(Unit) { draw.animateTo(1f, motion.spec(MotionToken.Small)) }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                DrawnCheckmark({ draw.value }, colors.success.strong, Modifier.size(Sizes.iconSmall))
-                Text(
-                    stringResource(R.string.pay_verified, DisplayText.safe(v.payeeName)),
-                    style = type.label,
-                    color = colors.success.strong,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer { alpha = draw.value }.testTag(PayFlowTestTags.PAY_VERIFIED),
-                )
-            }
-        }
+        is VpaVerificationState.Verified -> VerifiedMark()
         VpaVerificationState.NotFound -> Text(stringResource(R.string.error_vpa_not_found), style = type.label, color = colors.failed.strong)
         VpaVerificationState.Unavailable -> Text(stringResource(R.string.pay_verify_unavailable), style = type.label, color = colors.pending.strong)
         VpaVerificationState.Skipped -> Text(stringResource(R.string.pay_vpa_hint_real), style = type.label, color = colors.textSecondary)
@@ -247,9 +232,33 @@ private fun VerificationLine(state: PayUiState) {
 }
 
 @Composable
+private fun VerifiedMark() {
+    val colors = PayFlowTheme.colors
+    val motion = LocalMotion.current
+    val draw = remember { Animatable(if (motion.reduced) 1f else 0f) }
+    LaunchedEffect(Unit) { draw.animateTo(1f, motion.spec(MotionToken.Small)) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+        DrawnCheckmark({ draw.value }, colors.success.strong, Modifier.size(Sizes.iconSmall))
+        Text(
+            stringResource(R.string.pay_verified_short),
+            style = PayFlowTheme.type.label,
+            color = colors.success.strong,
+            modifier = Modifier.graphicsLayer { alpha = draw.value }.testTag(PayFlowTestTags.PAY_VERIFIED),
+        )
+    }
+}
+
+@Composable
 private fun EditablePayee(state: PayUiState, callbacks: PayCallbacks, busy: Boolean) {
     val verified = state.verification as? VpaVerificationState.Verified
     val realMode = state.paymentMode == PaymentMode.UPI_APPS
+    // The directory supplies the name in sandbox, so a name field only appears when it can't. In UPI-apps mode the name is
+    // optional, and asked for once there's a payee to name.
+    val askForName = verified == null && (
+        state.errors.name != null ||
+            state.verification is VpaVerificationState.Unavailable ||
+            (realMode && VpaValidator.isValid(state.vpa))
+        )
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         PayFlowTextField(
             value = state.vpa,
@@ -262,10 +271,12 @@ private fun EditablePayee(state: PayUiState, callbacks: PayCallbacks, busy: Bool
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
             fieldTag = PayFlowTestTags.PAY_VPA,
         )
-        if (state.errors.vpa == null) VerificationHint(state)
+        if (state.errors.vpa == null && verified == null) VerificationHint(state)
         if (state.vpa.isBlank() && state.paymentMode == PaymentMode.SANDBOX) DemoPayees(callbacks.onVpaChange, !busy)
-        AnimatedVisibility(verified != null) { if (verified != null) RegisteredName(verified.payeeName) }
-        if (verified == null) {
+        AnimatedVisibility(verified != null, enter = motion().enter(), exit = motion().exit()) {
+            if (verified != null) RegisteredName(verified.payeeName)
+        }
+        if (askForName) {
             PayFlowTextField(
                 value = state.name,
                 onValueChange = callbacks.onNameChange,
@@ -280,6 +291,9 @@ private fun EditablePayee(state: PayUiState, callbacks: PayCallbacks, busy: Bool
 }
 
 @Composable
+private fun motion() = LocalMotion.current
+
+@Composable
 private fun VerificationHint(state: PayUiState) {
     if (state.verification is VpaVerificationState.Idle) {
         Text(stringResource(R.string.pay_vpa_hint), style = PayFlowTheme.type.label, color = PayFlowTheme.colors.textSecondary)
@@ -288,19 +302,28 @@ private fun VerificationHint(state: PayUiState) {
     }
 }
 
-/** The directory's name replaces whatever was typed, and can't be edited. */
+/** The directory's name replaces whatever was typed, can't be edited, and fades in with its check. */
 @Composable
 private fun RegisteredName(name: String) {
     val colors = PayFlowTheme.colors
     val safe = DisplayText.safe(name)
     Row(
-        Modifier.fillMaxWidth().padding(vertical = Spacing.xxs).semantics { disabled() }.testTag(PayFlowTestTags.PAY_NAME),
+        Modifier.fillMaxWidth().padding(vertical = Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        PayFlowAvatar(safe, badge = AvatarBadge.Verified)
-        Text(safe, style = PayFlowTheme.type.bodyStrong, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_name_registered), tint = colors.textSecondary, modifier = Modifier.size(Sizes.iconSmall))
+        PayFlowAvatar(safe)
+        Column(Modifier.weight(1f)) {
+            Row(
+                Modifier.semantics { disabled() }.testTag(PayFlowTestTags.PAY_NAME),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            ) {
+                Text(safe, style = PayFlowTheme.type.bodyStrong, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_name_registered), tint = colors.textSecondary, modifier = Modifier.size(Sizes.iconSmall))
+            }
+            VerifiedMark()
+        }
     }
 }
 
