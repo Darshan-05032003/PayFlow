@@ -19,6 +19,7 @@ import com.darshan.checkoutkit.core.CheckoutKit
 import com.darshan.payflow.data.qr.CameraController
 import com.darshan.payflow.data.qr.CameraPermission
 import com.darshan.payflow.data.security.AppLock
+import com.darshan.payflow.data.upi.IncomingIntentPolicy
 import com.darshan.payflow.data.upi.IncomingUpiLinkStore
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.ui.designsystem.effects.UiPreferences
@@ -49,6 +50,8 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         // Tapjacking: taps delivered through another app's overlay are dropped everywhere, not only on secure screens.
         window.decorView.filterTouchesWhenObscured = true
+        // Before Navigation can read it: this activity is exported, so an intent's extras and data are an attacker's input.
+        intent = IncomingIntentPolicy.sanitize(intent)
         // Only a cold start carries the link; after a rotation the saved state already holds the Pay screen.
         if (savedInstanceState == null) offerLink(intent)
         setContent {
@@ -71,7 +74,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        offerLink(intent)
+        // getIntent() stays the sanitized launch intent: Navigation only ever reads that one.
+        offerLink(IncomingIntentPolicy.sanitize(intent))
     }
 
     private fun offerLink(intent: Intent?) {

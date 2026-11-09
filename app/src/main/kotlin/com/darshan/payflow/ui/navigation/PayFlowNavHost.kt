@@ -21,6 +21,7 @@ import com.darshan.payflow.domain.model.RecentPayee
 import com.darshan.payflow.ui.checkout.CheckoutRoute
 import com.darshan.payflow.ui.collect.CollectRoute
 import com.darshan.payflow.ui.components.LocalPaymentMode
+import com.darshan.payflow.ui.components.SecureWindow
 import com.darshan.payflow.ui.history.HistoryRoute
 import com.darshan.payflow.ui.history.PaymentDetailRoute
 import com.darshan.payflow.ui.home.HomeCallbacks
@@ -83,6 +84,9 @@ fun AppRoot(
     val lockState by lockViewModel.uiState.collectAsStateWithLifecycle()
     val mode by modeViewModel.mode.collectAsStateWithLifecycle()
     lockViewModel.host = LocalActivity.current
+    // The whole app is secure, not screen by screen: Home and History show payees and amounts, and a flag that follows the
+    // screen would change mid-transition.
+    SecureWindow()
     CompositionLocalProvider(LocalPaymentMode provides mode) {
         when (lockState) {
             is LockUiState.Unlocked -> PayFlowNavHost(
@@ -95,7 +99,7 @@ fun AppRoot(
                 lockState,
                 LockCallbacks(
                     onDigit = lockViewModel::onPinDigit, onBackspace = lockViewModel::onPinBackspace, onBiometric = lockViewModel::onBiometricRequested,
-                    onTick = lockViewModel::onTick, onSetupPin = lockViewModel::onSetupPin, onCancelSetup = lockViewModel::cancelSetup,
+                    onTick = lockViewModel::onTick, onSetupDigit = lockViewModel::onSetupDigit, onSetupBackspace = lockViewModel::onSetupBackspace, onCancelSetup = lockViewModel::cancelSetup,
                 ),
             )
         }

@@ -1,6 +1,7 @@
 package com.darshan.payflow.ui.lock
 
 import app.cash.turbine.test
+import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.data.security.AppLock
 import com.darshan.payflow.data.security.BiometricAvailability
 import com.darshan.payflow.data.security.BiometricResult
@@ -11,15 +12,20 @@ import com.darshan.payflow.testutil.FakeBiometricAuthenticator
 import com.darshan.payflow.testutil.MainDispatcherRule
 import com.darshan.payflow.testutil.TestDispatcherProvider
 import com.darshan.payflow.testutil.fixedClock
+import com.darshan.payflow.ui.designsystem.effects.HapticEvent
+import com.darshan.payflow.ui.designsystem.effects.UiEffect
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import java.time.Clock
 import java.time.ZoneOffset
+import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppLockViewModelTest {
@@ -37,6 +43,14 @@ class AppLockViewModelTest {
     private val appLock = AppLock(pins, clock)
 
     private fun vm() = AppLockViewModel(appLock, pins, biometric, TestDispatcherProvider(dispatcher), clock)
+
+    /** Holds work until the test lets it run, to look at the state in between. */
+    private class ParkedDispatcher : CoroutineDispatcher() {
+        private val queue = ArrayDeque<Runnable>()
+        override fun dispatch(context: CoroutineContext, block: Runnable) { queue += block }
+        fun hasWork() = queue.isNotEmpty()
+        fun drain() { while (queue.isNotEmpty()) queue.removeFirst().run() }
+    }
 
     @Test
     fun `without a pin the app is open but setup is offered`() = runTest(dispatcher) {
@@ -126,6 +140,190 @@ class AppLockViewModelTest {
         assertThat(appLock.isLocked.value).isTrue()
         advanceUntilIdle()
         assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `relock during pin setup ends the setup and cancelling cannot open the app`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.onPinEntered("493027"); advanceUntilIdle()
+        vm.startSetup()
+        appLock.lock(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+        vm.cancelSetup(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+        vm.onSetupPin("284913"); advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+        assertThat(pins.verify("493027")).isEqualTo(com.darshan.payflow.data.security.PinVerification.Ok)
+    }
+
+    @Test
+    fun `setup cannot start over the lock`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.startSetup()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `the unlocked state goes the moment the lock lands, before its details have loaded`() = runTest(dispatcher) {
+        pins.set("493027")
+        val parkedIo = ParkedDispatcher()
+        val provider = object : DispatcherProvider {
+            override val io: CoroutineDispatcher get() = parkedIo
+            override val default: CoroutineDispatcher get() = dispatcher
+            override val main: CoroutineDispatcher get() = dispatcher
+        }
+        val vm = AppLockViewModel(appLock, pins, biometric, provider, clock)
+        fun settle() { do { parkedIo.drain(); advanceUntilIdle() } while (parkedIo.hasWork()) }
+        settle()
+        vm.onPinEntered("493027"); settle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = true))
+        appLock.lock()
+        runCurrent()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Checking)
+        settle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `a pin removed while unlocked does not strand the user on the lock`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.onPinEntered("493027"); advanceUntilIdle()
+        pins.clear()
+        appLock.onBackground()
+        now = now.plusSeconds(AppLock.GRACE_SECONDS + 1)
+        appLock.onForeground(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Unlocked::class.java)
+
+        // The same thing arriving late: the lock screen is already up when the store says there is no PIN.
+        appLock.lock(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+        appLock.refresh(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = false))
+    }
+
+    @Test
+    fun `typing during a verification cannot burn a second attempt`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        "000000".forEach { vm.onPinDigit(it.toString()) }
+        vm.onPinBackspace()
+        vm.onPinDigit("1")
+        vm.onPinEntered("000000")
+        "111111".forEach { vm.onPinDigit(it.toString()) }
+        advanceUntilIdle()
+        assertThat((vm.uiState.value as LockUiState.Locked).remainingAttempts).isEqualTo(4)
+        assertThat((vm.uiState.value as LockUiState.Locked).enteredDigits).isEqualTo(0)
+    }
+
+    @Test
+    fun `every refused attempt moves the rejection serial, so the same message still shakes`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        val start = (vm.uiState.value as LockUiState.Locked).rejections
+        repeat(5) { vm.onPinEntered("000000"); advanceUntilIdle() }
+        assertThat((vm.uiState.value as LockUiState.Locked).rejections).isEqualTo(start + 5)
+        assertThat((vm.uiState.value as LockUiState.Locked).error).isEqualTo(LockError.LOCKED_OUT)
+    }
+
+    @Test
+    fun `setup digits live in the view model and never reach the screen as text`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.startSetup()
+        "4930".forEach { vm.onSetupDigit(it.toString()) }
+        vm.onSetupBackspace()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Setup(SetupStep.ENTER, error = null, enteredDigits = 3))
+        vm.onSetupDigit("x")
+        assertThat((vm.uiState.value as LockUiState.Setup).enteredDigits).isEqualTo(3)
+        "027".forEach { vm.onSetupDigit(it.toString()) }
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Setup(SetupStep.CONFIRM, error = null, enteredDigits = 0))
+        "493027".forEach { vm.onSetupDigit(it.toString()) }
+        advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = true))
+    }
+
+    @Test
+    fun `cancelling setup with no pin leaves the app open`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.startSetup()
+        vm.cancelSetup(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = false))
+    }
+
+    @Test
+    fun `a slow double tap on biometrics opens one prompt`() = runTest(dispatcher) {
+        pins.set("493027")
+        biometric.result = BiometricResult.Failed("no match")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.onBiometricRequested()
+        vm.onBiometricRequested()
+        advanceUntilIdle()
+        assertThat(biometric.prompts).isEqualTo(1)
+    }
+
+    @Test
+    fun `the right haptic for each event`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.uiEffects.test {
+            vm.onPinDigit("x")
+            vm.onPinDigit("0")
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Tick))
+            vm.onPinBackspace()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Tick))
+            vm.onPinEntered("000000"); advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Reject))
+            biometric.result = BiometricResult.Failed("no match")
+            vm.onBiometricRequested(); advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Reject))
+            biometric.result = BiometricResult.Cancelled
+            vm.onBiometricRequested(); advanceUntilIdle()
+            expectNoEvents()
+            vm.onPinEntered("493027"); advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Confirm))
+        }
+    }
+
+    @Test
+    fun `setup refusals reject and a finished setup confirms`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.startSetup()
+        vm.uiEffects.test {
+            vm.onSetupPin("123456"); advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Reject))
+            vm.onSetupPin("493027"); advanceUntilIdle()
+            vm.onSetupPin("000000"); advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Reject))
+            vm.onSetupPin("493027"); advanceUntilIdle()
+            vm.onSetupPin("493027"); advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Confirm))
+        }
+    }
+
+    @Test
+    fun `the view model remembers how the app was unlocked for the reveal`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        assertThat(vm.lastUnlockMethod).isNull()
+        vm.onPinEntered("493027"); advanceUntilIdle()
+        assertThat(vm.lastUnlockMethod).isEqualTo(UnlockMethod.Pin)
+        appLock.lock(); advanceUntilIdle()
+        biometric.result = BiometricResult.Success
+        vm.onBiometricRequested(); advanceUntilIdle()
+        assertThat(vm.lastUnlockMethod).isEqualTo(UnlockMethod.Biometric)
     }
 
     @Test

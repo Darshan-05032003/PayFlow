@@ -29,10 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,7 +52,8 @@ data class LockCallbacks(
     val onBackspace: () -> Unit = {},
     val onBiometric: () -> Unit = {},
     val onTick: () -> Unit = {},
-    val onSetupPin: (String) -> Unit = {},
+    val onSetupDigit: (String) -> Unit = {},
+    val onSetupBackspace: () -> Unit = {},
     val onCancelSetup: () -> Unit = {},
 )
 
@@ -116,21 +113,15 @@ private fun LockedContent(state: LockUiState.Locked, callbacks: LockCallbacks) {
 
 @Composable
 private fun SetupContent(state: LockUiState.Setup, callbacks: LockCallbacks) {
-    var entered by rememberSaveable(state.step) { mutableStateOf("") }
     PinFrame(
         icon = Icons.Outlined.LockOpen,
         title = stringResource(if (state.step == SetupStep.ENTER) R.string.lock_setup_enter else R.string.lock_setup_confirm),
         subtitle = stringResource(if (state.step == SetupStep.ENTER) R.string.lock_setup_hint else R.string.lock_setup_confirm_hint),
-        dots = entered.length,
+        dots = state.enteredDigits,
         message = state.error?.message() ?: "",
         keypadEnabled = true,
-        onDigit = { d ->
-            if (entered.length < PinManager.PIN_LENGTH) {
-                entered += d
-                if (entered.length == PinManager.PIN_LENGTH) { callbacks.onSetupPin(entered); entered = "" }
-            }
-        },
-        onBackspace = { entered = entered.dropLast(1) },
+        onDigit = callbacks.onSetupDigit,
+        onBackspace = callbacks.onSetupBackspace,
     ) {
         TextButton(onClick = callbacks.onCancelSetup, modifier = Modifier.padding(top = 4.dp)) { Text(stringResource(R.string.lock_setup_later)) }
     }
