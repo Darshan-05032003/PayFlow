@@ -66,11 +66,15 @@ import com.darshan.payflow.data.security.BindingStatus
 import com.darshan.payflow.data.security.IntegrityVerdict
 import com.darshan.payflow.data.security.TamperFinding
 import com.darshan.payflow.ui.PayFlowTestTags
+import com.darshan.payflow.ui.navigation.LocalBottomBarInset
+import com.darshan.payflow.ui.navigation.ScrollToTopOnReselect
+import com.darshan.payflow.ui.navigation.ShellRoute
 import com.darshan.payflow.ui.components.LoadingView
 import com.darshan.payflow.ui.components.SecureWindow
 
 data class SecurityCallbacks(
-    val onBack: () -> Unit = {},
+    /** Null on the Me tab. */
+    val onBack: (() -> Unit)? = {},
     val onPhoneChange: (String) -> Unit = {},
     val onRequestOtp: () -> Unit = {},
     val onOtpChange: (String) -> Unit = {},
@@ -84,7 +88,7 @@ data class SecurityCallbacks(
 )
 
 @Composable
-fun SecurityRoute(onBack: () -> Unit, onSetupPin: () -> Unit, viewModel: SecurityViewModel = hiltViewModel()) {
+fun SecurityRoute(onBack: (() -> Unit)?, onSetupPin: () -> Unit, viewModel: SecurityViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SecurityScreen(
         state,
@@ -114,11 +118,14 @@ fun TamperFinding.label(): String = stringResource(
 @Composable
 fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
     SecureWindow()
+    val scroll = rememberScrollState()
+    val barInset = LocalBottomBarInset.current
+    ScrollToTopOnReselect(ShellRoute.Me, scroll)
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.security_title)) },
-                navigationIcon = { IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+                navigationIcon = { callbacks.onBack?.let { onBack -> IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
@@ -128,7 +135,7 @@ fun SecurityScreen(state: SecurityUiState, callbacks: SecurityCallbacks) {
             return@Scaffold
         }
         Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
+            Modifier.padding(padding).fillMaxSize().verticalScroll(scroll).padding(start = ScreenPadding, end = ScreenPadding, top = 8.dp, bottom = 8.dp + barInset),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SecurityOverview(state)

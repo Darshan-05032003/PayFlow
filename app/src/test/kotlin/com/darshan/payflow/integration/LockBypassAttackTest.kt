@@ -213,6 +213,50 @@ class LockBypassAttackTest {
         }
     }
 
+    /** A back gesture in progress must not hold the screen behind it on the display when the lock lands. */
+    @Test
+    fun aRelockDuringAPredictiveBackGestureRemovesBothScreens() {
+        setPin()
+        launch().use { scenario ->
+            awaitLock()
+            unlock()
+            compose.onNodeWithTag(PayFlowTestTags.HOME_MANDATES).performScrollTo().performClick()
+            compose.waitUntilWithMainLooper(10_000) { exists(PayFlowTestTags.MANDATE_CREATE) }
+            compose.waitForIdle()
+            scenario.onActivity { activity ->
+                activity.onBackPressedDispatcher.dispatchOnBackStarted(gesture(0f))
+                activity.onBackPressedDispatcher.dispatchOnBackProgressed(gesture(0.5f))
+            }
+            compose.waitForIdle()
+            scenario.onActivity { appLock.lock() }
+            awaitLock()
+            assertNothingBehindTheLock()
+            assertThat(exists(PayFlowTestTags.MANDATE_CREATE)).isFalse()
+        }
+    }
+
+    /** Every tab, and a screen reached from one, keeps the window secure with no change at any step. */
+    @Test
+    fun theWindowStaysSecureOnEveryTabAndThroughTheChanges() {
+        launch().use { scenario ->
+            awaitHome()
+            fun assertSecure() = scenario.onActivity {
+                assertThat(it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE).isNotEqualTo(0)
+                assertThat(it.window.decorView.filterTouchesWhenObscured).isTrue()
+            }
+            assertSecure()
+            compose.onNodeWithTag(PayFlowTestTags.HOME_HISTORY).performClick()
+            compose.waitForIdle()
+            assertSecure()
+            compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
+            compose.waitForIdle()
+            assertSecure()
+            compose.onNodeWithTag(PayFlowTestTags.NAV_HOME).performClick()
+            compose.waitForIdle()
+            assertSecure()
+        }
+    }
+
     /** Back on the lock finishes the activity on older phones. Reopening in the same process must not skip the lock. */
     @Test
     fun finishingTheLockedActivityAndReopeningStaysLocked() {

@@ -34,6 +34,7 @@
 
     <application
         android:name=".PayFlowApp"
+        android:enableOnBackInvokedCallback="true"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"

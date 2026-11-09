@@ -24,6 +24,8 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.ui.PayFlowTestTags
+import com.darshan.payflow.ui.navigation.containerTransform
+import com.darshan.payflow.ui.navigation.paymentContainerKey
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -62,6 +64,7 @@ fun PaymentRow(payment: Payment, onClick: (String) -> Unit, modifier: Modifier =
     val time = payment.createdAt.relativeLabel()
     Row(
         modifier = modifier
+            .containerTransform(paymentContainerKey(payment.id))
             .fillMaxWidth()
             .clickable { onClick(payment.id) }
             .padding(horizontal = 16.dp, vertical = 12.dp)

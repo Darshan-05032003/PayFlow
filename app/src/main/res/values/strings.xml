@@ -294,6 +294,10 @@
     <string name="mandate_msg_rejected">Debit rejected by the mandate rules</string>
 
     <!-- App lock -->
+    <string name="nav_home">Home</string>
+    <string name="nav_scan">Scan</string>
+    <string name="nav_history">History</string>
+    <string name="nav_me">Me</string>
     <string name="lock_title">PayFlow is locked</string>
     <string name="lock_enter_pin">Enter your 6-digit PIN</string>
     <string name="lock_wrong_pin">Wrong PIN. %1$d attempts left</string>

@@ -80,6 +80,9 @@ import com.darshan.payflow.ui.components.InfoBanner
 import com.darshan.payflow.ui.components.LoadingView
 import com.darshan.payflow.ui.components.PaymentRow
 import com.darshan.payflow.ui.components.SectionHeader
+import com.darshan.payflow.ui.navigation.LocalBottomBarInset
+import com.darshan.payflow.ui.navigation.ScrollToTopOnReselect
+import com.darshan.payflow.ui.navigation.ShellRoute
 import com.darshan.payflow.ui.theme.PayFlowTheme
 import com.darshan.payflow.ui.theme.ScreenPadding
 
@@ -111,6 +114,9 @@ fun HomeRoute(callbacks: HomeCallbacks, pinConfigured: Boolean = true, viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Boolean = true) {
+    val barInset = LocalBottomBarInset.current
+    val scroll = rememberScrollState()
+    ScrollToTopOnReselect(ShellRoute.Home, scroll)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -126,7 +132,7 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Bool
                 text = { Text(stringResource(R.string.home_pay)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag(PayFlowTestTags.HOME_PAY),
+                modifier = Modifier.padding(bottom = barInset).testTag(PayFlowTestTags.HOME_PAY),
             )
         },
     ) { padding ->
@@ -135,8 +141,8 @@ fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Bool
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = ScreenPadding, end = ScreenPadding, top = 4.dp, bottom = 96.dp),
+                .verticalScroll(scroll)
+                .padding(start = ScreenPadding, end = ScreenPadding, top = 4.dp, bottom = 96.dp + barInset),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (!pinConfigured) {
@@ -245,7 +251,7 @@ private fun QuickActions(callbacks: HomeCallbacks) {
         QuickAction(R.string.home_action_requests, Icons.Outlined.RequestQuote, PayFlowTestTags.HOME_COLLECT, callbacks.onCollect),
         QuickAction(R.string.home_action_autopay, Icons.Outlined.EventRepeat, PayFlowTestTags.HOME_MANDATES, callbacks.onMandates),
         QuickAction(R.string.home_action_checkout, Icons.Outlined.ShoppingBag, PayFlowTestTags.HOME_CHECKOUT, callbacks.onCheckout),
-        QuickAction(R.string.home_action_history, Icons.Outlined.History, PayFlowTestTags.HOME_HISTORY, callbacks.onViewAll),
+        QuickAction(R.string.home_action_history, Icons.Outlined.History, PayFlowTestTags.HOME_HISTORY_TILE, callbacks.onViewAll),
         QuickAction(R.string.home_action_security, Icons.Outlined.Shield, PayFlowTestTags.HOME_SECURITY, callbacks.onSecurity),
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

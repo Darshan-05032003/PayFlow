@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.outlined.Check
@@ -63,9 +64,13 @@ import com.darshan.payflow.ui.components.EmptyView
 import com.darshan.payflow.ui.components.ErrorView
 import com.darshan.payflow.ui.components.LoadingView
 import com.darshan.payflow.ui.components.PaymentRow
+import com.darshan.payflow.ui.navigation.LocalBottomBarInset
+import com.darshan.payflow.ui.navigation.ScrollToTopOnReselect
+import com.darshan.payflow.ui.navigation.ShellRoute
 
 data class HistoryCallbacks(
-    val onBack: () -> Unit = {},
+    /** Null on a tab, where back is the system's job and an arrow would suggest there is somewhere to go up to. */
+    val onBack: (() -> Unit)? = {},
     val onFilter: (HistoryFilter) -> Unit = {},
     val onQuery: (String) -> Unit = {},
     val onPaymentClick: (String) -> Unit = {},
@@ -74,7 +79,7 @@ data class HistoryCallbacks(
 )
 
 @Composable
-fun HistoryRoute(onBack: () -> Unit, onPaymentClick: (String) -> Unit, viewModel: HistoryViewModel = hiltViewModel()) {
+fun HistoryRoute(onBack: (() -> Unit)?, onPaymentClick: (String) -> Unit, viewModel: HistoryViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     HistoryScreen(
         state = state,
@@ -133,14 +138,19 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
         else -> ""
     }
     var text by rememberSaveable(currentQuery) { mutableStateOf(currentQuery) }
+    val listState = rememberLazyListState()
+    val barInset = LocalBottomBarInset.current
+    ScrollToTopOnReselect(ShellRoute.History, listState)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.history_title)) },
                 navigationIcon = {
-                    IconButton(onClick = callbacks.onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    callbacks.onBack?.let { onBack ->
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
                     }
                 },
                 actions = {
@@ -209,8 +219,9 @@ fun HistoryScreen(state: HistoryUiState, callbacks: HistoryCallbacks) {
                     )
                 }
                 is HistoryUiState.Content -> LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.PAYMENT_LIST),
-                    contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, bottom = 24.dp + barInset),
                 ) {
                     item(key = "count") {
                         Text(
