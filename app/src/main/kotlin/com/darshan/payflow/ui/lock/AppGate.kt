@@ -4,6 +4,10 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +22,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.toSize
 import com.darshan.payflow.ui.designsystem.motion.LocalMotion
 import com.darshan.payflow.ui.designsystem.motion.MotionToken
 
@@ -47,6 +53,21 @@ fun AppGate(
     val open = state is LockUiState.Unlocked
     val revealing = open && (retained is LockUiState.Locked || retained is LockUiState.Setup) && finished !== retained
     val progress = remember { Animatable(0f) }
+    var gateSize by remember { mutableStateOf(Size.Zero) }
+    val revealingNow = rememberUpdatedState(revealing)
+    val methodNow = rememberUpdatedState(unlockMethod)
+    val reducedNow = rememberUpdatedState(motion.reduced)
+    // Re-evaluated every reveal frame in the snapshot, but only a flip reaches the screens that read it.
+    val appOwnsBar = remember {
+        derivedStateOf {
+            !revealingNow.value || LockMotionLogic.statusBarCovered(
+                LockMotionLogic.revealOrigin(methodNow.value, anchors.pin, anchors.biometric, gateSize),
+                gateSize,
+                progress.value,
+                reducedNow.value,
+            )
+        }
+    }
 
     LaunchedEffect(open) {
         if (!open) {
@@ -59,7 +80,7 @@ fun AppGate(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().onSizeChanged { gateSize = it.toSize() }) {
         if (!open || revealing) {
             val shown = if (open) retained ?: state else state
             LockScreen(
@@ -80,13 +101,24 @@ fun AppGate(
                     origin = { size -> LockMotionLogic.revealOrigin(method, anchors.pin, anchors.biometric, size) },
                 ),
             ) {
-                app(state.pinConfigured)
+                CompositionLocalProvider(LocalAppOwnsStatusBar provides appOwnsBar) { app(state.pinConfigured) }
             }
         }
     }
 }
 
 private val INERT = LockCallbacks()
+
+/**
+ * True once the app, not the lock, is what sits under the status bar: during the unlock reveal it turns true only when the
+ * circle has covered the bar. Screens that set the status-bar icon colour wait for it, so the icons always match the surface
+ * actually under them. Outside a gate (previews, tests) the app always owns the bar.
+ */
+val LocalAppOwnsStatusBar = staticCompositionLocalOf<State<Boolean>> { AlwaysOwned }
+
+private object AlwaysOwned : State<Boolean> {
+    override val value: Boolean get() = true
+}
 
 /** The circle (or, when reduced, the fade), read entirely in the draw and layer phases: nothing recomposes per frame. */
 private fun Modifier.revealClip(reduced: Boolean, fraction: () -> Float, origin: (Size) -> Offset): Modifier =

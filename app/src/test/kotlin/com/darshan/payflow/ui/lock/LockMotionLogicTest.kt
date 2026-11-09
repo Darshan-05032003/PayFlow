@@ -76,6 +76,21 @@ class LockMotionLogicTest {
     }
 
     @Test
+    fun `the status bar passes to the app only once the circle has covered the top edge`() {
+        val size = Size(300f, 400f)
+        val nearTop = Offset(150f, 50f) // top corners 158.1 away, furthest corner 380.8 away
+        assertThat(LockMotionLogic.statusBarCovered(nearTop, size, fraction = 0f, reduced = false)).isFalse()
+        assertThat(LockMotionLogic.statusBarCovered(nearTop, size, fraction = 0.40f, reduced = false)).isFalse()
+        assertThat(LockMotionLogic.statusBarCovered(nearTop, size, fraction = 0.42f, reduced = false)).isTrue()
+        val middle = Offset(150f, 200f) // the top corners are the furthest points: only the finished circle covers them
+        assertThat(LockMotionLogic.statusBarCovered(middle, size, fraction = 0.99f, reduced = false)).isFalse()
+        assertThat(LockMotionLogic.statusBarCovered(middle, size, fraction = 1f, reduced = false)).isTrue()
+        // The reduced-motion fade hands the bar over at half opacity.
+        assertThat(LockMotionLogic.statusBarCovered(middle, size, fraction = 0.49f, reduced = true)).isFalse()
+        assertThat(LockMotionLogic.statusBarCovered(middle, size, fraction = 0.5f, reduced = true)).isTrue()
+    }
+
+    @Test
     fun `the reveal falls back when a control was never measured`() {
         val size = Size(300f, 400f)
         val dots = Offset(150f, 100f)

@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
+import com.darshan.payflow.ui.lock.LocalAppOwnsStatusBar
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.darshan.payflow.R
@@ -179,12 +180,17 @@ internal fun refreshMessage(effect: HomeEffect, resources: android.content.res.R
     }
 }
 
-/** The header is graphite in both themes and runs under the status bar, so the icons must be light here whatever the theme. */
+/**
+ * The header is graphite in both themes and runs under the status bar, so the icons must be light here whatever the theme.
+ * While the unlock reveal is still opening, the lock screen is what sits under the bar, so the switch waits for the circle.
+ */
 @Composable
 private fun LightStatusBarIconsOnHero() {
     val window = LocalActivity.current?.window ?: return
     val darkTheme = PayFlowTheme.colors.isDark
-    DisposableEffect(window, darkTheme) {
+    val ownsBar by LocalAppOwnsStatusBar.current
+    DisposableEffect(window, darkTheme, ownsBar) {
+        if (!ownsBar) return@DisposableEffect onDispose {}
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = false
         onDispose { controller.isAppearanceLightStatusBars = !darkTheme }

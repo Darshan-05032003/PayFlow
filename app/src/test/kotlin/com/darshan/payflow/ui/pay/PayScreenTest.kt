@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -76,6 +77,34 @@ class PayScreenTest {
         assertThat(submitted).isFalse()
         rule.onNodeWithTag(PayFlowTestTags.PAY_SUBMIT).performClick()
         assertThat(submitted).isTrue()
+    }
+
+    @Test
+    fun theNoteOpensOnRequestAndThenSitsClearOfTheKeypadAndTheSlider() {
+        // Found on the emulator at 1080x2400 (this test's 411x891dp): the note field sat half under the docked keypad.
+        show(
+            PayUiState(vpa = "alice@okbank", amountText = "500", paymentMode = PaymentMode.UPI_APPS, verification = VpaVerificationState.Skipped),
+            PayCallbacks(onNoteChange = { holder.value = holder.value.copy(note = it) }),
+        )
+        rule.onAllNodesWithTag(PayFlowTestTags.PAY_NOTE).assertCountEquals(0)
+        rule.onNodeWithTag(PayFlowTestTags.PAY_NOTE_ADD).performScrollTo().performClick()
+        rule.waitForIdle()
+        val note = rule.onNodeWithTag(PayFlowTestTags.PAY_NOTE)
+        note.assertIsFocused()
+        val field = note.fetchSemanticsNode().boundsInRoot
+        val keypadTop = rule.onNodeWithTag(PayFlowTestTags.payKey(AmountKey.D1.name)).fetchSemanticsNode().boundsInRoot.top
+        val sliderTop = rule.onNodeWithTag(PayFlowTestTags.PAY_SWIPE).fetchSemanticsNode().boundsInRoot.top
+        assertThat(field.top).isAtLeast(0f)
+        assertThat(field.bottom).isAtMost(minOf(keypadTop, sliderTop))
+        note.performTextInput("Rent")
+        assertThat(holder.value.note).isEqualTo("Rent")
+    }
+
+    @Test
+    fun aNoteAlreadyWrittenShowsItsFieldStraightAway() {
+        show(PayUiState(vpa = "alice@okbank", note = "Rent", paymentMode = PaymentMode.UPI_APPS, verification = VpaVerificationState.Skipped))
+        rule.onNodeWithTag(PayFlowTestTags.PAY_NOTE).performScrollTo().assertIsDisplayed()
+        rule.onAllNodesWithTag(PayFlowTestTags.PAY_NOTE_ADD).assertCountEquals(0)
     }
 
     @Test

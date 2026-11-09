@@ -367,6 +367,28 @@ class HomeScreenBehaviourTest {
     }
 
     @Test
+    fun theFirstTotalAfterLoadingIsShownAsItIsAndNeverRollsUpFromZero() {
+        // Found on the emulator: after a cold start the hero showed ₹0 and counted up to the month's total.
+        val holder = mutableStateOf<HomeUiState>(HomeUiState.Loading)
+        rule.mainClock.autoAdvance = false
+        rule.setDs {
+            scroll = rememberScrollState()
+            CompositionLocalProvider(LocalPaymentMode provides PaymentMode.UPI_APPS) {
+                HomeScreen(holder.value, HomeCallbacks(), pinConfigured = true, amountsHidden = false, refreshing = false, memory = HomeEntranceMemory(), scroll = scroll)
+            }
+        }
+        rule.mainClock.advanceTimeByFrame()
+        holder.value = content(sent = 50_000)
+        rule.mainClock.advanceTimeByFrame()
+        // Every frame from the one the total arrives in: the real total, never ₹0 counting up.
+        repeat(60) {
+            val shown = rule.onNodeWithTag(PayFlowTestTags.HOME_HERO_AMOUNT).fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+            assertThat(shown).containsExactly("₹500")
+            rule.mainClock.advanceTimeByFrame()
+        }
+    }
+
+    @Test
     fun comingBackDoesNotReplayTheEntrance() {
         val memory = HomeEntranceMemory()
         show(memory = memory)

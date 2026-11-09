@@ -22,6 +22,12 @@ object HomeHeaderLogic {
     private const val DETAILS_GONE_AT = 0.5f
     private const val SCAN_MIN_SCALE = 0.7f
 
+    /** The hero total on screen: the last one the user saw, else the real one as it is; zero only when nothing is known yet. */
+    fun shownTotal(lastShown: Long?, current: Long?): Long = lastShown ?: current ?: 0L
+
+    /** A roll (and its sheen) is a change from a total the user has seen, never the first value arriving after loading. */
+    fun rollsTo(lastShown: Long?, current: Long): Boolean = lastShown != null && lastShown != current
+
     fun progress(scrollPx: Int, rangePx: Int): Float =
         if (rangePx <= 0) 0f else (scrollPx.toFloat() / rangePx).coerceIn(0f, 1f)
 

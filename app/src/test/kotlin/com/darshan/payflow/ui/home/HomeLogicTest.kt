@@ -16,6 +16,16 @@ class HomeLogicTest {
     // Collapsing header
 
     @Test
+    fun `the hero shows the first total as it is and rolls only from one already seen`() {
+        assertThat(HomeHeaderLogic.shownTotal(lastShown = null, current = 50_000)).isEqualTo(50_000)
+        assertThat(HomeHeaderLogic.shownTotal(lastShown = 10_000, current = 50_000)).isEqualTo(10_000)
+        assertThat(HomeHeaderLogic.shownTotal(lastShown = null, current = null)).isEqualTo(0)
+        assertThat(HomeHeaderLogic.rollsTo(lastShown = null, current = 50_000)).isFalse()
+        assertThat(HomeHeaderLogic.rollsTo(lastShown = 50_000, current = 50_000)).isFalse()
+        assertThat(HomeHeaderLogic.rollsTo(lastShown = 10_000, current = 50_000)).isTrue()
+    }
+
+    @Test
     fun `progress runs from 0 to 1 over the collapse range and stays there`() {
         assertThat(HomeHeaderLogic.progress(0, 200)).isEqualTo(0f)
         assertThat(HomeHeaderLogic.progress(100, 200)).isEqualTo(0.5f)

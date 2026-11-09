@@ -34,6 +34,19 @@ object LockMotionLogic {
         return hypot(dx, dy)
     }
 
+    /**
+     * Whether the opening app has covered the status bar, so it may set the bar's icon colour. The bar runs along the top edge,
+     * so the circle covers it once it reaches both top corners. The reduced-motion fade hands it over at half opacity.
+     */
+    fun statusBarCovered(origin: Offset, size: Size, fraction: Float, reduced: Boolean): Boolean {
+        if (reduced) return fraction >= REDUCED_HANDOVER
+        if (fraction >= 1f) return true
+        val reach = max(hypot(origin.x, origin.y), hypot(size.width - origin.x, origin.y))
+        return revealRadius(origin, size) * fraction >= reach
+    }
+
+    private const val REDUCED_HANDOVER = 0.5f
+
     /** Where the reveal opens from: the fingerprint key, the PIN dots, or the middle of the window if neither was measured. */
     fun revealOrigin(method: UnlockMethod?, pinAnchor: Offset?, biometricAnchor: Offset?, size: Size): Offset {
         val anchor = if (method == UnlockMethod.Biometric) biometricAnchor ?: pinAnchor else pinAnchor

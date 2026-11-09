@@ -7,6 +7,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -58,6 +59,21 @@ class PayMotionTest {
         rule.mainClock.advanceTimeBy(250)
         val later = rule.onRoot().captureToImage().asAndroidBitmap()
         assertThat(early.sameAs(later)).isFalse()
+    }
+
+    @Test
+    fun aCelebratedSuccessShowsTheRealAmountFromItsFirstFrame() {
+        // Found on the emulator: "Payment successful ₹0.00" for a frame or two while the amount rolled up from zero.
+        rule.mainClock.autoAdvance = false
+        rule.setDs(haptics = haptics) { PayScreen(done(PaymentStatus.SUCCESS), PayCallbacks()) }
+        // The very first composition, before any frame or effect has run, already holds the real amount.
+        rule.onAllNodesWithText("₹0.00").assertCountEquals(0)
+        assertThat(rule.onAllNodesWithText("₹1,250.00").fetchSemanticsNodes()).isNotEmpty()
+        repeat(30) {
+            rule.mainClock.advanceTimeByFrame()
+            rule.onAllNodesWithText("₹0.00").assertCountEquals(0)
+            assertThat(rule.onAllNodesWithText("₹1,250.00").fetchSemanticsNodes()).isNotEmpty()
+        }
     }
 
     @Test

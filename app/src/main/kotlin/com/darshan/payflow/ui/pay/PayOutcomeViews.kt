@@ -345,15 +345,19 @@ fun ResultView(
     }
 }
 
-/** A confirmed amount rolls up from zero and catches the sheen. Anything else states the number and leaves it. */
+/**
+ * A confirmed amount is the real number from its first frame and catches the sheen once; it never counts up from zero, so the
+ * screen can't read "Payment successful ₹0.00" even for a frame. Anything else states the number and leaves it.
+ */
 @Composable
 private fun ResultAmount(paise: Long, full: Boolean, play: Boolean) {
     val colors = PayFlowTheme.colors
     val type = PayFlowTheme.type
     if (full) {
-        var shown by remember { mutableStateOf(if (play) 0L else paise) }
-        LaunchedEffect(paise) { shown = paise }
-        val sweep = rememberSheenSweep(shown)
+        // The sheen plays when this flips, i.e. once, right after the amount lands; a replayed outcome stays still.
+        var landed by remember { mutableStateOf(!play) }
+        LaunchedEffect(Unit) { landed = true }
+        val sweep = rememberSheenSweep(landed)
         Box(
             Modifier
                 .fillMaxWidth()
@@ -362,7 +366,7 @@ private fun ResultAmount(paise: Long, full: Boolean, play: Boolean) {
                 .testTag(PayFlowTestTags.PAY_RESULT_AMOUNT),
             contentAlignment = Alignment.Center,
         ) {
-            AmountOdometer(shown, style = type.display, color = colors.text, decimals = AmountDecimals.Always)
+            AmountOdometer(paise, style = type.display, color = colors.text, decimals = AmountDecimals.Always)
         }
     } else {
         AmountText(paise, Modifier.testTag(PayFlowTestTags.PAY_RESULT_AMOUNT), style = type.display, color = colors.text, decimals = AmountDecimals.Always)

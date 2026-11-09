@@ -26,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -135,14 +134,19 @@ internal fun HomeHero(
     header.dockScale = HomeHeaderLogic.dockScale(heroFont, dockFont)
 
     val sent = (content as? HeroContent.Known)?.month?.sentPaise
-    var shownSent by remember { mutableLongStateOf(memory.lastShownSentPaise ?: sent ?: 0L) }
+    // Rolls only from a total the user has already seen. The first total after loading appears as it is: counting up from ₹0
+    // would show a number that was never true.
+    var lastShown by remember { mutableStateOf(memory.lastShownSentPaise) }
+    var rolls by remember { mutableIntStateOf(0) }
     if (sent != null) {
         LaunchedEffect(sent) {
-            shownSent = sent
+            if (HomeHeaderLogic.rollsTo(lastShown, sent)) rolls++
+            lastShown = sent
             memory.lastShownSentPaise = sent
         }
     }
-    val sweep = rememberSheenSweep(shownSent)
+    val shownSent = HomeHeaderLogic.shownTotal(lastShown, sent)
+    val sweep = rememberSheenSweep(rolls)
 
     PayFlowSurface(
         modifier = modifier

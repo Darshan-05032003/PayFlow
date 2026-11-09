@@ -13,6 +13,7 @@ object PayFlowTestTags {
     const val PAY_NAME = "payflow:pay:name"
     const val PAY_AMOUNT = "payflow:pay:amount"
     const val PAY_NOTE = "payflow:pay:note"
+    const val PAY_NOTE_ADD = "payflow:pay:noteAdd"
     const val PAY_SUBMIT = "payflow:pay:submit"
     const val PAY_CHECK_STATUS = "payflow:pay:check"
     const val PAY_RESET = "payflow:pay:reset"

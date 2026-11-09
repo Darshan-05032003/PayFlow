@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -212,6 +213,53 @@ class AppGateTest {
     }
 
     @Test
+    fun theStatusBarStaysWithTheLockUntilTheRevealCoversIt() {
+        // Found on the emulator: Home switched the status-bar icons to light while the ivory lock still filled the bar.
+        var owns: State<Boolean>? = null
+        state = locked
+        method = UnlockMethod.Pin
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            PayFlowTheme(darkTheme = false) {
+                AppGate(state, method, LockCallbacks()) {
+                    owns = LocalAppOwnsStatusBar.current
+                    Box(Modifier.fillMaxSize().background(APP_COLOUR).testTag(APP))
+                }
+            }
+        }
+        rule.mainClock.advanceTimeByFrame()
+        commitState { state = LockUiState.Unlocked(pinConfigured = true) }
+        rule.mainClock.advanceTimeByFrame()
+        assertThat(owns!!.value).isFalse()
+        // Frame by frame: the app may set the icons only while it is what covers the whole top edge.
+        var handedOver = false
+        repeat(((MotionDurations.Screen + FRAME_SLACK_MS) / FRAME_MS).toInt()) {
+            rule.mainClock.advanceTimeByFrame()
+            val image = frame()
+            if (owns!!.value) {
+                handedOver = true
+                assertThat(image.isApp(0, 0) && image.isApp(image.width - 1, 0)).isTrue()
+            }
+        }
+        assertThat(handedOver).isTrue()
+        assertThat(owns!!.value).isTrue()
+    }
+
+    @Test
+    fun withNoRevealTheAppOwnsTheStatusBarAtOnce() {
+        var owns: State<Boolean>? = null
+        state = LockUiState.Unlocked(pinConfigured = false)
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            PayFlowTheme(darkTheme = false) {
+                AppGate(state, method, LockCallbacks()) { owns = LocalAppOwnsStatusBar.current }
+            }
+        }
+        rule.mainClock.advanceTimeByFrame()
+        assertThat(owns!!.value).isTrue()
+    }
+
+    @Test
     fun theRevealDoesNotRecomposeEveryFrame() {
         show()
         commitState { state = LockUiState.Unlocked(pinConfigured = true) }
@@ -227,6 +275,7 @@ class AppGateTest {
     private companion object {
         const val APP = "gate:app"
         const val FRAME_SLACK_MS = 100L
+        const val FRAME_MS = 16L
         val APP_COLOUR = Color(0xFF00C853)
     }
 }

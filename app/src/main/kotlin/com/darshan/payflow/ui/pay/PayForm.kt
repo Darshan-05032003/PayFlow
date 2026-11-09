@@ -25,6 +25,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
@@ -423,15 +435,52 @@ private fun QuickAmounts(state: PayUiState, callbacks: PayCallbacks, busy: Boole
     }
 }
 
+/**
+ * The note stays a one-line "Add a note" until it's wanted, so the form above the docked keypad and slider stays short enough
+ * not to leave a field half under them. Opened, the field takes focus, and while it has focus it is kept fully in view above
+ * the slider and the system keyboard as the keyboard slides in.
+ */
 @Composable
 private fun NoteField(state: PayUiState, callbacks: PayCallbacks, busy: Boolean) {
+    var opened by rememberSaveable { mutableStateOf(false) }
+    if (!opened && state.note.isEmpty()) {
+        GhostButton(
+            stringResource(R.string.pay_note_add),
+            onClick = { opened = true },
+            enabled = !busy,
+            leadingIcon = Icons.Outlined.Edit,
+            tone = GhostTone.Neutral,
+            // Full width on the gutter, like the fields it stands in for.
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NOTE_ADD),
+        )
+        return
+    }
+    val focus = remember { FocusRequester() }
+    val inView = remember { BringIntoViewRequester() }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    // Opening is a request to type: focus the field once, right after it appears (not after a rotation or a restore).
+    val askedToType = remember { booleanArrayOf(opened && state.note.isEmpty()) }
+    LaunchedEffect(Unit) {
+        if (askedToType[0]) {
+            askedToType[0] = false
+            focus.requestFocus()
+        }
+    }
+    LaunchedEffect(focused) {
+        if (focused) snapshotFlow { ime.getBottom(density) }.collect { inView.bringIntoView() }
+    }
     PayFlowTextField(
         value = state.note,
         onValueChange = callbacks.onNoteChange,
         label = stringResource(R.string.pay_note),
         enabled = !busy,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+        interactionSource = interaction,
         fieldTag = PayFlowTestTags.PAY_NOTE,
+        modifier = Modifier.bringIntoViewRequester(inView).focusRequester(focus),
     )
 }
 

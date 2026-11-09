@@ -160,6 +160,7 @@
     <string name="pay_payee_name_optional">Payee name (optional)</string>
     <string name="pay_amount">Amount</string>
     <string name="pay_note">Note (optional)</string>
+    <string name="pay_note_add">Add a note</string>
     <string name="pay_submit_amount">Pay %1$s</string>
     <string name="pay_amount_placeholder">₹0.00</string>
     <string name="pay_amount_display">Amount to pay: %1$s</string>
