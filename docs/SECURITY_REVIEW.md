@@ -366,3 +366,43 @@ Severity scale: Critical / High / Medium / Low.
   - Screens rendering payee names outside `PayFlowListRow` must call `DisplayText.safe` themselves (pay, scan, receipt).
   - The debug catalog activity is exported so `adb` can open it. That's fine for a debug build, and it isn't in release.
   - Not checked on a device: this review used JVM tests and images only.
+
+## UI Feature: App shell (splash, lock, navigation, bottom bar)
+- Attacks tried, each written as a test (`LockBypassAttackTest`, `AppLockTest`, `AppLockViewModelTest`, `AppGateTest`):
+  - Cold start with a PIN; incoming `upi://` link at cold start and to a running locked activity; wrong PIN with a link waiting.
+  - Back and predictive back on the lock (start, progress, cancel), and a relock in the middle of a back gesture inside the app.
+  - Finishing the locked activity and reopening it in the same process.
+  - Clock moved back while in the background; a store that hangs when the app returns.
+  - Relock during PIN setup, then "Not now"; starting setup over the lock.
+  - Crafted Navigation deep links: a route URI for Security, a route URI for Pay with a chosen payee and amount, and destination ids in extras.
+  - 5 wrong PINs with the keypad; typing during a verification; double tap on biometrics; 1,000 rapid taps.
+  - Relock in the middle of the reveal; tapping the frozen lock during the reveal; `FLAG_SECURE` on every tab and through the reveal.
+- What broke:
+  - High: finishing the locked activity and reopening it skipped the lock. Each new ViewModel called `AppLock.refresh()`, which recalculated the lock from "has this session ever unlocked" and cleared a relock. Back on the lock finishes the activity below API 31, so back alone was enough.
+  - High: the same `refresh()` cleared the lock when the app was reopened after the grace period in the same process.
+  - High: a relock during PIN setup was ignored. The state stayed `Setup`, and "Not now" opened the app.
+  - Medium: moving the system clock back while the app was away kept the session open.
+  - Medium: `onForeground` read the store before locking, and the ViewModel loaded lock details before leaving `Unlocked`. A frame of the app could land in that gap. The tests show the ordering; the frame itself was not seen on a device.
+  - Medium: Home, History and the payment detail had no `FLAG_SECURE`, so payee names and amounts could reach the recents thumbnail and screenshots.
+  - Medium: PIN digits during setup were in `rememberSaveable`, so they could enter the saved-instance bundle, which leaves the process.
+  - Low: backspacing during a PBKDF2 verification allowed a second verification and burned an extra attempt.
+  - Low: a double tap on biometrics opened two prompts.
+- Attacks that failed:
+  - Route URIs in an intent's data did not match with Navigation 2.10, even before the fix.
+  - Destination ids in extras did not open Security in the test. The id in that test is computed the way Navigation computes it, but that was not proven against Navigation's internals, so treat this as "not demonstrated", not "impossible".
+  - The intent is sanitized anyway, because the activity is exported and this behaviour belongs to a library that can change.
+- Fixed now:
+  - `AppLock`: only `unlock()` opens a lock. `refresh()` can only add one, unless the PIN is gone. A negative time away counts as expired. The lock lands before the first suspension.
+  - `AppLockViewModel`: leaves `Unlocked` and `Setup` as soon as the lock lands, and refuses setup and cancel while locked. One verification and one prompt at a time. Setup digits stay in the ViewModel.
+  - `AppGate`: the app isn't composed until unlocked and leaves in the same recomposition a lock arrives. The frozen lock during the reveal takes no input and is hidden from accessibility.
+  - `IncomingIntentPolicy`: extras and anything but `upi://pay` data are removed before Navigation reads the intent.
+  - `AppRoot` holds `SecureWindow` for the whole app, so the flag no longer changes during transitions.
+  - The splash waits for the lock's answer, so the first frame can't be the app.
+- Scope for improvement:
+  - `SecurityViewModel.removePin` asks for no PIN, and it doesn't refresh `pinConfigured` in `AppLockViewModel`, so Home's banner stays stale until restart. For the settings rebuild.
+  - Back during a running payment still pops Pay. The payment row survives and the reconciler picks it up, but Pay should block back while submitting. For the pay rebuild.
+  - The UPI app chooser on Pay is still a `ModalBottomSheet`, a separate window that doesn't inherit `FLAG_SECURE`. For the pay rebuild, with `PayFlowBottomSheet`.
+  - FLAG_SECURE app-wide means no screenshots of a receipt. Share-as-image is the supported route.
+  - Biometric unlock still works during a PIN lockout. BiometricPrompt has its own lockout, so this was left as it was.
+  - Keypad digits are read aloud by TalkBack, as on any PIN pad.
+  - `AndroidBiometricAuthenticator` is device-only and did not run in these tests: biometric paths use the fake.

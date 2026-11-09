@@ -273,3 +273,30 @@ To keep these benchmarks working as the UI changes:
   4. Only the ViewModel's idempotency stops a duplicate.
 - Fix applied / recommendation: money actions must set `loading = true` on the first accepted click. The debounce is a second layer, not the guard. The no-per-frame-recomposition checks have a control test showing the counter does move when a value is read in composition.
 - Not measured: real frame times and jank. Macrobenchmark needs the device run in the QA step, and these components aren't on a screen yet. 3× animator speed isn't a separate case: Compose scales durations itself and `ThemeTest` confirms motion stays full; scale 0 resolves to reduced motion.
+
+## UI Feature: App shell
+- Scenario and scale: `ShellStressTest`, `LockTapStressTest` (run with `stressTest`), JVM under Robolectric. Reduced motion in the gate and tab tests, so they measure the shell rather than animation time.
+- Results:
+
+| Scenario | Result |
+|---|---|
+| 1,000 unlock and relock cycles through `AppGate` | 8,003 ms, 8.0 ms per cycle, heap growth -26 KB, app composed exactly 1,000 times, `FLAG_SECURE` set after every relock |
+| 1,000 tab switches on a NavHost | 694 ms, back stack depth 2 at the end (the tab and Home) |
+| 1,000 rapid taps on one PIN key | 1 attempt burned, 1 rejection |
+| 1,000 PIN unlock and lock cycles (1,000 PBKDF2 iterations each) | 539 ms, state correct at every step |
+| 200,000 digit and backspace calls with nobody collecting haptics | Channel stays bounded |
+| 1,000,000 route and transition lookups | 34 ms, 34 ns each |
+| 10,000 bar selections | 2 ms |
+| 10,000 payment rows, 150 list jumps | 1,153 ms without shared bounds, 1,191 ms with them on every row (+3%) |
+| Reveal, 10 frames | At most 2 recomposition cycles, app content not recomposed (`AppGateTest`) |
+| Dot fill, 8 frames | At most 1 recomposition cycle (`LockScreenMotionTest`) |
+
+- What broke: nothing at this scale. One test artifact: `ActivityScenario` finds its activity by comparing intents, so rewriting a launch intent made `close()` wait 45 s per test. Those tests now use `Robolectric.buildActivity`, and `onNewIntent` no longer calls `setIntent`, which wasn't needed.
+- Failure flow: none found.
+- Fix applied / recommendation:
+  - A tab's scroll to top jumps instead of animating past 30 rows, so it doesn't compose every row on the way.
+  - The first frame of a reveal also composes the app. On a slow phone that frame could be long, and only a device run will show it.
+- Release APK: 25,523,345 → 25,591,195 bytes, +67,850 bytes (+0.3 %), with core-splashscreen and the shell.
+- Not measured:
+  - Real frame times, jank and cold start with the splash hold. Holding the first frame for DataStore and the lock can add to time to initial display, so compare `startupNoCompilation` against the 876 ms baseline in the QA step.
+  - 3x animator speed isn't a separate case: Compose scales durations, and the logic doesn't depend on them.

@@ -170,7 +170,7 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Sandbox-only features stay sandbox.** Collect requests, AutoPay mandates and Checkout talk to the fake PSP in both modes; the
   mode only changes how a `Pay` / QR / link payment is executed. The Sandbox badge appears in top bars whenever sandbox is active.
 - **No bottom navigation.** The dashboard grid (two rows of four) plus the Pay FAB already makes every screen one tap away; a bottom
-  bar would have duplicated Home / Scan / History and cost vertical space on the Pay form.
+  bar would have duplicated Home / Scan / History and cost vertical space on the Pay form. (Superseded by the UI overhaul; see "app shell decisions".)
 
 ## Scan from a gallery image
 - **Photo Picker, no permission.** `ActivityResultContracts.PickVisualMedia(ImageOnly)`; no `READ_MEDIA_IMAGES` / storage permission.
@@ -232,3 +232,25 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Fonts are subset** to Latin, Latin-1, Latin Extended-A, punctuation, ₹ and −, with variation axes and OpenType features kept. Other scripts such as Devanagari fall back to the system font.
 - **Sheen strength differs by theme:** 35% on champagne, 14% on graphite. The same strength looked scratchy on the dark button.
 - **Additions beyond the brief's component list**, because later screens would otherwise improvise them: `PayFlowTopBar`, `PayFlowListRow`, `PayFlowChoiceChip`, `PayFlowSwitch`, `PayFlowSurface`, `AmountText`, `DrawnCheckmark`, `DrawnCross`, `StaggeredEntrance`.
+
+## UI overhaul: app shell decisions (2026-11-09)
+- **Bottom navigation now exists,** replacing the earlier "No bottom navigation" decision, as the brief requires. Bar: Home, Scan, History, Me.
+- **Scan is in the bar but is not a tab.** A camera is a mode. It opens full-bleed over the current tab, and back returns there. The pill moves to Scan while it's open and goes back, because the back stack is the single source of truth for the pill.
+- **The bar shows on tab roots only.** A task inside a flow gets the whole screen, and a payment screen has nothing competing with its one action.
+- **Me opens Security for now.** The settings rebuild decides what else it holds.
+- **`HOME_HISTORY` moved to the bar's History item.** The Home tile that opens History is now `HOME_HISTORY_TILE`. The benchmarks still find the tag on the first screen, and now with no scrolling.
+- **One transition per relationship, in `ShellLogic.transition`:**
+  - Tab to tab: fade through. Tabs have no spatial order worth implying.
+  - Along a flow: shared axis X, a 10% move with a fade.
+  - Scanner: rises and sinks. A scanned code then moves forward into Pay on the shared axis.
+  - Payment row to detail: container transform.
+  - Going back always undoes the way in. Reduced motion makes all of them short fades, from the design system's helpers.
+- **Shared elements: one in the shell, the rest later.** `Modifier.containerTransform(key)` is available to every screen. It's used for payment row to detail now. Home's Scan button to the scanner (home row) and the payee card from the QR (scan row) use the same modifier. It does nothing under reduced motion or outside the shell. Cost on a 10,000-row list: 3% on a JVM scroll test (1,153 vs 1,191 ms).
+- **Predictive back uses the same transitions,** seeked by Navigation's own handling. A separate preview style would have been a second vocabulary. `enableOnBackInvokedCallback` is declared explicitly.
+- **The app leaves the composition while locked,** rather than sitting under an opaque layer. Nothing can be read or tapped behind the lock. To keep the user's place, the app's saved state lives in a `SaveableStateHolder` above the gate, so unlocking restores the back stack the way a rotation does, with the same ViewModels. Before this, a relock always dropped the user on Home.
+- **Circular reveal for PIN as well as biometrics.** The brief names biometrics. A second unlock motion would be noise, so both use the circle, opening from the control that unlocked: the fingerprint key or the dots. Reduced motion is a short fade. The reveal never delays the app, which is open and tappable from its first frame.
+- **Back on the lock isn't intercepted.** It leaves the app with the system's own back animation, and nothing is behind the lock to fall back to. During PIN setup, which the user opened from inside the app, back means "Not now".
+- **The lock follows the user's theme** rather than always being dark. A locked app is still the user's app, and light is first-class.
+- **Splash is graphite in both themes,** matching the launcher icon, so a stored theme can't flash the wrong one. It holds for the theme and the lock's answer, up to 2.5 s, so a stuck read can't trap the app. The lock still covers everything after that limit. Below API 31 the icon is static, because the library doesn't play animated icons there.
+- **`FLAG_SECURE` is app-wide,** held by `AppRoot`. Per-screen flags left Home and History uncovered and would change mid-transition. `-PscreenshotMode=true` still turns it off in debug.
+- **A background is painted behind the NavHost.** Mid-fade the window shows through, and the window follows the system theme rather than the app's, so a light app on a dark phone would flash dark between screens.

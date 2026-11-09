@@ -108,3 +108,16 @@ Modifiers in `ui/designsystem/modifiers/`:
 2. Build the component from tokens, reading animated values in the draw or layer phase.
 3. Add it to the catalog in every state, in both themes.
 4. Test it with `mainClock.autoAdvance = false` at 1.0× and 1.3×, with reduced motion on and off. Wrap state changes in `commitState { }`: with a paused clock nothing else delivers them to the recomposer, and an animation test would pass without animating.
+
+## App shell
+Lives outside the design system, built only from it.
+
+| Piece | File | Notes |
+|---|---|---|
+| `AppGate` | `ui/lock/AppGate.kt` | The only way to the app. Circular reveal on unlock |
+| `LockScreen` | `ui/lock/LockScreen.kt` | Spring dots, wrong-PIN shake and pulse, round keypad. Rules in `LockMotionLogic` |
+| `ShellLogic`, `ShellTransitions` | `ui/navigation/` | Which transition between two screens, and where the bar shows |
+| `Modifier.containerTransform(key)` | `ui/navigation/ShellTransitions.kt` | One end of a container transform. Does nothing under reduced motion or outside the shell |
+| `LocalBottomBarInset` | `ui/navigation/ShellBottomBar.kt` | A tab screen keeps this free at the end of its scroll and lifts anything anchored to the bottom by it |
+| `ScrollToTopOnReselect(tab, state)` | `ui/navigation/ShellBottomBar.kt` | What a tab screen adds so tapping its tab again scrolls to the top |
+| `holdUntilReadyThenHandOff` | `ui/splash/SplashHandoff.kt` | Splash hold and exit. Rules in `SplashPolicy` |
