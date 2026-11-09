@@ -407,3 +407,31 @@ Severity scale: Critical / High / Medium / Low.
   - Keypad digits are read aloud by TalkBack, as on any PIN pad.
   - `AndroidBiometricAuthenticator` is device-only and did not run in these tests: biometric paths use the fake.
   - Not checked on a device: all of this ran on the JVM under Robolectric. The one emulator attempt ended before the app could install (see `LOAD_TEST_REPORT.md`). FLAG_SECURE in the recents thumbnail, the real back gesture and overlay touch filtering still need a device.
+
+## UI Feature: Home
+- Attacks tried:
+  - Reading a hidden amount from the screen, TalkBack, the semantics tree, the all-time line, payment rows and the refresh toast.
+  - Comparing a hidden ₹1 with a hidden ₹99,99,99,999.99 for any difference in text or width.
+  - A hidden amount flashing at launch before the stored choice has been read, and 1,001 fast hide and show toggles.
+  - Tapping through the docked header onto the Scan & Pay action scrolled beneath it.
+  - 1,000 taps on Scan & Pay, a double tap on a quick action, 1,000 refresh requests while one runs.
+  - Payee names with a right-to-left override, zero-width characters only, spaces only, emoji only, Arabic, and 500 characters.
+  - Amounts entering saved state, which leaves the process.
+  - The lock paths against the rebuilt Home (`LockBypassAttackTest` unchanged, and it still passes).
+- What broke:
+  - Medium: the old hero showed ₹0.00 while loading and after a load error, which reads as "you sent nothing". An unknown total was presented as a fact.
+  - Low: a tap on the docked bar would have reached the invisible action beneath it, because a surface with no pointer handler doesn't block what's below. Found while designing the overlap, and covered before it shipped.
+  - Low: a first version of the test for that tap passed for the wrong reason. The test tag sat outside the pinning layer, so the tap landed off the header.
+  - Low, not fixed: the odometer clamps at ₹99,99,99,999.99. Reaching that takes 10,000 payments at the ₹1,00,000 cap in one month, and the hero would then understate by the excess.
+- Fixed now:
+  - Hero shows a skeleton while loading and "Not available" on error, with regression tests. The header keeps one height across states.
+  - Header blocks touches once docked, and the action drops below it: `aTapOnTheDockedBarDoesNotReachTheScanActionHiddenBelowIt`.
+  - Hide masks every amount on Home, in text and in spoken descriptions. The scramble is random and mask-length, so no frame depends on the amount. Amounts stay masked until the stored choice is read.
+  - Payee names on Home go through `DisplayText.safe`, including the spoken descriptions. A name with nothing visible falls back to the UPI handle.
+  - The last-seen amount and entrance memory are in the ViewModel. Home uses no `rememberSaveable`, so no amount enters the saved-instance bundle.
+- Scope for improvement:
+  - Hide applies to Home only. History and the payment detail still show amounts: for the money screens row.
+  - If DataStore can't write, hide stays off with no message, because `UiPreferences` drops failed writes by design. The tap appears to do nothing.
+  - Payment counts stay visible when hidden. They say how often, not how much.
+  - `performScrollTo` and TalkBack focus can leave an element under the pinned header or the floating bar, because the scroller doesn't know about either. A TalkBack action still works there, since it doesn't use coordinates.
+- Not checked on a device: all of this ran on the JVM under Robolectric. `FLAG_SECURE` is unchanged and is covered by an existing test on the window flag, but the recents thumbnail, real TalkBack and overlay touch filtering need a device.

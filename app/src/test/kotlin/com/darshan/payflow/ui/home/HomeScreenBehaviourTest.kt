@@ -281,13 +281,20 @@ class HomeScreenBehaviourTest {
         rule.waitForIdle()
         rule.mainClock.autoAdvance = false
         rule.mainClock.advanceTimeBy(2_000)
+        val heroBottom = rule.onNodeWithTag(PayFlowTestTags.HOME_HERO).fetchSemanticsNode().boundsInRoot.bottom
         val before = recompositionCycles()
         repeat(60) {
             rule.runOnUiThread { scroll.dispatchRawDelta(8f) }
             rule.mainClock.advanceTimeByFrame()
+            rule.waitForIdle()
         }
+        val cycles = recompositionCycles() - before
         rule.mainClock.autoAdvance = true
-        assertThat(recompositionCycles() - before).isAtMost(3L)
+        // The page moved past where the header docks, so the one flip this allows really happened.
+        assertThat(scroll.value).isGreaterThan(400)
+        assertThat(rule.onNodeWithTag(PayFlowTestTags.HOME_HERO).fetchSemanticsNode().boundsInRoot.bottom).isLessThan(heroBottom)
+        assertThat(cycles).isAtLeast(1L)
+        assertThat(cycles).isAtMost(3L)
     }
 
     @Test
@@ -417,6 +424,35 @@ class HomeScreenBehaviourTest {
         show(content(payments = listOf(payment("a", name = spoof)), payees = listOf(RecentPayee("a@okbank", spoof, testPayment().createdAt))))
         rule.waitForIdle()
         assertThat(allText().none { it.contains('‮') }).isTrue()
+    }
+
+    @Test
+    fun emojiOnlyRightToLeftAndEmptyNamesStayInsideTheirSlots() {
+        val names = listOf("😀😀😀", "محمد علي", "   ", "\u200B\u200B")
+        val at = testPayment().createdAt
+        show(
+            content(
+                payments = names.mapIndexed { i, name -> payment("n$i", name = name) },
+                payees = names.mapIndexed { i, name -> RecentPayee("p$i@okbank", name, at) },
+            ),
+            fontScale = 1.3f,
+        )
+        rule.waitForIdle()
+        val right = rule.onRoot().fetchSemanticsNode().boundsInRoot.right
+        names.indices.forEach { i ->
+            rule.onNodeWithTag(PayFlowTestTags.paymentRow("n$i")).performScrollTo()
+            assertThat(rule.onNodeWithTag(PayFlowTestTags.paymentRow("n$i")).fetchSemanticsNode().boundsInRoot.right).isAtMost(right)
+        }
+        // A name with nothing visible in it falls back to the handle, so the contact still has a label.
+        assertThat(allText().any { it == "p2@okbank" || it == "p3@okbank" }).isTrue()
+    }
+
+    @Test
+    fun theRefreshToastCarriesNoAmounts() {
+        val resources = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>().resources
+        listOf(HomeEffect.Refreshed(0, 0), HomeEffect.Refreshed(3, 2), HomeEffect.Refreshed(3, 0), HomeEffect.RefreshFailed).forEach {
+            assertThat(refreshMessage(it, resources)).doesNotContain("₹")
+        }
     }
 
     @Test

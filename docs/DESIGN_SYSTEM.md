@@ -22,9 +22,9 @@ Theme-dependent values are read from `PayFlowTheme`; static ones are plain objec
 | Colour | `PayFlowTheme.colors` | `bg`, `surface`, `raised`, `text`, `textSecondary`, `primary`/`onPrimary` (+`primaryTop`, `primaryBottom`, `primaryPressed`, `primaryDisabled`, `onPrimaryDisabled`), `accent`, `accentTint`/`onAccentTint`, `hairline`, `outline`, `focusGlow`, `scrim`, `tactileCap`/`onTactile`/`tactileBase`, `toast`/`onToast`, `heroStart`/`heroEnd`/`onHero`, `success`/`pending`/`failed`/`refund`/`neutral` (each `strong`, `content`, `container`), `shimmerBase`/`shimmerHighlight`, `sheen`, `avatarTones` |
 | Type | `PayFlowTheme.type` | `hero` 44/48, `display` 30/36, `amount` 20/26 (Newsreader); `title` 20/26, `body`, `bodyStrong`, `button`, `numeric` 15/22, `label`, `labelStrong` 12/16 (Geist) |
 | Spacing | `Spacing` | `xxs` 4, `xs` 8, `sm` 12, `md` 16, `lg` 20, `xl` 24, `xxl` 32, `xxxl` 48, `huge` 64, `screen` 20 |
-| Radius | `Radii` | `small` 12, `medium` 20, `large` 28, each with a shape, plus `topLargeShape` and `pillShape` |
+| Radius | `Radii` | `small` 12, `medium` 20, `large` 28, each with a shape, plus `topLargeShape`, `bottomLargeShape` and `pillShape` |
 | Depth | `Hairline`, `SurfaceLevel` | 1dp hairline over layered tones. No drop shadows |
-| Sizes | `Sizes` | `touchTarget` 48, `buttonHeight` 56, icons 16/24/32, avatars 32/40/64 and other fixed sizes |
+| Sizes | `Sizes` | `touchTarget` 48, `buttonHeight` 56, icons 16/24/32, avatars 32/40/56/64, `quickAction` 56, `heroAction` 88 and other fixed sizes |
 
 `strong` is for status text on `bg` or `surface`; `content` on `container` is the tinted pill. Every text pair is at least 4.5:1 and every control boundary at least 3:1, enforced by `TokensTest`.
 
@@ -57,7 +57,7 @@ Read with `PayFlowTheme.motion` or `LocalMotion`.
 | `LocalHaptics` / `PayFlowTheme.haptics` | `tick` for detents, `light` for presses (buttons do this themselves), `confirm` for real success, `reject` for refusals, `heavy` for a weighty commit. Plays through the view's haptic channel, so it needs no permission and respects the phone's touch-feedback setting |
 | `LocalUiSound` | `play(UiSoundEvent)`. Off by default and silent for now |
 | `UiEffectChannel`, `CollectUiEffects` | One-off effects. A ViewModel calls `effects.send(UiEffect.Haptic(HapticEvent.Confirm))` and exposes `effects.effects`; the screen collects it. Feature effects such as navigation implement `UiEffect` and arrive through `onOther` |
-| `UiPreferences` | `settings: StateFlow<UiSettings>` (haptics on, sound off, reduce motion off, theme system), `loaded`, and suspend setters. Injected by Hilt; read by `MainActivity`. `InMemoryUiPreferences` is for tests |
+| `UiPreferences` | `settings: StateFlow<UiSettings>` (haptics on, sound off, reduce motion off, theme system, amounts shown), `loaded`, and suspend setters. Injected by Hilt; read by `MainActivity`. `InMemoryUiPreferences` is for tests |
 
 Tests use `FakeHaptics` and `FakeUiSound` (`app/src/test/.../ui/designsystem/FakeEffects.kt`) through `PayFlowTheme(haptics = fake)` or the `setDs` helper.
 
@@ -72,11 +72,11 @@ All in `ui/designsystem/components/` unless noted.
 | `PayFlowIconButton` | `Buttons.kt` | 48dp target, `tonal`, required `contentDescription` |
 | `BrandLoader` | `BrandLoader.kt` | Replaces every stock spinner. Holds still under reduced motion |
 | `PayFlowTextField` | `Inputs.kt` | Empty, filled, focused glow, error with shake and reject haptic, disabled, read-only, helper, leading and trailing slots |
-| `AmountOdometer`, `AmountText` | `AmountOdometer.kt` | Rolling or static amount, Indian grouping up to ₹99,99,99,999.99, Geist sign, auto-shrink, `hidden`. Rules in `OdometerLogic.kt` |
+| `AmountOdometer`, `AmountText` | `AmountOdometer.kt` | Rolling or static amount, Indian grouping up to ₹99,99,99,999.99, Geist sign, auto-shrink, `hidden` on both. Rules in `OdometerLogic.kt` |
 | `PayFlowAvatar` | `Avatar.kt` | Tone from name, `ring`, `badge` (verified, count, dot) |
 | `StatusPill`, `DrawnCheckmark`, `DrawnCross` | `StatusPill.kt` | Success draws a check, failed a cross with a small shake, refund's arrow turns backwards, pending breathes. Set `animate = false` in lists |
 | `PayFlowBottomSheet` | `BottomSheet.kt` | Spring entrance, drag with fling, works from inside scrollable content, `dismissible = false` locks it. Drawn in the screen's own window so `FLAG_SECURE` still covers it |
-| `SkeletonBlock`, `SkeletonLine`, `SkeletonCircle`, `SkeletonRow`, `SkeletonList`, `SkeletonGroup` | `Skeleton.kt` | One shared shimmer per group |
+| `SkeletonBlock`, `SkeletonLine`, `SkeletonCircle`, `SkeletonRow`, `SkeletonList`, `SkeletonGroup` | `Skeleton.kt` | One shared shimmer per group. `SkeletonBlock` takes `base` and `highlight` for surfaces the default tones don't suit, such as the graphite hero |
 | `PayFlowToastHost`, `PayFlowToast`, `rememberToastHostState` | `Toast.kt` | Info, success, pending, failed. Bounded queue, repeats collapse, tap to dismiss |
 | `EmptyState`, `ErrorState`, `Illustration` | `StateViews.kt`, `Illustrations.kt` | Eight code-drawn drawings: `EmptyLedger`, `NoResults`, `Offline`, `ErrorReceipt`, `NoMandates`, `NoRequests`, `CameraOff`, `Locked` |
 | `PayFlowBottomNav`, `rememberBottomNavState`, `NavGlyphs` | `BottomNav.kt` | Floating dock, sliding pill, morphing icons. Rules in `BottomNavLogic` |
@@ -121,3 +121,17 @@ Lives outside the design system, built only from it.
 | `LocalBottomBarInset` | `ui/navigation/ShellBottomBar.kt` | A tab screen keeps this free at the end of its scroll and lifts anything anchored to the bottom by it |
 | `ScrollToTopOnReselect(tab, state)` | `ui/navigation/ShellBottomBar.kt` | What a tab screen adds so tapping its tab again scrolls to the top |
 | `holdUntilReadyThenHandOff` | `ui/splash/SplashHandoff.kt` | Splash hold and exit. Rules in `SplashPolicy` |
+
+## Home
+Lives outside the design system, built only from it. Rules are in `ui/home/HomeLogic.kt`.
+
+| Piece | File | Notes |
+|---|---|---|
+| `HomeHero`, `HomeHeaderState` | `ui/home/HomeHero.kt` | Full-bleed graphite header that docks into the top bar. Parts move in layers, so a scroll step recomposes nothing. Blocks touches to what's scrolled beneath it |
+| `VeiledAmount` | `ui/home/HomeHero.kt` | Hide and show: blur and a random, mask-length scramble, swapping at the peak. Interruptible. Reduced motion keeps a short fade |
+| `ScanAndPay` | `ui/home/HomeScreen.kt` | The primary action, across the header's edge in a notch. Breathing ring in a layer, stopped once docked. Container transform into the scanner |
+| `magneticPress`, `AvatarRipple`, `PullCoin` | `ui/home/HomeMotion.kt` | Quick action lean, contact tap ring, refresh coin. Reduced motion: scale only, no ring, a still coin |
+
+- Motion: scroll is direct. Hide is `Micro` then `Small`. Stagger is the standard token, once per visit; a new row plays its own. A new total rolls from the last one seen, with one sheen sweep.
+- Bottom bar: content fades out in the 24dp above the dock. From the dock's top edge down, the base is solid background.
+- A tab screen's end spacer needs the navigation bar inset as well as `LocalBottomBarInset`. Tests don't catch this, because Robolectric reports no inset.

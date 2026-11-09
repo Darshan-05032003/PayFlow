@@ -301,3 +301,36 @@ To keep these benchmarks working as the UI changes:
   - Real frame times, jank and cold start with the splash hold. Holding the first frame for DataStore and the lock can add to time to initial display, so compare `startupNoCompilation` against the 876 ms baseline in the QA step.
   - 3x animator speed isn't a separate case: Compose scales durations, and the logic doesn't depend on them.
 - Device run: not run. The emulator booted in 19 s under its 4 GB memory cap, and the cap stopped it about 4 s later (4.16 GB resident, software rendering), before the app could install. The rest of the machine was not affected.
+
+## UI Feature: Home
+- Scenario and scale: `HomeStressTest`, `HomeViewModelTest` and `HomeScreenBehaviourTest`, JVM under Robolectric. Room in memory, seeded with 10,000 payments. **None of these are frame times:** nothing was drawn by a GPU. They show composition, layout and query cost. Real frame times need Macrobenchmark on a device, in the QA row.
+- Results:
+
+| Scenario | Result |
+|---|---|
+| First content from 10,000 stored payments (4 queries, 5 rows returned) | 23 ms |
+| First composition of Home, 10,000 stored payments, reduced motion | 874 ms, includes Robolectric and class loading on a cold JVM |
+| 600 scroll steps, up and down past the dock, composition and layout | 454 ms, 756 µs per step, no drawing |
+| Recomposition cycles in those 600 steps | 6, one per dock crossing |
+| 60 scroll steps past the dock (`HomeScreenBehaviourTest`) | At most 3 cycles |
+| New payment among 10,000, to the screen's state | 15 ms each over 50 inserts |
+| 1,000 taps on Scan & Pay | 1,266 ms, 59 accepted by the 500 ms debounce on the injected clock; `launchSingleTop` keeps one scanner on the stack |
+| 1,000 refresh requests while one runs | 1 reconcile |
+| 1,001 hide and show toggles, one per 16 ms | 2,020 ms, heap change -967 KB, ends on the last choice |
+| ₹99,99,99,999.99 at 1.0× and 1.3× | Fits the hero (shrinks to fit), docks inside the bar |
+| 100,000 payments through the entrance memory | Holds at most 64 ids |
+
+- What broke:
+  - The first version of the scroll measurement reported 4 ms over 600 frames and 0 recompositions. It wasn't laying anything out, so that number meant nothing. The test now forces layout on each step and asserts the page reached past the dock.
+  - The hero can't show more than ₹99,99,99,999.99. 10,000 payments at the ₹1,00,000 cap total one paisa more than that.
+- Failure flow:
+  1. A month's captured payments pass ₹99,99,99,999.99, at least 10,000 of them at the per-payment cap.
+  2. `OdometerLogic` clamps the display.
+  3. The hero understates the total, and the all-time line clamps the same way.
+- Fix applied / recommendation:
+  - Clamp left as it is, since no real month gets there. Nothing overflows: the sum is a `Long` of paise.
+  - Home stays a column because its children are bounded by the queries (5 payments, 8 payees), whatever the table holds. A scroll step recomposes nothing.
+  - The breathing ring is a layer update and stops once the header has docked, so a scrolled page isn't animating something off screen.
+- Release APK: 25,591,195 → 25,661,427 bytes, +70,232 bytes (+0.3 %).
+- Benchmark contracts kept: `HOME_HISTORY` on the bar, `PAYMENT_LIST`, `EXPOSE_TEST_TAGS` at the root, Home vertically scrollable (tallest scrollable node is the page), `SeedDataReceiver` unchanged, no new first-launch screen. With 200 seeded rows Home still shows 5, so `homeScroll` still measures a short page. Its content changed entirely, so a before and after comparison shows the rebuild's cost, not the cost of a longer list.
+- Not measured: frame times, jank, cold start, and the cost of film grain plus a full-width header layer on a real GPU. No device run in this row.
