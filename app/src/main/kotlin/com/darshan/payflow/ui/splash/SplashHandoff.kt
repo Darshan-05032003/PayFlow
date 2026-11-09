@@ -3,6 +3,7 @@ package com.darshan.payflow.ui.splash
 import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
 import android.os.SystemClock
+import android.view.View
 import androidx.compose.animation.core.Easing
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreenViewProvider
@@ -46,20 +47,25 @@ fun SplashScreen.holdUntilReadyThenHandOff(themeLoaded: () -> Boolean, lockResol
 
 private fun SplashScreenViewProvider.playExit() {
     val delay = SplashPolicy.exitDelayMs(SystemClock.uptimeMillis(), iconAnimationStartMillis, iconAnimationDurationMillis)
+    playSplashExit(view, iconView, delay, onDone = ::remove)
+}
+
+/** Separate from the provider, whose constructor is private to the library, so a test can run the real animation. */
+internal fun playSplashExit(splash: View, icon: View, delayMs: Long, onDone: () -> Unit) {
     val duration = MotionDurations.Small.toLong()
-    iconView.animate()
+    icon.animate()
         .scaleX(SplashPolicy.EXIT_ICON_SCALE)
         .scaleY(SplashPolicy.EXIT_ICON_SCALE)
-        .setStartDelay(delay)
+        .setStartDelay(delayMs)
         .setDuration(duration)
         .setInterpolator(MotionEasing.Emphasized.curve.asInterpolator())
         .start()
-    view.animate()
+    splash.animate()
         .alpha(0f)
-        .setStartDelay(delay)
+        .setStartDelay(delayMs)
         .setDuration(duration)
         .setInterpolator(MotionEasing.Standard.curve.asInterpolator())
-        .withEndAction { remove() }
+        .withEndAction(onDone)
         .start()
 }
 

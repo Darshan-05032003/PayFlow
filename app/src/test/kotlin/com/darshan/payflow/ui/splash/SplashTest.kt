@@ -2,6 +2,8 @@ package com.darshan.payflow.ui.splash
 
 import android.content.ComponentName
 import android.graphics.drawable.AnimatedVectorDrawable
+import android.os.Looper
+import android.view.View
 import android.util.TypedValue
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ApplicationProvider
@@ -12,8 +14,10 @@ import com.google.common.truth.Truth.assertThat
 import android.content.Context
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.Duration
 
 class SplashPolicyTest {
     @Test
@@ -75,6 +79,19 @@ class SplashResourcesTest {
         val drawable = ContextCompat.getDrawable(context, R.drawable.splash_icon_animated)
         assertThat(drawable).isInstanceOf(AnimatedVectorDrawable::class.java)
         assertThat(context.resources.getInteger(R.integer.splash_icon_duration)).isEqualTo(com.darshan.payflow.ui.designsystem.motion.MotionDurations.ScreenSlow)
+    }
+
+    /** The exit a device would play. It has to end by removing the splash, or the app stays covered. */
+    @Test
+    fun theExitAnimationFadesTheSplashAndThenRemovesIt() {
+        val splash = View(context)
+        val icon = View(context)
+        var removed = 0
+        playSplashExit(splash, icon, delayMs = 100, onDone = { removed++ })
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        assertThat(removed).isEqualTo(1)
+        assertThat(splash.alpha).isEqualTo(0f)
+        assertThat(icon.scaleX).isEqualTo(SplashPolicy.EXIT_ICON_SCALE)
     }
 
     @Config(sdk = [30])
