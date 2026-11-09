@@ -69,8 +69,10 @@ cmd_build_baseline() {
     echo "Worktree kept at $wt; remove it with: git -C $root worktree remove $wt"
 }
 
+# Results go to a subfolder of the test app's media folder, as Gradle's connected tasks do. Deleting the media folder
+# itself from the shell (or writing results straight into it) made the Perfetto trace move fail after the first iteration.
 cmd_bench() {
-    local apks="${1:?apk dir}" results="${2:?results dir}" media="/sdcard/Android/media/$bench_pkg"
+    local apks="${1:?apk dir}" results="${2:?results dir}" media="/sdcard/Android/media/$bench_pkg/additional_test_output"
     no_gradle; need_emulator; mkdir -p "$results"
     # Flings decay through the animation system, so every run uses the same scales.
     for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
@@ -83,7 +85,7 @@ cmd_bench() {
         # A fresh install per test: no app lock, no data but the seed the benchmark itself broadcasts.
         "${adb[@]}" uninstall "$app_pkg" >/dev/null 2>&1 || true
         "${adb[@]}" install -r -t "$apks/app-benchmark.apk" >/dev/null
-        "${adb[@]}" shell rm -rf "$media"
+        "${adb[@]}" shell "rm -rf $media && mkdir -p $media"
         echo "run $name"
         "${adb[@]}" shell am instrument -w -r \
             -e class "$bench_pkg.$test" \
@@ -98,16 +100,20 @@ cmd_bench() {
             echo "FAILED $name (see $results/$name.log)"
         fi
     done
-    python3 "$root/scripts/perf_summary.py" "$results"/*.json | tee "$results/summary.md"
+    if ls "$results"/*.json >/dev/null 2>&1; then
+        python3 "$root/scripts/perf_summary.py" "$results"/*.json | tee "$results/summary.md"
+    else
+        echo "no results yet in $results"
+    fi
 }
 
 cmd_profile() {
-    local apks="${1:?apk dir}" results="${2:?results dir}" media="/sdcard/Android/media/$profile_pkg"
+    local apks="${1:?apk dir}" results="${2:?results dir}" media="/sdcard/Android/media/$profile_pkg/additional_test_output"
     no_gradle; need_emulator; mkdir -p "$results"
     "${adb[@]}" uninstall "$app_pkg" >/dev/null 2>&1 || true
     "${adb[@]}" install -r -t "$apks/app-nonminified.apk" >/dev/null
     "${adb[@]}" install -r -t "$apks/baselineprofile.apk" >/dev/null
-    "${adb[@]}" shell rm -rf "$media"
+    "${adb[@]}" shell "rm -rf $media && mkdir -p $media"
     "${adb[@]}" shell am instrument -w -r \
         -e class "$profile_pkg.BaselineProfileGenerator#generate" \
         -e androidx.benchmark.enabledRules BaselineProfile \
