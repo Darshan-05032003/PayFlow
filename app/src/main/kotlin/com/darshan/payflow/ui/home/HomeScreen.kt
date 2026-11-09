@@ -81,20 +81,15 @@ import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.darshan.payflow.R
-import com.darshan.payflow.core.Money
 import com.darshan.payflow.domain.model.HistorySummary
-import com.darshan.payflow.domain.model.Payment
-import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentMode
-import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.model.RecentPayee
 import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.components.LocalPaymentMode
-import com.darshan.payflow.ui.components.label
+import com.darshan.payflow.ui.components.PaymentFeedRow
 import com.darshan.payflow.ui.components.relativeLabel
 import com.darshan.payflow.ui.designsystem.components.AmountDecimals
 import com.darshan.payflow.ui.designsystem.components.AmountSign
-import com.darshan.payflow.ui.designsystem.components.AmountText
 import com.darshan.payflow.ui.designsystem.components.ClickDebouncer
 import com.darshan.payflow.ui.designsystem.components.DisplayText
 import com.darshan.payflow.ui.designsystem.components.EmptyState
@@ -129,7 +124,6 @@ import com.darshan.payflow.ui.navigation.SCAN_CONTAINER_KEY
 import com.darshan.payflow.ui.navigation.ScrollToTopOnReselect
 import com.darshan.payflow.ui.navigation.ShellRoute
 import com.darshan.payflow.ui.navigation.containerTransform
-import com.darshan.payflow.ui.navigation.paymentContainerKey
 import com.darshan.payflow.ui.theme.PayFlowTheme
 
 data class HomeCallbacks(
@@ -609,7 +603,7 @@ private fun Feed(state: HomeUiState, callbacks: HomeCallbacks, amountsHidden: Bo
                     val playRow = remember { memory.firstSight(payment.id) }
                     StaggeredEntrance(FEED_FIRST_INDEX + 1 + index, play = playRow) {
                         Column {
-                            FeedRow(payment, amountsHidden, callbacks.onPaymentClick)
+                            PaymentFeedRow(payment, amountsHidden, payment.createdAt.relativeLabel(), callbacks.onPaymentClick)
                             if (index < state.recent.lastIndex) HairlineDivider(Modifier.padding(start = Spacing.screen + Sizes.avatar + Spacing.sm, end = Spacing.screen))
                         }
                     }
@@ -617,45 +611,6 @@ private fun Feed(state: HomeUiState, callbacks: HomeCallbacks, amountsHidden: Bo
             }
         }
     }
-}
-
-@Composable
-private fun FeedRow(payment: Payment, amountsHidden: Boolean, onClick: (String) -> Unit) {
-    val colors = PayFlowTheme.colors
-    val outgoing = payment.direction == PaymentDirection.OUTGOING
-    val name = remember(payment.payeeName) { DisplayText.safe(payment.payeeName) }
-    val statusLabel = payment.status.label()
-    val direction = stringResource(if (outgoing) R.string.payment_to else R.string.payment_from)
-    val spokenAmount = if (amountsHidden) stringResource(R.string.ds_amount_hidden) else Money.formatInr(payment.amountPaise)
-    val description = stringResource(R.string.payment_row_description, direction, name, spokenAmount, statusLabel)
-    val amountColor = when {
-        payment.status == PaymentStatus.FAILED -> colors.textSecondary
-        !outgoing -> colors.success.strong
-        else -> colors.text
-    }
-    PayFlowListRow(
-        title = name,
-        subtitle = "${payment.createdAt.relativeLabel()} · ${payment.payeeVpa}",
-        leading = { PayFlowAvatar(name) },
-        trailing = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                AmountText(
-                    paise = if (outgoing) -payment.amountPaise else payment.amountPaise,
-                    color = amountColor,
-                    decimals = AmountDecimals.WhenNonZero,
-                    sign = AmountSign.Always,
-                    hidden = amountsHidden,
-                )
-                val pill: StatusKind? = payment.status.feedPill()
-                if (pill != null) StatusPill(pill, statusLabel, animate = false)
-            }
-        },
-        onClick = { onClick(payment.id) },
-        modifier = Modifier
-            .containerTransform(paymentContainerKey(payment.id))
-            .testTag(PayFlowTestTags.paymentRow(payment.id))
-            .semantics(mergeDescendants = true) { contentDescription = description },
-    )
 }
 
 /** The store runs on the sandbox in both modes, so it says "Demo" whichever mode the app is in. */

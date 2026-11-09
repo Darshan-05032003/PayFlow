@@ -87,6 +87,20 @@
     <string name="history_count">%1$d payments</string>
     <string name="history_clear_search">Clear search</string>
     <string name="history_refresh">Refresh</string>
+    <string name="history_search_open">Search payments</string>
+    <string name="history_search_close">Close search</string>
+    <string name="history_day_today">Today</string>
+    <string name="history_day_yesterday">Yesterday</string>
+    <string name="history_day_sent">%1$s sent</string>
+    <plurals name="history_day_description">
+        <item quantity="one">%1$s, %2$d payment, %3$s sent</item>
+        <item quantity="other">%1$s, %2$d payments, %3$s sent</item>
+    </plurals>
+    <string name="history_action_pay_again">Pay again</string>
+    <string name="history_action_check">Check status</string>
+    <string name="detail_sheet_close">Close payment</string>
+    <string name="detail_amount_label">Amount</string>
+    <string name="detail_status_heading">Status</string>
 
     <!-- Payment detail -->
     <string name="detail_section_details">Details</string>

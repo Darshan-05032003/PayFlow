@@ -92,6 +92,26 @@ object Sizes {
 
     /** Moves a Newsreader numeral down to the optical centre of a round key. */
     val numeralNudge = 3.dp
+
+    /** One action cell in a list row's swipe tray. */
+    val rowSwipeAction = 88.dp
+
+    /** A collect request's countdown ring, and the stroke of that ring and of other thin progress rings. */
+    val countdownRing = 48.dp
+    val ringStroke = 3.dp
+
+    /** An AutoPay card in the stack, and how much of each card behind it peeks out. */
+    val mandateCard = 184.dp
+    val mandateStackPeek = 10.dp
+
+    /** A dot on the upcoming-debit timeline. */
+    val timelineDot = 10.dp
+
+    /** The demo scratch card. */
+    val scratchCard = 168.dp
+
+    /** The finger's width when scratching. */
+    val scratchBrush = 28.dp
 }
 
 /**

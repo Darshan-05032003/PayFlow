@@ -3,9 +3,7 @@ package com.darshan.payflow.ui.home
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import com.darshan.payflow.domain.model.HistorySummary
-import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.ui.designsystem.components.OdometerLogic
-import com.darshan.payflow.ui.designsystem.components.StatusKind
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.hypot
@@ -121,14 +119,6 @@ fun HistorySummary.heroCounts(): List<HeroCount> = buildList {
     if (success > 0) add(HeroCount.Paid(success))
     if (pending > 0) add(HeroCount.Pending(pending))
     if (failed > 0) add(HeroCount.Failed(failed))
-}
-
-/** A settled, successful payment is the normal case and needs no label: only exceptions get a pill. */
-fun PaymentStatus.feedPill(): StatusKind? = when (this) {
-    PaymentStatus.SUCCESS -> null
-    PaymentStatus.CREATED, PaymentStatus.PENDING -> StatusKind.Pending
-    PaymentStatus.FAILED -> StatusKind.Failed
-    PaymentStatus.REFUND_PENDING, PaymentStatus.REFUNDED -> StatusKind.Refund
 }
 
 /**

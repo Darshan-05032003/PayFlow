@@ -189,7 +189,8 @@ class ShellNavigationTest {
         compose.onNodeWithTag(row).performClick()
         compose.waitUntilWithMainLooper(10_000) { textExists("Payment") }
         compose.waitUntilWithMainLooper(5_000) { !barVisible() }
-        compose.onNodeWithContentDescription("Back").performClick()
+        // The detail is a sheet now: its close button goes back the way it came.
+        compose.onNodeWithContentDescription("Close payment").performClick()
         await(PayFlowTestTags.PAYMENT_LIST)
         compose.waitUntilWithMainLooper(5_000) { barVisible() }
         compose.onNodeWithTag(PayFlowTestTags.HOME_HISTORY).assertIsSelected()

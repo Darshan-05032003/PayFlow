@@ -67,6 +67,9 @@ class HistoryScreenTest {
         )
         rule.onNodeWithTag(PayFlowTestTags.filterChip(HistoryFilter.PENDING)).performClick()
         assertThat(filter).isEqualTo(HistoryFilter.PENDING)
+        // Search is a button until opened; the field it grows into takes the query.
+        rule.onAllNodesWithTag(PayFlowTestTags.SEARCH_FIELD).assertCountEquals(0)
+        rule.onNodeWithTag(PayFlowTestTags.HISTORY_SEARCH_OPEN).performClick()
         rule.onNodeWithTag(PayFlowTestTags.SEARCH_FIELD).performTextInput("ali")
         assertThat(query).isEqualTo("ali")
         rule.onNodeWithText("Alice").performClick()
@@ -93,7 +96,7 @@ class HistoryScreenTest {
                 )
             }
         }
-        rule.onNodeWithText("Not confirmed yet. Check in GPay.").assertIsDisplayed()
+        rule.onNodeWithText("Not confirmed yet. Check in GPay.").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.DETAIL_MARK_PAID).performScrollTo().performClick()
         assertThat(paid).isTrue()
         rule.onNodeWithTag(PayFlowTestTags.DETAIL_MARK_NOT_PAID).performScrollTo().performClick()

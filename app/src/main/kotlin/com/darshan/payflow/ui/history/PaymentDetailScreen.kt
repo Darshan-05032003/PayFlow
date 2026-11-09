@@ -1,75 +1,113 @@
 package com.darshan.payflow.ui.history
 
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.SearchOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.darshan.payflow.R
-import com.darshan.payflow.core.Money
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentMethod
-import com.darshan.payflow.ui.components.DetailRow
-import com.darshan.payflow.ui.components.EmptyView
-import com.darshan.payflow.ui.components.ErrorView
-import com.darshan.payflow.ui.components.InitialAvatar
-import com.darshan.payflow.ui.components.LoadingView
-import com.darshan.payflow.ui.components.StatusChip
-import com.darshan.payflow.ui.components.formattedDate
 import com.darshan.payflow.ui.PayFlowTestTags
-import com.darshan.payflow.ui.pay.statusSourceLabel
-import com.darshan.payflow.ui.theme.ScreenPadding
+import com.darshan.payflow.ui.designsystem.components.AmountDecimals
+import com.darshan.payflow.ui.designsystem.components.AmountText
+import com.darshan.payflow.ui.designsystem.components.DisplayText
+import com.darshan.payflow.ui.designsystem.components.EmptyState
+import com.darshan.payflow.ui.designsystem.components.ErrorState
+import com.darshan.payflow.ui.designsystem.components.GhostButton
+import com.darshan.payflow.ui.designsystem.components.GhostTone
+import com.darshan.payflow.ui.designsystem.components.HairlineDivider
+import com.darshan.payflow.ui.designsystem.components.IllustrationKind
+import com.darshan.payflow.ui.designsystem.components.PayFlowAvatar
+import com.darshan.payflow.ui.designsystem.components.PayFlowIconButton
+import com.darshan.payflow.ui.designsystem.components.PayFlowSurface
+import com.darshan.payflow.ui.designsystem.components.PayFlowToastHost
+import com.darshan.payflow.ui.designsystem.components.PrimaryButton
+import com.darshan.payflow.ui.designsystem.components.SheetPhysics
+import com.darshan.payflow.ui.designsystem.components.SheetTarget
+import com.darshan.payflow.ui.designsystem.components.SkeletonList
+import com.darshan.payflow.ui.designsystem.components.SurfaceLevel
+import com.darshan.payflow.ui.designsystem.components.rememberToastHostState
+import com.darshan.payflow.ui.designsystem.effects.ToastTone
+import com.darshan.payflow.ui.designsystem.motion.LocalMotion
+import com.darshan.payflow.ui.designsystem.motion.MotionToken
+import com.darshan.payflow.ui.designsystem.tokens.Hairline
+import com.darshan.payflow.ui.designsystem.tokens.Radii
+import com.darshan.payflow.ui.designsystem.tokens.Sizes
+import com.darshan.payflow.ui.designsystem.tokens.Spacing
+import com.darshan.payflow.ui.navigation.containerTransform
+import com.darshan.payflow.ui.pay.ReceiptCard
+import com.darshan.payflow.ui.pay.ReceiptContent
+import com.darshan.payflow.ui.theme.PayFlowTheme
 import kotlinx.coroutines.launch
 
 data class PaymentDetailCallbacks(
     val onBack: () -> Unit = {},
     val onMarkPaid: () -> Unit = {},
     val onMarkNotPaid: () -> Unit = {},
+    val onToggleAmounts: () -> Unit = {},
 )
 
 @Composable
-fun PaymentDetailRoute(onBack: () -> Unit, viewModel: PaymentDetailViewModel = hiltViewModel()) {
+fun PaymentDetailRoute(onBack: () -> Unit, containerKey: String? = null, viewModel: PaymentDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val hidden by viewModel.amountsHidden.collectAsStateWithLifecycle()
     PaymentDetailScreen(
         state,
-        PaymentDetailCallbacks(onBack = onBack, onMarkPaid = { viewModel.markManually(paid = true) }, onMarkNotPaid = { viewModel.markManually(paid = false) }),
+        PaymentDetailCallbacks(
+            onBack = onBack,
+            onMarkPaid = { viewModel.markManually(paid = true) },
+            onMarkNotPaid = { viewModel.markManually(paid = false) },
+            onToggleAmounts = viewModel::toggleAmountsHidden,
+        ),
+        amountsHidden = hidden,
+        containerKey = containerKey,
     )
 }
 
@@ -88,121 +126,227 @@ fun PaymentMethod.label(): String = stringResource(
 @Composable
 fun PaymentDetailScreen(state: PaymentDetailUiState, onBack: () -> Unit) = PaymentDetailScreen(state, PaymentDetailCallbacks(onBack = onBack))
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A payment as a sheet over the list it came from. The row it was opened from grows into it ([containerKey]), and dragging
+ * the top down puts it back. The sheet is drawn for every state, so the transform always has somewhere to land.
+ *
+ * Status and source come from the same [ReceiptCard] Pay prints, so the two never word a payment differently. Amounts follow
+ * Home's hide setting.
+ */
 @Composable
-fun PaymentDetailScreen(state: PaymentDetailUiState, callbacks: PaymentDetailCallbacks) {
-    val onBack = callbacks.onBack
-    val snackbar = remember { SnackbarHostState() }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.payment_detail_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+fun PaymentDetailScreen(
+    state: PaymentDetailUiState,
+    callbacks: PaymentDetailCallbacks,
+    amountsHidden: Boolean = false,
+    containerKey: String? = null,
+) {
+    val colors = PayFlowTheme.colors
+    val motion = LocalMotion.current
+    val toasts = rememberToastHostState()
+    val scope = rememberCoroutineScope()
+    var drag by remember { mutableFloatStateOf(0f) }
+    var height by remember { mutableFloatStateOf(0f) }
+    val dragState = rememberDraggableState { delta -> drag = SheetPhysics.applyDrag(drag, delta).coerceAtLeast(0f) }
+    val sheetColor = if (colors.isDark) colors.raised else colors.surface
+
+    Box(Modifier.fillMaxSize().background(colors.bg)) {
+        Column(
+            Modifier
+                .statusBarsPadding()
+                .padding(top = Spacing.xs)
+                .fillMaxSize()
+                .then(if (containerKey != null) Modifier.containerTransform(containerKey) else Modifier)
+                .onSizeChanged { height = it.height.toFloat() }
+                .graphicsLayer { translationY = drag }
+                .clip(Radii.topLargeShape)
+                .background(sheetColor)
+                .border(Hairline.width, colors.hairline, Radii.topLargeShape)
+                .testTag(PayFlowTestTags.DETAIL_SHEET),
+        ) {
+            // The grab area: handle and title. Dragging it down far or fast enough closes the sheet.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .draggable(
+                        dragState,
+                        Orientation.Vertical,
+                        onDragStopped = { velocity ->
+                            if (SheetPhysics.settle(drag, height, velocity, dismissible = true) == SheetTarget.Dismissed) {
+                                callbacks.onBack()
+                            } else {
+                                scope.launch { animate(drag, 0f, velocity, motion.spec(MotionToken.Bounce)) { v, _ -> drag = v } }
+                            }
+                        },
+                    ),
+            ) {
+                Box(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentAlignment = Alignment.Center) {
+                    val handle = colors.outline
+                    Spacer(Modifier.size(Sizes.sheetHandleWidth, Sizes.sheetHandleHeight).drawBehind { drawRoundRect(handle, cornerRadius = CornerRadius(size.height / 2)) })
+                }
+                Row(Modifier.fillMaxWidth().padding(start = Spacing.screen, end = Spacing.xxs), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.payment_detail_title),
+                        style = PayFlowTheme.type.title,
+                        color = colors.text,
+                        modifier = Modifier.weight(1f).semantics { heading() },
+                    )
+                    if (state is PaymentDetailUiState.Content) {
+                        PayFlowIconButton(
+                            if (amountsHidden) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            stringResource(if (amountsHidden) R.string.home_show_amounts else R.string.home_hide_amounts),
+                            callbacks.onToggleAmounts,
+                            tint = colors.textSecondary,
+                            modifier = Modifier.testTag(PayFlowTestTags.DETAIL_HIDE_AMOUNTS),
+                        )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        when (state) {
-            PaymentDetailUiState.Loading -> LoadingView(Modifier.padding(padding))
-            PaymentDetailUiState.NotFound -> EmptyView(stringResource(R.string.payment_not_found), modifier = Modifier.padding(padding), icon = Icons.Outlined.SearchOff)
-            is PaymentDetailUiState.Error -> ErrorView(stringResource(R.string.error_generic), onRetry = onBack, Modifier.padding(padding))
-            is PaymentDetailUiState.Content -> PaymentDetailContent(state, callbacks, snackbar, Modifier.padding(padding))
+                    PayFlowIconButton(Icons.Outlined.Close, stringResource(R.string.detail_sheet_close), callbacks.onBack, tint = colors.text)
+                }
+            }
+            when (state) {
+                PaymentDetailUiState.Loading -> SkeletonList(Modifier.fillMaxWidth().testTag(PayFlowTestTags.LOADING), count = 4)
+                PaymentDetailUiState.NotFound -> EmptyState(
+                    title = stringResource(R.string.payment_not_found),
+                    illustration = IllustrationKind.NoResults,
+                    modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.EMPTY),
+                )
+                is PaymentDetailUiState.Error -> ErrorState(
+                    title = stringResource(R.string.error_generic),
+                    retryLabel = stringResource(R.string.back),
+                    onRetry = callbacks.onBack,
+                    modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.ERROR),
+                )
+                is PaymentDetailUiState.Content -> DetailContent(state, callbacks, amountsHidden) { message -> toasts.show(message, ToastTone.Info) }
+            }
         }
+        PayFlowToastHost(toasts, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 
 @Composable
-private fun PaymentDetailContent(state: PaymentDetailUiState.Content, callbacks: PaymentDetailCallbacks, snackbar: SnackbarHostState, modifier: Modifier = Modifier) {
+private fun DetailContent(state: PaymentDetailUiState.Content, callbacks: PaymentDetailCallbacks, amountsHidden: Boolean, onCopied: (String) -> Unit) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
     val payment = state.payment
     val outgoing = payment.direction == PaymentDirection.OUTGOING
+    val name = remember(payment.payeeName) { DisplayText.safe(payment.payeeName) }
+    val receipt = remember(payment, state.handlerLabel) { ReceiptContent.from(payment, state.handlerLabel) }
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.screen)
+            .padding(bottom = Spacing.xl)
+            .navigationBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InitialAvatar(payment.payeeName, size = 64.dp)
-                Text(
-                    stringResource(if (outgoing) R.string.payment_to else R.string.payment_from) + " " + payment.payeeName,
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Text(payment.payeeVpa, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(Money.formatInr(payment.amountPaise), style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(top = 4.dp))
-                StatusChip(payment.status, withIcon = true)
-                Text(
-                    statusSourceLabel(payment, state.handlerLabel),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                payment.failureReason?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-                }
+        Column(Modifier.fillMaxWidth().padding(top = Spacing.xs), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            PayFlowAvatar(name, size = Sizes.avatarLarge)
+            Spacer(Modifier.height(Spacing.xxs))
+            Text(stringResource(if (outgoing) R.string.payment_to else R.string.payment_from), style = type.label, color = colors.textSecondary)
+            Text(name, style = type.title, color = colors.text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(DisplayText.safe(payment.payeeVpa), style = type.label, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            AmountText(
+                payment.amountPaise,
+                Modifier.padding(top = Spacing.xs).testTag(PayFlowTestTags.DETAIL_AMOUNT),
+                style = type.display,
+                color = colors.text,
+                decimals = AmountDecimals.Always,
+                hidden = amountsHidden,
+            )
+            payment.failureReason?.let {
+                Text(DisplayText.safe(it), style = type.body, color = colors.failed.strong, textAlign = TextAlign.Center)
             }
         }
-        if (payment.canBeMarkedManually) {
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.detail_mark_title), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.detail_mark_hint, state.handlerLabel ?: payment.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)), style = MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = callbacks.onMarkPaid, enabled = !state.marking, modifier = Modifier.testTag(PayFlowTestTags.DETAIL_MARK_PAID)) { Text(stringResource(R.string.detail_mark_paid)) }
-                        OutlinedButton(onClick = callbacks.onMarkNotPaid, enabled = !state.marking, modifier = Modifier.testTag(PayFlowTestTags.DETAIL_MARK_NOT_PAID)) { Text(stringResource(R.string.detail_mark_not_paid)) }
-                    }
-                }
-            }
-        }
-        DetailCard(stringResource(R.string.detail_section_details)) {
-            if (payment.note.isNotBlank()) DetailRow(stringResource(R.string.detail_note), payment.note)
-            DetailRow(stringResource(R.string.detail_method), payment.method.label())
-            state.handlerLabel?.let { DetailRow(stringResource(R.string.detail_paid_via), it) }
-            DetailRow(stringResource(R.string.detail_created), payment.formattedDate())
-        }
-        DetailCard(stringResource(R.string.detail_section_references)) {
-            CopyableRow(stringResource(R.string.detail_txn_ref), payment.txnRef, snackbar)
-            payment.pspTxnId?.let { CopyableRow(stringResource(R.string.detail_psp_txn), it, snackbar) }
-            payment.upiTxnId?.let { CopyableRow(stringResource(R.string.detail_upi_txn), it, snackbar) }
-            payment.refundId?.let { CopyableRow(stringResource(R.string.detail_refund_id), it, snackbar) }
-        }
+        if (payment.canBeMarkedManually) MarkCard(state, callbacks)
+        // The sheet is the surface colour in light, so the receipt is printed on the page colour there to stay a slip of paper.
+        ReceiptCard(receipt, payment, state.handlerLabel, tag = PayFlowTestTags.DETAIL_RECEIPT, paper = if (colors.isDark) colors.surface else colors.bg)
+        MoreDetails(payment, onCopied)
     }
 }
 
 @Composable
-private fun DetailCard(title: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-            content()
+private fun MarkCard(state: PaymentDetailUiState.Content, callbacks: PaymentDetailCallbacks) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    val payment = state.payment
+    PayFlowSurface(Modifier.fillMaxWidth(), level = SurfaceLevel.Raised) {
+        Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(stringResource(R.string.detail_mark_title), style = type.bodyStrong, color = colors.text)
+            Text(
+                stringResource(R.string.detail_mark_hint, state.handlerLabel ?: payment.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)),
+                style = type.body,
+                color = colors.textSecondary,
+            )
+            PrimaryButton(stringResource(R.string.detail_mark_paid), callbacks.onMarkPaid, loading = state.marking, modifier = Modifier.fillMaxWidth().padding(top = Spacing.xxs).testTag(PayFlowTestTags.DETAIL_MARK_PAID))
+            GhostButton(stringResource(R.string.detail_mark_not_paid), callbacks.onMarkNotPaid, enabled = !state.marking, tone = GhostTone.Neutral, modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.DETAIL_MARK_NOT_PAID))
         }
     }
 }
 
-/** A reference line with a copy button; the value is what tests and support staff look for. */
+/** What the receipt leaves out: how it was paid, the provider's own ID, a refund's ID. Each can be copied for support. */
 @Composable
-private fun CopyableRow(label: String, value: String, snackbar: SnackbarHostState) {
-    val clipboard = LocalClipboardManager.current
-    val scope = rememberCoroutineScope()
-    val copied = stringResource(R.string.detail_copied, label)
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        DetailRow(label, value, modifier = Modifier.weight(1f))
-        IconButton(
-            onClick = {
-                clipboard.setText(AnnotatedString(value))
-                scope.launch { snackbar.showSnackbar(copied) }
+private fun MoreDetails(payment: Payment, onCopied: (String) -> Unit) {
+    val colors = PayFlowTheme.colors
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+        Text(stringResource(R.string.detail_section_details), style = PayFlowTheme.type.labelStrong, color = colors.textSecondary, modifier = Modifier.semantics { heading() })
+        HairlineDivider()
+        InfoRow(stringResource(R.string.detail_method), payment.method.label())
+        payment.pspTxnId?.let { CopyRow(stringResource(R.string.detail_psp_txn), it, onCopied) }
+        payment.refundId?.let { CopyRow(stringResource(R.string.detail_refund_id), it, onCopied) }
+        // The receipt already shows the reference; this only copies it.
+        val clipboard = LocalClipboardManager.current
+        val referenceLabel = stringResource(R.string.detail_txn_ref)
+        val copied = stringResource(R.string.detail_copied, referenceLabel)
+        GhostButton(
+            stringResource(R.string.detail_copy, referenceLabel.lowercase()),
+            {
+                clipboard.setText(AnnotatedString(payment.txnRef))
+                onCopied(copied)
             },
-            modifier = Modifier.size(36.dp),
-        ) {
-            Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.detail_copy, label), modifier = Modifier.size(18.dp))
-        }
+            outlined = false,
+            tone = GhostTone.Neutral,
+            leadingIcon = Icons.Outlined.ContentCopy,
+            debounceMs = 0L,
+        )
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(label, style = type.label, color = colors.textSecondary)
+        Text(value, style = type.label, color = colors.text, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+    }
+}
+
+/** An ID with a copy button, for support. */
+@Composable
+private fun CopyRow(label: String, value: String, onCopied: (String) -> Unit) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    val clipboard = LocalClipboardManager.current
+    val copied = stringResource(R.string.detail_copied, label)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(label, style = type.label, color = colors.textSecondary)
+        Text(
+            value,
+            style = type.label,
+            color = colors.text,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        PayFlowIconButton(
+            Icons.Outlined.ContentCopy,
+            stringResource(R.string.detail_copy, label),
+            {
+                clipboard.setText(AnnotatedString(value))
+                onCopied(copied)
+            },
+            tint = colors.textSecondary,
+        )
     }
 }

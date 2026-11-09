@@ -233,6 +233,7 @@ fun PayFlowNavHost(
                             HistoryRoute(
                                 onBack = null,
                                 onPaymentClick = { navController.push(PaymentDetailDestination(it)) },
+                                onPayAgain = { navController.push(PayDestination(vpa = it.payeeVpa, name = it.payeeName, source = PayViewModel.SOURCE_PAYEE)) },
                             )
                         }
                         screen<PayDestination> {
@@ -282,9 +283,8 @@ fun PayFlowNavHost(
                         }
                         screen<PaymentDetailDestination> { backStackEntry ->
                             val id = backStackEntry.toRoute<PaymentDetailDestination>().id
-                            Box(Modifier.fillMaxSize().containerTransform(paymentContainerKey(id))) {
-                                PaymentDetailRoute(onBack = { navController.popBackStack() })
-                            }
+                            // The sheet inside carries the transform, so the row grows into the sheet rather than the whole screen.
+                            PaymentDetailRoute(onBack = { navController.popBackStack() }, containerKey = paymentContainerKey(id))
                         }
                     }
                     AnimatedVisibility(

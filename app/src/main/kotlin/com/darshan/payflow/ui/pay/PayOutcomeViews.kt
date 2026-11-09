@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -409,8 +410,6 @@ class PerforatedEdgeShape(private val tooth: Dp) : Shape {
  */
 @Composable
 private fun PrintingReceipt(receipt: ReceiptContent, payment: Payment, handlerLabel: String?, play: Boolean) {
-    val colors = PayFlowTheme.colors
-    val type = PayFlowTheme.type
     val motion = LocalMotion.current
     val printed = remember { Animatable(if (play) 0f else 1f) }
     LaunchedEffect(play) {
@@ -422,37 +421,57 @@ private fun PrintingReceipt(receipt: ReceiptContent, payment: Payment, handlerLa
             printed.snapTo(1f)
         }
     }
+    Box(Modifier.fillMaxWidth().padding(top = Spacing.xs).clipToBounds()) {
+        ReceiptCard(
+            receipt, payment, handlerLabel,
+            Modifier.graphicsLayer { translationY = -(1f - printed.value.coerceIn(0f, 1f)) * size.height },
+        )
+    }
+}
+
+/**
+ * The receipt itself: status pill, who established it, reference, UPI transaction, the app that handled it, time, note and the
+ * sandbox line. Pay prints it; the payment detail shows it as is, so both say exactly the same thing.
+ */
+@Composable
+fun ReceiptCard(
+    receipt: ReceiptContent,
+    payment: Payment,
+    handlerLabel: String?,
+    modifier: Modifier = Modifier,
+    tag: String = PayFlowTestTags.PAY_RECEIPT,
+    paper: Color = PayFlowTheme.colors.surface,
+) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
     val shape = remember { PerforatedEdgeShape(Sizes.receiptPerforation) }
     val stroke = with(LocalDensity.current) { Hairline.width.toPx() }
-    Box(Modifier.fillMaxWidth().padding(top = Spacing.xs).clipToBounds()) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .graphicsLayer { translationY = -(1f - printed.value.coerceIn(0f, 1f)) * size.height }
-                .clip(shape)
-                .drawBehind {
-                    drawRect(colors.surface)
-                    drawLine(colors.outline, Offset(0f, 0f), Offset(size.width, 0f), stroke)
-                }
-                .padding(horizontal = Spacing.md)
-                .padding(top = Spacing.md, bottom = Spacing.lg)
-                .testTag(PayFlowTestTags.PAY_RECEIPT),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(stringResource(R.string.pay_receipt_title), style = type.bodyStrong, color = colors.text, modifier = Modifier.weight(1f))
-                StatusPill(receipt.status.kind(), ReceiptContent.statusLabel(receipt.status))
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .drawBehind {
+                drawRect(paper)
+                drawLine(colors.outline, Offset(0f, 0f), Offset(size.width, 0f), stroke)
             }
-            Text(statusSourceLabel(payment, handlerLabel), style = type.label, color = colors.textSecondary)
-            HairlineDivider()
-            ReceiptRow(stringResource(R.string.detail_txn_ref), receipt.reference)
-            receipt.upiTxnId?.let { ReceiptRow(stringResource(R.string.detail_upi_txn), it) }
-            handlerLabel?.let { ReceiptRow(stringResource(R.string.detail_paid_via), it) }
-            ReceiptRow(stringResource(R.string.pay_receipt_time), receipt.timeText())
-            if (payment.note.isNotBlank()) ReceiptRow(stringResource(R.string.detail_note), DisplayText.safe(payment.note))
-            if (!payment.isUpiAppPayment) Text(stringResource(R.string.pay_receipt_sandbox), style = type.label, color = colors.textSecondary)
-            Spacer(Modifier.height(Spacing.xxs))
+            .padding(horizontal = Spacing.md)
+            .padding(top = Spacing.md, bottom = Spacing.lg)
+            .testTag(tag),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(stringResource(R.string.pay_receipt_title), style = type.bodyStrong, color = colors.text, modifier = Modifier.weight(1f))
+            StatusPill(receipt.status.kind(), ReceiptContent.statusLabel(receipt.status))
         }
+        Text(statusSourceLabel(payment, handlerLabel), style = type.label, color = colors.textSecondary)
+        HairlineDivider()
+        ReceiptRow(stringResource(R.string.detail_txn_ref), receipt.reference)
+        receipt.upiTxnId?.let { ReceiptRow(stringResource(R.string.detail_upi_txn), it) }
+        handlerLabel?.let { ReceiptRow(stringResource(R.string.detail_paid_via), it) }
+        ReceiptRow(stringResource(R.string.pay_receipt_time), receipt.timeText())
+        if (payment.note.isNotBlank()) ReceiptRow(stringResource(R.string.detail_note), DisplayText.safe(payment.note))
+        if (!payment.isUpiAppPayment) Text(stringResource(R.string.pay_receipt_sandbox), style = type.label, color = colors.textSecondary)
+        Spacer(Modifier.height(Spacing.xxs))
     }
 }
 

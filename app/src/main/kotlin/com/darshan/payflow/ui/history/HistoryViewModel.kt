@@ -63,7 +63,8 @@ class HistoryViewModel @Inject constructor(
     private val savedState: SavedStateHandle,
     preferences: UiPreferences = InMemoryUiPreferences(),
     private val clock: Clock = Clock.systemUTC(),
-    private val zone: ZoneId = ZoneId.systemDefault(),
+    /** The zone days are counted in; the screen formats times in the same one. */
+    val zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
 
     private val visibility = AmountVisibility(preferences, viewModelScope)
