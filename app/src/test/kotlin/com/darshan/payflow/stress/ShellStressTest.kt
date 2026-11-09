@@ -30,7 +30,7 @@ import com.darshan.payflow.testutil.MainDispatcherRule
 import com.darshan.payflow.testutil.TestDispatcherProvider
 import com.darshan.payflow.testutil.fixedClock
 import com.darshan.payflow.testutil.testPayment
-import com.darshan.payflow.ui.components.PaymentRow
+import com.darshan.payflow.ui.components.PaymentFeedRow
 import com.darshan.payflow.ui.designsystem.components.BottomNavLogic
 import com.darshan.payflow.ui.lock.AppGate
 import com.darshan.payflow.ui.lock.AppLockViewModel
@@ -162,7 +162,7 @@ class ShellStressTest {
             val content = @androidx.compose.runtime.Composable {
                 val state = rememberLazyListState().also { list = it }
                 LazyColumn(state = state, modifier = Modifier.fillMaxSize().testTag("rows")) {
-                    items(payments, key = { it.id }) { PaymentRow(it, onClick = {}) }
+                    items(payments, key = { it.id }) { PaymentFeedRow(it, amountsHidden = false, timeLabel = "10:15 AM", onClick = {}) }
                 }
             }
             val tree = @androidx.compose.runtime.Composable {
