@@ -33,7 +33,8 @@ sealed interface ScanUiState {
     /** Denied with "don't ask again": only Settings can fix it (the gallery still works). */
     data object PermissionDenied : ScanUiState
     data class Scanning(val torchOn: Boolean, val hint: QrError?) : ScanUiState
-    data class Found(val payload: UpiQrPayload) : ScanUiState
+    /** [codesInImage] above 1: a gallery image held several payment codes, so the user confirms this one before going on. */
+    data class Found(val payload: UpiQrPayload, val codesInImage: Int = 1) : ScanUiState
     data class Error(val detail: String?) : ScanUiState
     /** A picked gallery image is being decoded. */
     data object DecodingImage : ScanUiState
@@ -96,7 +97,7 @@ class ScanViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = withContext(dispatchers.io) { imageQrDecoder.decode(uri) }) {
                 is ImageQrResult.Found -> found(result.payload)
-                is ImageQrResult.MultipleFound -> found(result.first)
+                is ImageQrResult.MultipleFound -> found(result.first, result.payloads.size)
                 is ImageQrResult.NotUpi -> imageFailed(ImageError.NOT_UPI)
                 ImageQrResult.NoQrFound -> imageFailed(ImageError.NO_QR)
                 ImageQrResult.Unreadable -> imageFailed(ImageError.UNREADABLE)
@@ -112,10 +113,11 @@ class ScanViewModel @Inject constructor(
         _uiState.value = cameraState ?: ScanUiState.CheckingPermission
     }
 
-    private fun found(payload: UpiQrPayload) {
+    private fun found(payload: UpiQrPayload, codes: Int = 1) {
         savedState[KEY_FOUND_RAW] = payload.raw
-        _uiState.value = ScanUiState.Found(payload)
-        _events.tryEmit(ScanEvent.PayloadReady(payload))
+        _uiState.value = ScanUiState.Found(payload, codes)
+        // One code goes straight on. Several in one picture: the user sees which one was picked and taps Pay themselves.
+        if (codes == 1) _events.tryEmit(ScanEvent.PayloadReady(payload))
     }
 
     private fun imageFailed(error: ImageError) {

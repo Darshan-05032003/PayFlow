@@ -137,13 +137,9 @@
     <string name="pay_payee_name_optional">Payee name (optional)</string>
     <string name="pay_amount">Amount</string>
     <string name="pay_note">Note (optional)</string>
-    <string name="pay_submit">Pay with UPI app</string>
     <string name="pay_submit_amount">Pay %1$s</string>
     <string name="pay_amount_placeholder">₹0.00</string>
     <string name="pay_amount_display">Amount to pay: %1$s</string>
-    <string name="pay_amount_display_hint">Amount in rupees</string>
-    <string name="pay_section_payee">Payee</string>
-    <string name="pay_section_amount">Amount</string>
     <string name="pay_vpa_placeholder">name@bank</string>
     <string name="pay_vpa_hint">The registered name is checked before you pay.</string>
     <string name="pay_vpa_hint_real">Your UPI app shows the registered name before you confirm.</string>
@@ -157,8 +153,6 @@
     <string name="pay_chooser_app">Pay with %1$s</string>
     <string name="pay_chooser_note">You will confirm the payment in the app you choose. PayFlow records what that app reports back.</string>
     <string name="pay_no_upi_app">No UPI app found on this device</string>
-    <string name="pay_sandbox_note">Sandbox mode: the result shown here comes from the in-app fake payment provider, not from your bank. No real money moves.</string>
-    <string name="pay_real_note">The payment is completed inside your UPI app. The status PayFlow shows afterwards is what that app reported; PayFlow has no bank connection to verify it.</string>
     <string name="pay_awaiting_app">Complete the payment in your UPI app</string>
     <string name="pay_awaiting_app_hint">When you return, PayFlow confirms the result with the payment provider.</string>
     <string name="pay_awaiting_app_hint_real">Approve or cancel in the app, then come back. PayFlow records what the app reports.</string>
@@ -196,6 +190,9 @@
 
     <!-- Scan QR -->
     <string name="scan_title">Scan QR</string>
+    <string name="scan_multiple">This image has %1$d payment QR codes. This is the first one. Check it\'s who you meant to pay.</string>
+    <string name="scan_camera_error_hint">Another app may be using it. Try again, or pay from a screenshot.</string>
+    <string name="scan_found_label">Payment QR found</string>
     <string name="scan_hint">Point the camera at a UPI QR code</string>
     <string name="scan_torch_on">Turn torch on</string>
     <string name="scan_torch_off">Turn torch off</string>
@@ -289,7 +286,6 @@
     <string name="pay_source_refund">Refund recorded by the sandbox payment provider.</string>
     <string name="pay_processing_label">Payment in progress</string>
     <string name="pay_verifying">Checking UPI ID…</string>
-    <string name="pay_verified">Verified: %1$s</string>
     <string name="pay_verify_unavailable">Could not verify this UPI ID right now. The name shown is what you typed.</string>
     <string name="error_vpa_not_found">This UPI ID was not found</string>
 
