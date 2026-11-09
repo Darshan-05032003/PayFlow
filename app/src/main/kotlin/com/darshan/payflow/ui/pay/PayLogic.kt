@@ -7,6 +7,7 @@ import com.darshan.payflow.domain.model.PaymentStatus
 import com.darshan.payflow.domain.model.StatusSource
 import com.darshan.payflow.domain.model.VpaValidator
 import com.darshan.payflow.ui.designsystem.effects.HapticEvent
+import com.darshan.payflow.ui.designsystem.effects.UiSoundEvent
 
 /** One key of the amount keypad. */
 enum class AmountKey(val label: String) {
@@ -135,7 +136,10 @@ enum class Celebration {
     NONE,
 }
 
-data class PayOutcome(val kind: OutcomeKind, val celebration: Celebration, val haptic: HapticEvent?)
+data class PayOutcome(val kind: OutcomeKind, val celebration: Celebration, val haptic: HapticEvent?) {
+    /** The optional chime (off unless the user turned sound on) belongs to the same moment as the burst: a confirmed success. */
+    val sound: UiSoundEvent? get() = if (celebration == Celebration.FULL) UiSoundEvent.Success else null
+}
 
 /** What an outcome is allowed to look like. The stored record decides, and every delight is earned here or not at all. */
 object PayOutcomes {

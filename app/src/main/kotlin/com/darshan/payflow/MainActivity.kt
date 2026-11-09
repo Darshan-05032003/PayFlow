@@ -24,6 +24,7 @@ import com.darshan.payflow.data.security.AppLock
 import com.darshan.payflow.data.upi.IncomingIntentPolicy
 import com.darshan.payflow.data.upi.IncomingUpiLinkStore
 import com.darshan.payflow.data.upi.UpiAppLauncher
+import com.darshan.payflow.ui.designsystem.effects.ChimeUiSound
 import com.darshan.payflow.ui.designsystem.effects.UiPreferences
 import com.darshan.payflow.ui.lock.AppLockViewModel
 import com.darshan.payflow.ui.lock.LockUiState
@@ -69,6 +70,8 @@ class MainActivity : FragmentActivity() {
         intent = IncomingIntentPolicy.sanitize(intent)
         // Only a cold start carries the link; after a rotation the saved state already holds the Pay screen.
         if (savedInstanceState == null) offerLink(intent)
+        // The chime plays only for a confirmed payment, and only once the user turns sound on in Me.
+        val chime = ChimeUiSound(this)
         setContent {
             val settings by uiPreferences.settings.collectAsStateWithLifecycle()
             val dark = settings.isDark()
@@ -78,7 +81,7 @@ class MainActivity : FragmentActivity() {
                 enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
                 onDispose {}
             }
-            PayFlowTheme(settings) {
+            PayFlowTheme(settings, sound = chime) {
                 // No visual effect. Off in release; the benchmark build uses it to find screens by test tag.
                 Box(if (BuildConfig.EXPOSE_TEST_TAGS) Modifier.semantics { testTagsAsResourceId = true } else Modifier) {
                     AppRoot(upiAppLauncher, cameraController, cameraPermission, checkoutKit, incomingLinks, lockViewModel = lockViewModel)

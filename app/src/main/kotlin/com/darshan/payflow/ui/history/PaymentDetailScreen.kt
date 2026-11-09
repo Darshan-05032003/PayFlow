@@ -39,13 +39,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,6 +54,7 @@ import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentMethod
 import com.darshan.payflow.ui.PayFlowTestTags
+import com.darshan.payflow.ui.components.copySensitive
 import com.darshan.payflow.ui.designsystem.components.AmountDecimals
 import com.darshan.payflow.ui.designsystem.components.AmountText
 import com.darshan.payflow.ui.designsystem.components.DisplayText
@@ -302,13 +302,13 @@ private fun MoreDetails(payment: Payment, onCopied: (String) -> Unit) {
         payment.pspTxnId?.let { CopyRow(stringResource(R.string.detail_psp_txn), it, onCopied) }
         payment.refundId?.let { CopyRow(stringResource(R.string.detail_refund_id), it, onCopied) }
         // The receipt already shows the reference; this only copies it.
-        val clipboard = LocalClipboardManager.current
+        val context = LocalContext.current
         val referenceLabel = stringResource(R.string.detail_txn_ref)
         val copied = stringResource(R.string.detail_copied, referenceLabel)
         GhostButton(
             stringResource(R.string.detail_copy, referenceLabel.lowercase()),
             {
-                clipboard.setText(AnnotatedString(payment.txnRef))
+                context.copySensitive(referenceLabel, payment.txnRef)
                 onCopied(copied)
             },
             outlined = false,
@@ -334,7 +334,7 @@ private fun InfoRow(label: String, value: String) {
 private fun CopyRow(label: String, value: String, onCopied: (String) -> Unit) {
     val colors = PayFlowTheme.colors
     val type = PayFlowTheme.type
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     val copied = stringResource(R.string.detail_copied, label)
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
         Text(label, style = type.label, color = colors.textSecondary)
@@ -351,7 +351,7 @@ private fun CopyRow(label: String, value: String, onCopied: (String) -> Unit) {
             Icons.Outlined.ContentCopy,
             stringResource(R.string.detail_copy, label),
             {
-                clipboard.setText(AnnotatedString(value))
+                context.copySensitive(label, value)
                 onCopied(copied)
             },
             tint = colors.textSecondary,

@@ -40,6 +40,8 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.darshan.payflow.R
+import com.darshan.payflow.data.security.GuardReason
+import com.darshan.payflow.ui.security.TamperWarningOverlay
 import com.darshan.payflow.core.Money
 import com.darshan.payflow.data.upi.UpiApp
 import com.darshan.payflow.data.upi.UpiAppLauncher
@@ -112,7 +114,9 @@ fun PayRoute(
     val activityLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         viewModel.onUpiAppResult(upiAppLauncher.parseActivityResult(result.resultCode, result.data))
     }
-    val blocked = stringResource(R.string.pay_blocked)
+    // The guard's refusal opens a designed explanation instead of a toast. Closing it changes nothing: the guard runs again
+    // before every payment.
+    var blockedReasons by rememberSaveable { mutableStateOf("") }
     val warning = stringResource(R.string.pay_guard_warning)
     CollectUiEffects(viewModel.uiEffects)
     LaunchedEffect(Unit) {
@@ -123,7 +127,7 @@ fun PayRoute(
                     runCatching { activityLauncher.launch(intent) }.onFailure { toasts.show(noUpiApp, ToastTone.Failed) }
                 }
                 PayEvent.NoUpiApp -> toasts.show(noUpiApp, ToastTone.Failed)
-                is PayEvent.Blocked -> toasts.show(blocked, ToastTone.Failed)
+                is PayEvent.Blocked -> blockedReasons = event.reasons.joinToString(",") { it.name }
                 is PayEvent.Warning -> toasts.show(warning, ToastTone.Pending)
                 is PayEvent.ShareReceipt -> {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, event.text)
@@ -168,6 +172,8 @@ fun PayRoute(
             onMarkNotPaid = { viewModel.markManually(paid = false) },
         ),
         toasts = toasts,
+        blocked = blockedReasons.split(',').mapNotNull { name -> GuardReason.entries.firstOrNull { it.name == name } },
+        onCloseBlocked = { blockedReasons = "" },
     )
 }
 
@@ -206,7 +212,13 @@ private fun rememberWaitMillis(key: Any?, waiting: Boolean): Long {
 }
 
 @Composable
-fun PayScreen(state: PayUiState, callbacks: PayCallbacks, toasts: ToastHostState = rememberToastHostState()) {
+fun PayScreen(
+    state: PayUiState,
+    callbacks: PayCallbacks,
+    toasts: ToastHostState = rememberToastHostState(),
+    blocked: List<GuardReason> = emptyList(),
+    onCloseBlocked: () -> Unit = {},
+) {
     SecureWindow()
     val colors = PayFlowTheme.colors
     val motion = LocalMotion.current
@@ -230,7 +242,7 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, toasts: ToastHostState
     val appSheet = phase as? PayPhase.ChoosingApp
     val shareVisible = shareOpen && phase is PayPhase.Done
     val againVisible = againOpen && phase is PayPhase.Done
-    val sheetOpen = confirmVisible || appSheet != null || shareVisible || againVisible
+    val sheetOpen = confirmVisible || appSheet != null || shareVisible || againVisible || blocked.isNotEmpty()
     val blockedMessage = stringResource(R.string.pay_back_blocked)
 
     // Registered before the sheets' own handlers, so an open sheet still takes back first.
@@ -278,6 +290,7 @@ fun PayScreen(state: PayUiState, callbacks: PayCallbacks, toasts: ToastHostState
         AppChooserSheet(appSheet, state, backBlocked, callbacks)
         ShareSheet(shareVisible, onDismiss = { shareOpen = false }, callbacks)
         PayAgainSheet(againVisible, onDismiss = { againOpen = false }, callbacks)
+        TamperWarningOverlay(visible = blocked.isNotEmpty(), reasons = blocked, onClose = onCloseBlocked)
     }
 }
 

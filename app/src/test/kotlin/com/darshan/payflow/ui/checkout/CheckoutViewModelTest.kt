@@ -67,4 +67,27 @@ class CheckoutViewModelTest {
         val vm2 = CheckoutViewModel(RecordCheckoutResultUseCase(repo, fixedClock, { "ck-1" }) { "CKREF" }, TestDispatcherProvider(dispatcher), handle)
         assertThat(vm2.uiState.value.activeOrder).isEqualTo(order)
     }
+
+    /** The store behind CheckoutKit's sheet recedes only while the sheet is up, and comes back while the result is saved. */
+    @Test
+    fun `the sheet counts as open from launch until its result arrives`() = runTest(dispatcher) {
+        val vm = vm()
+        assertThat(vm.uiState.value.sheetOpen).isFalse()
+        val order = vm.startOrder(vm.uiState.value.products.first())
+        assertThat(vm.uiState.value.sheetOpen).isTrue()
+        vm.onResult(CheckoutResult.Success("CKREF", order.amountPaise))
+        assertThat(vm.uiState.value.recording).isTrue()
+        assertThat(vm.uiState.value.sheetOpen).isFalse()
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.sheetOpen).isFalse()
+    }
+
+    @Test
+    fun `starting an order while one is open is refused, so a double tap on buy opens one sheet`() = runTest(dispatcher) {
+        val vm = vm()
+        val first = vm.startOrder(vm.uiState.value.products.first())
+        val second = vm.startOrder(vm.uiState.value.products[1])
+        assertThat(second).isEqualTo(first)
+        assertThat(vm.uiState.value.activeOrder).isEqualTo(first)
+    }
 }

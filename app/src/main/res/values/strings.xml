@@ -454,16 +454,15 @@
     <string name="home_lock_setup">Set up</string>
 
     <!-- Pay guard -->
-    <string name="pay_blocked">Payment blocked: this device failed the security checks (root, hooking tools or a modified app).</string>
     <string name="pay_guard_warning">Security warning: this device is not fully verified.</string>
 
     <!-- Security screen -->
     <string name="security_title">Security</string>
     <string name="security_pin_title">App lock</string>
-    <string name="security_pin_on">PIN and biometric lock are on.</string>
-    <string name="security_pin_off">No app lock set.</string>
-    <string name="security_pin_setup">Set up PIN</string>
-    <string name="security_pin_remove">Remove PIN</string>
+    <string name="security_pin_on">On. PayFlow locks after a minute away.</string>
+    <string name="security_pin_off">Off. Anyone holding this phone can open PayFlow.</string>
+    <string name="security_pin_setup">Set up app lock</string>
+    <string name="security_pin_remove">Turn off app lock</string>
     <string name="security_binding_title">Device binding</string>
     <string name="security_unbound">Link this device to your phone number (sandbox: the OTP is shown here instead of an SMS).</string>
     <string name="security_phone">Mobile number</string>
@@ -482,7 +481,7 @@
     <string name="security_rebind">Re-verify</string>
     <string name="security_tamper_title">Device integrity</string>
     <string name="security_tamper_clean">No root, hooking or tampering detected.</string>
-    <string name="security_tamper_blocked">Payments are blocked on this device.</string>
+    <string name="security_tamper_blocked">Payments are paused: root, hooking tools or a modified app were found.</string>
     <string name="security_rescan">Scan again</string>
     <string name="tamper_su">Root access (su binary) found</string>
     <string name="tamper_magisk">Magisk detected</string>
@@ -497,10 +496,10 @@
     <string name="security_integrity_not_configured">Not configured: add PLAY_INTEGRITY_CLOUD_PROJECT to local.properties.</string>
     <string name="security_integrity_error">Request failed: %1$s</string>
     <string name="security_integrity_ok">Device meets integrity requirements.</string>
-    <string name="security_integrity_failed">Device failed the integrity check.</string>
+    <string name="security_integrity_failed">Google Play says this phone fails its integrity check.</string>
     <string name="security_integrity_unevaluated">Integrity could not be evaluated.</string>
     <string name="security_integrity_sandbox">(verified by the sandbox verifier; real verification needs a server)</string>
-    <string name="security_integrity_check">Request token</string>
+    <string name="security_integrity_check">Check integrity again</string>
     <string name="security_overview_title">%1$d of %2$d protections active</string>
     <string name="security_overview_hint">App lock, device binding, tamper checks and Play Integrity.</string>
     <string name="security_state_on">On</string>
@@ -559,4 +558,107 @@
     <string name="receive_error_too_long">Use at most 50 characters</string>
     <string name="receive_error_vpa">Enter a UPI ID like name@bank</string>
     <string name="receive_note">Receiving happens in the payer\'s UPI app and your bank; PayFlow only shows the QR and cannot see incoming money.</string>
+
+    <!-- Security centre (UI overhaul) -->
+    <string name="security_summary_overline">Security centre</string>
+    <string name="security_summary_checking">Checking this phone…</string>
+    <string name="security_summary_clear">Everything checks out</string>
+    <plurals name="security_summary_needs_you">
+        <item quantity="one">One thing needs you</item>
+        <item quantity="other">%d things need you</item>
+    </plurals>
+    <string name="security_summary_clear_notes">Nothing needs you</string>
+    <string name="security_detail_warnings">Warnings found. Payments still work; open for details.</string>
+    <string name="security_summary_payments_off">Payments are paused on this phone</string>
+    <string name="security_check_binding">Device binding</string>
+    <string name="security_check_device">Root and tamper scan</string>
+    <string name="security_check_integrity">Play Integrity</string>
+    <string name="security_check_app_lock">App lock</string>
+    <string name="security_check_biometric">Biometric unlock</string>
+    <string name="security_detail_checking">Checking…</string>
+    <string name="security_detail_unbound">Not bound to a phone number yet.</string>
+    <string name="security_detail_debug">Debug build: the app can be debugged. Expected while developing; payments still work.</string>
+    <string name="security_detail_integrity_sandbox">Token received from Google Play. The verdict is simulated: checking it needs a server PayFlow doesn\'t have.</string>
+    <string name="security_detail_integrity_not_configured">Not set up in this build: it has no Google Cloud project number.</string>
+    <string name="security_detail_biometric_ready">Your fingerprint or face can unlock PayFlow.</string>
+    <string name="security_detail_biometric_needs_pin">Set up the app lock first. Biometrics unlock it.</string>
+    <string name="security_detail_biometric_not_enrolled">No fingerprint or face is enrolled on this phone.</string>
+    <string name="security_detail_biometric_unavailable">This phone has no biometric unlock PayFlow can use.</string>
+    <string name="security_verdict_checking">Checking</string>
+    <string name="security_verdict_passed">Passed</string>
+    <string name="security_verdict_attention">Needs you</string>
+    <string name="security_verdict_failed">Failed</string>
+    <string name="security_verdict_info">Note</string>
+    <string name="security_next_explain">What this means</string>
+    <string name="security_next_bind">Bind this phone</string>
+    <string name="security_mode_overline">How payments run</string>
+    <string name="security_integrity_explainer">PayFlow asks Google Play whether this is a genuine phone running a genuine copy of the app, and ties the answer to each payment. A failed verdict pauses payments.</string>
+    <string name="security_biometric_explainer">It uses the phone\'s own prompt, with the screen lock as a fallback. PayFlow never sees your fingerprint.</string>
+    <string name="security_pin_on_detail">PayFlow asks for your PIN or fingerprint when it opens and after a minute in the background. Turning it off needs your PIN.</string>
+    <string name="security_pin_off_detail">Set a 6-digit PIN so only you can open PayFlow. Your fingerprint can unlock it too.</string>
+    <string name="security_remove_title">Turn off app lock?</string>
+    <string name="security_remove_body">Anyone holding this phone could then open PayFlow and see your payments. Enter your PIN to confirm.</string>
+    <string name="security_remove_pin_label">Current PIN</string>
+    <plurals name="security_remove_wrong">
+        <item quantity="one">Wrong PIN. 1 try left before a pause.</item>
+        <item quantity="other">Wrong PIN. %d tries left before a pause.</item>
+    </plurals>
+    <string name="security_remove_locked">Too many tries. Try again in %d min.</string>
+    <string name="security_remove_biometric_failed">Not recognised. Try again or use your PIN.</string>
+    <string name="security_remove_confirm">Turn off</string>
+    <string name="security_remove_biometric">Use fingerprint instead</string>
+
+    <!-- Root / tamper warning -->
+    <string name="tamper_warning_bar">Device check</string>
+    <string name="tamper_warning_title">Payments are paused on this phone</string>
+    <string name="tamper_warning_body">PayFlow found signs that this phone, or this copy of the app, has been changed. On a changed phone another app can read the screen or alter a payment before it\'s sent, so PayFlow won\'t send money from it.</string>
+    <string name="tamper_warning_found">What PayFlow found</string>
+    <string name="tamper_reason_rooted">The phone is rooted: an app can take full control of it.</string>
+    <string name="tamper_reason_hooking">A tool that changes apps while they run (Frida) is active.</string>
+    <string name="tamper_reason_signature">This copy of PayFlow isn\'t signed by its publisher.</string>
+    <string name="tamper_reason_integrity">Google Play couldn\'t vouch for this phone.</string>
+    <string name="tamper_reason_other">Another device check failed.</string>
+    <string name="tamper_warning_still_works">What still works</string>
+    <string name="tamper_works_history">Your history and receipts</string>
+    <string name="tamper_works_receive">Your QR for receiving money</string>
+    <string name="tamper_works_settings">App lock and your settings</string>
+    <string name="tamper_warning_fix">To pay again</string>
+    <string name="tamper_warning_fix_body">Remove root or the tool, or install PayFlow from its official source. Then check again: payments come back as soon as the checks pass.</string>
+    <string name="tamper_warning_recheck">Check again</string>
+    <string name="tamper_warning_close">Close</string>
+
+    <!-- Me -->
+    <string name="me_title">Me</string>
+    <string name="me_profile_none">No UPI ID yet</string>
+    <string name="me_profile_none_hint">Add the UPI ID you receive money with to get your own QR.</string>
+    <string name="me_profile_setup">Set up your UPI ID</string>
+    <string name="me_section_account">Account</string>
+    <string name="me_security">Security centre</string>
+    <string name="me_security_on">App lock on · checks and payment mode</string>
+    <string name="me_security_off">App lock is off</string>
+    <string name="me_receive">Receive money</string>
+    <string name="me_receive_hint">Your QR and UPI ID</string>
+    <string name="me_section_feel">Look and feel</string>
+    <string name="me_haptics">Haptics</string>
+    <string name="me_haptics_hint">A light tap on presses, a firm one when a payment goes through</string>
+    <string name="me_sound">Sound</string>
+    <string name="me_sound_hint">A soft chime when a payment is confirmed</string>
+    <string name="me_reduce_motion">Reduce motion</string>
+    <string name="me_reduce_motion_hint">Short fades instead of movement. Nothing decorative plays.</string>
+    <string name="me_theme">Theme</string>
+    <string name="me_theme_system">System</string>
+    <string name="me_theme_light">Light</string>
+    <string name="me_theme_dark">Dark</string>
+    <string name="me_section_more">More</string>
+    <string name="me_about">About PayFlow</string>
+    <string name="me_about_hint">Version %1$s · sandbox notes and credits</string>
+    <string name="about_body">A UPI payments app. In UPI apps mode, your UPI app moves the money and reports the result; in sandbox mode, every payment settles against a provider inside the app and no money moves.</string>
+    <string name="about_fonts">Type: Newsreader and Geist, both under the SIL Open Font License.</string>
+    <string name="about_inspired">Motion and craft inspired by best-in-class Indian consumer apps; not affiliated with any of them.</string>
+    <string name="about_close">Close</string>
+
+    <!-- Checkout (UI overhaul) -->
+    <string name="checkout_overline">Demo store</string>
+    <string name="checkout_cancelled_pill">Cancelled</string>
+    <string name="checkout_recording">Saving to your history…</string>
 </resources>

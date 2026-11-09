@@ -8,6 +8,10 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -57,6 +61,13 @@ class PinManager(
     private val mutex = Mutex()
     private val random = SecureRandom()
     private val json = Json
+    private val _changes = MutableStateFlow(0L)
+
+    /**
+     * Moves every time a PIN is set or removed (never on a verification). Everything that shows whether the app lock is on
+     * (Home's banner, the lock, Security) re-reads [isSet] when it moves, so a change made on one screen can't leave another stale.
+     */
+    val changes: StateFlow<Long> = _changes.asStateFlow()
 
     suspend fun isSet(): Boolean = load() != null
 
@@ -66,6 +77,7 @@ class PinManager(
             val salt = ByteArray(SALT_BYTES).also(random::nextBytes)
             save(PinRecord(iterations, salt, hash(pin, salt, iterations)))
         }
+        _changes.update { it + 1 }
     }
 
     suspend fun verify(pin: String): PinVerification = mutex.withLock {
@@ -94,7 +106,10 @@ class PinManager(
         return result
     }
 
-    suspend fun clear() = mutex.withLock { store.remove(KEY) }
+    suspend fun clear() {
+        mutex.withLock { store.remove(KEY) }
+        _changes.update { it + 1 }
+    }
 
     suspend fun lockoutRemainingMillis(): Long = (load()?.lockoutUntilMillis ?: 0L).minus(clock.millis()).coerceAtLeast(0)
 

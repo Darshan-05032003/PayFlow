@@ -85,14 +85,32 @@ class ShellNavigationTest {
     }
 
     @Test
-    fun theMeTabOpensSecurityWithNoBackArrow() {
+    fun theMeTabOpensMeWithNoBackArrowAndSecurityIsOneTapAway() {
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
-        await(PayFlowTestTags.SECURITY_SETUP_PIN)
+        await(PayFlowTestTags.ME_SCREEN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).assertIsSelected()
         assertThat(compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Back")).fetchSemanticsNodes()).isEmpty()
+        // Security is a page inside Me: it has a back arrow, no bar, and back returns to Me.
+        compose.onNodeWithTag(PayFlowTestTags.ME_SECURITY).performClick()
+        await(PayFlowTestTags.SECURITY_SETUP_PIN)
+        assertThat(compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Back")).fetchSemanticsNodes()).isNotEmpty()
+        awaitGone(PayFlowTestTags.NAV_HOME)
+        back()
+        await(PayFlowTestTags.ME_SCREEN)
+        compose.onNodeWithTag(PayFlowTestTags.NAV_ME).assertIsSelected()
         back()
         await(PayFlowTestTags.HOME_SCAN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_HOME).assertIsSelected()
+    }
+
+    @Test
+    fun meOpensReceive() {
+        compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
+        await(PayFlowTestTags.ME_RECEIVE)
+        compose.onNodeWithTag(PayFlowTestTags.ME_RECEIVE).performScrollTo().performClick()
+        await(PayFlowTestTags.RECEIVE_SAVE)
+        back()
+        await(PayFlowTestTags.ME_SCREEN)
     }
 
     @Test
@@ -164,7 +182,7 @@ class ShellNavigationTest {
         back()
         await(PayFlowTestTags.HOME_SCAN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
-        await(PayFlowTestTags.SECURITY_SETUP_PIN)
+        await(PayFlowTestTags.ME_SCREEN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).assertIsSelected()
     }
 
@@ -232,7 +250,7 @@ class ShellNavigationTest {
             compose.onNodeWithTag(PayFlowTestTags.NAV_HOME).performClick()
         }
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
-        await(PayFlowTestTags.SECURITY_SETUP_PIN)
+        await(PayFlowTestTags.ME_SCREEN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).assertIsSelected()
         back()
         await(PayFlowTestTags.HOME_SCAN)
@@ -252,17 +270,19 @@ class ShellNavigationTest {
     @Test
     fun theTabSurvivesRecreationAndThePillFollows() {
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
-        await(PayFlowTestTags.SECURITY_SETUP_PIN)
+        await(PayFlowTestTags.ME_SCREEN)
         compose.activityRule.scenario.recreate()
-        await(PayFlowTestTags.SECURITY_SETUP_PIN)
+        await(PayFlowTestTags.ME_SCREEN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).assertIsSelected()
         back()
         await(PayFlowTestTags.HOME_SCAN)
     }
 
     @Test
-    fun settingUpAPinFromTheMeTabReturnsThere() {
+    fun settingUpAPinFromSecurityReturnsThere() {
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
+        await(PayFlowTestTags.ME_SECURITY)
+        compose.onNodeWithTag(PayFlowTestTags.ME_SECURITY).performClick()
         await(PayFlowTestTags.SECURITY_SETUP_PIN)
         compose.onNodeWithTag(PayFlowTestTags.SECURITY_SETUP_PIN).performScrollTo().performClick()
         compose.waitUntilWithMainLooper(5_000) { exists(PayFlowTestTags.lockKey("1")) }

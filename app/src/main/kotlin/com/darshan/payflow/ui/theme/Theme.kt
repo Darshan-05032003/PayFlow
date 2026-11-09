@@ -63,12 +63,14 @@ fun UiSettings.isDark(): Boolean = when (theme) {
 
 /** App entry point: everything comes from the stored UI settings. */
 @Composable
-fun PayFlowTheme(settings: UiSettings, content: @Composable () -> Unit) {
+fun PayFlowTheme(settings: UiSettings, sound: UiSound = NoOpUiSound, haptics: Haptics? = null, content: @Composable () -> Unit) {
     PayFlowTheme(
         darkTheme = settings.isDark(),
         reduceMotion = settings.reduceMotion,
         hapticsEnabled = settings.hapticsEnabled,
         soundEnabled = settings.soundEnabled,
+        haptics = haptics,
+        sound = sound,
         content = content,
     )
 }

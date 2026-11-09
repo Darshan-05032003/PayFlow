@@ -196,6 +196,7 @@ class PayOutcomesTest {
         assertThat(o.kind).isEqualTo(OutcomeKind.SUCCESS)
         assertThat(o.celebration).isEqualTo(Celebration.FULL)
         assertThat(o.haptic).isEqualTo(HapticEvent.Confirm)
+        assertThat(o.sound).isEqualTo(com.darshan.payflow.ui.designsystem.effects.UiSoundEvent.Success)
     }
 
     @Test
@@ -203,6 +204,7 @@ class PayOutcomesTest {
         val o = PayOutcomes.of(done(PaymentStatus.SUCCESS, StatusSource.UPI_APP, "com.example.gpay"))
         assertThat(o.kind).isEqualTo(OutcomeKind.REPORTED_SUCCESS)
         assertThat(o.celebration).isEqualTo(Celebration.QUIET)
+        assertThat(o.sound).isNull() // a success PayFlow can't verify doesn't chime
     }
 
     @Test
@@ -231,6 +233,7 @@ class PayOutcomesTest {
             val o = PayOutcomes.of(phase)
             assertThat(o.celebration).isEqualTo(Celebration.NONE)
             assertThat(o.haptic).isNotEqualTo(HapticEvent.Confirm)
+            assertThat(o.sound).isNull()
         }
     }
 

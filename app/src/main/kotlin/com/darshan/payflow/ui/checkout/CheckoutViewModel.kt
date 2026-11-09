@@ -31,7 +31,10 @@ data class CheckoutUiState(
     val activeOrder: CheckoutOrder? = null,
     val lastOutcome: CheckoutOutcome? = null,
     val recording: Boolean = false,
-)
+) {
+    /** CheckoutKit's sheet is up: an order is out and its result hasn't come back yet. The store recedes behind it. */
+    val sheetOpen: Boolean get() = activeOrder != null && !recording
+}
 
 /** Hosts the merchant demo: creates an order, hands it to the CheckoutKit sheet and records whatever comes back. */
 @HiltViewModel
@@ -45,6 +48,9 @@ class CheckoutViewModel @Inject constructor(
 
     /** Creates a new order for [product]; the id is unique per attempt so the SDK's idempotency is per checkout. */
     fun startOrder(product: Product): CheckoutOrder {
+        // A second tap while a sheet is up must not swap the order under it: the sheet would charge one product and the
+        // result would be recorded against another.
+        _uiState.value.activeOrder?.let { return it }
         val order = CheckoutOrder(
             orderId = "PF-" + product.id + "-" + java.lang.Long.toString(System.currentTimeMillis(), 36).uppercase() + random.nextInt(1_000).toString().padStart(3, '0'),
             amountPaise = product.pricePaise, description = product.name, merchantVpa = MERCHANT_VPA, merchantName = MERCHANT_NAME,

@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -226,6 +227,25 @@ class HistoryMoneyScreenTest {
         rule.setDs { PaymentDetailScreen(PaymentDetailUiState.Content(payment), PaymentDetailCallbacks()) }
         rule.onNodeWithTag(PayFlowTestTags.DETAIL_RECEIPT).assertIsDisplayed()
         rule.onNodeWithText("Confirmed by the sandbox payment provider.", substring = true).assertExists()
+    }
+
+    /** Clipboard exposure: keyboards and the clipboard preview must not show a copied payment reference. */
+    @Test
+    fun copiedReferencesAreMarkedSensitiveOnTheClipboard() {
+        val payment = sample.first().copy(pspTxnId = "PSPX123456")
+        rule.setDs { PaymentDetailScreen(PaymentDetailUiState.Content(payment), PaymentDetailCallbacks()) }
+        val clipboard = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+            .getSystemService(android.content.ClipboardManager::class.java)
+        rule.onNodeWithText("Copy reference").performScrollTo().performClick()
+        rule.waitForIdle()
+        var clip = clipboard.primaryClip!!
+        assertThat(clip.getItemAt(0).text.toString()).isEqualTo(payment.txnRef)
+        assertThat(clip.description.extras?.getBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE)).isTrue()
+        rule.onNodeWithContentDescription("Copy PSP transaction").performScrollTo().performClick()
+        rule.waitForIdle()
+        clip = clipboard.primaryClip!!
+        assertThat(clip.getItemAt(0).text.toString()).isEqualTo("PSPX123456")
+        assertThat(clip.description.extras?.getBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE)).isTrue()
     }
 
     @Test

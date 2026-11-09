@@ -56,6 +56,7 @@ import com.darshan.payflow.ui.mandates.MandateDetailRoute
 import com.darshan.payflow.ui.mandates.MandatesRoute
 import com.darshan.payflow.ui.pay.PayRoute
 import com.darshan.payflow.ui.pay.PayViewModel
+import com.darshan.payflow.ui.me.MeRoute
 import com.darshan.payflow.ui.receive.ReceiveRoute
 import com.darshan.payflow.ui.scan.ScanRoute
 import com.darshan.payflow.ui.security.SecurityRoute
@@ -83,6 +84,7 @@ data class PayDestination(
 @Serializable object ReceiveDestination
 @Serializable object CollectDestination
 @Serializable object SecurityDestination
+@Serializable object MeDestination
 @Serializable object CheckoutDestination
 @Serializable object MandatesDestination
 @Serializable object CreateMandateDestination
@@ -142,7 +144,8 @@ private const val APP_STATE_KEY = "app"
 fun NavDestination.shellRoute(): ShellRoute? = when {
     hasRoute<HomeDestination>() -> ShellRoute.Home
     hasRoute<HistoryDestination>() -> ShellRoute.History
-    hasRoute<SecurityDestination>() -> ShellRoute.Me
+    hasRoute<MeDestination>() -> ShellRoute.Me
+    hasRoute<SecurityDestination>() -> ShellRoute.Security
     hasRoute<ScanDestination>() -> ShellRoute.Scan
     hasRoute<PayDestination>() -> ShellRoute.Pay
     hasRoute<ReceiveDestination>() -> ShellRoute.Receive
@@ -249,8 +252,11 @@ fun PayFlowNavHost(
                         screen<CheckoutDestination> {
                             CheckoutRoute(checkoutKit, onBack = { navController.popBackStack() }, onOpenPayment = { navController.push(PaymentDetailDestination(it)) })
                         }
+                        screen<MeDestination> {
+                            MeRoute(onSecurity = { navController.push(SecurityDestination) }, onReceive = { navController.push(ReceiveDestination) })
+                        }
                         screen<SecurityDestination> {
-                            SecurityRoute(onBack = null, onSetupPin = onSetupPin)
+                            SecurityRoute(onBack = { navController.popBackStack() }, onSetupPin = onSetupPin)
                         }
                         screen<MandatesDestination> {
                             MandatesRoute(
@@ -300,7 +306,7 @@ fun PayFlowNavHost(
                                     is BottomNavChange.Changed -> when (ShellLogic.BAR[change.to]) {
                                         ShellRoute.Scan -> navController.push(ScanDestination)
                                         ShellRoute.History -> navController.openTab(HistoryDestination)
-                                        ShellRoute.Me -> navController.openTab(SecurityDestination)
+                                        ShellRoute.Me -> navController.openTab(MeDestination)
                                         else -> navController.openTab(HomeDestination)
                                     }
                                     is BottomNavChange.Reselected -> reselects.tryEmit(ShellLogic.BAR[change.index])

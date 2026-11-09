@@ -94,7 +94,7 @@ class ShellScreenshotTest {
     fun meTabLight() {
         theme(ThemeMode.Light)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
-        compose.waitUntilWithMainLooper(10_000) { exists(PayFlowTestTags.SECURITY_SETUP_PIN) }
+        compose.waitUntilWithMainLooper(10_000) { exists(PayFlowTestTags.ME_HAPTICS) }
         shot("me-light")
     }
 }

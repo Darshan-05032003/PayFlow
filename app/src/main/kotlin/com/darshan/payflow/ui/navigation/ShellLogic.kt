@@ -1,7 +1,7 @@
 package com.darshan.payflow.ui.navigation
 
 /** Every place the app can be. The shell's rules are written against this, so they can be tested without a NavController. */
-enum class ShellRoute { Home, History, Me, Scan, Pay, Receive, Collect, Checkout, Mandates, CreateMandate, MandateDetail, PaymentDetail }
+enum class ShellRoute { Home, History, Me, Scan, Pay, Receive, Collect, Checkout, Mandates, CreateMandate, MandateDetail, PaymentDetail, Security }
 
 /** How one screen replaces another. One vocabulary for the whole app; see docs/DECISIONS.md. */
 enum class ScreenTransition {

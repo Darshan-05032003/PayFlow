@@ -126,4 +126,18 @@ class PinManagerTest {
         m.clear()
         assertThat(m.isSet()).isFalse()
     }
+
+    /** Whoever shows "app lock on/off" (Home's banner, the lock, Security) follows this, so a removal can't leave one stale. */
+    @Test
+    fun `changes move on set and clear, never on a verification`() = runTest {
+        val m = manager()
+        val start = m.changes.value
+        m.set("493027")
+        assertThat(m.changes.value).isEqualTo(start + 1)
+        m.verify("000000")
+        m.verify("493027")
+        assertThat(m.changes.value).isEqualTo(start + 1)
+        m.clear()
+        assertThat(m.changes.value).isEqualTo(start + 2)
+    }
 }

@@ -446,7 +446,9 @@ class PayViewModel @Inject constructor(
         val previous = _uiState.value.phase
         _uiState.update { it.copy(phase = phase) }
         if (phase is PayPhase.Done && (previous as? PayPhase.Done)?.status != phase.status) {
-            PayOutcomes.of(phase).haptic?.let { effects.send(UiEffect.Haptic(it)) }
+            val outcome = PayOutcomes.of(phase)
+            outcome.haptic?.let { effects.send(UiEffect.Haptic(it)) }
+            outcome.sound?.let { effects.send(UiEffect.Sound(it)) }
         }
     }
 

@@ -1,6 +1,9 @@
 package com.darshan.payflow.ui.security
 
 import com.darshan.payflow.data.security.BindingStatus
+import com.darshan.payflow.data.security.BiometricAvailability
+import com.darshan.payflow.data.security.BiometricResult
+import com.darshan.payflow.testutil.FakeBiometricAuthenticator
 import com.darshan.payflow.data.security.DeviceBindingManager
 import com.darshan.payflow.data.security.DeviceIdentity
 import com.darshan.payflow.data.security.FakeIntegrityVerifier
@@ -37,11 +40,12 @@ class SecurityViewModelTest {
     private var integrity: IntegrityResult = IntegrityResult.Token("tok")
     private val modes = com.darshan.payflow.data.settings.InMemoryPaymentModeRepository(com.darshan.payflow.domain.model.PaymentMode.UPI_APPS)
     private val launcher = com.darshan.payflow.testutil.FakeUpiAppLauncher()
+    private val biometric = FakeBiometricAuthenticator()
 
     private fun vm() = SecurityViewModel(
         pins, binding, sender, tamper,
         object : IntegrityChecker { override val isConfigured get() = integrity !is IntegrityResult.NotConfigured; override suspend fun requestToken(requestHash: String) = integrity },
-        FakeIntegrityVerifier(IntegrityVerdict.MEETS_DEVICE_INTEGRITY), modes, launcher, TestDispatcherProvider(dispatcher),
+        FakeIntegrityVerifier(IntegrityVerdict.MEETS_DEVICE_INTEGRITY), modes, launcher, TestDispatcherProvider(dispatcher), biometric,
     )
 
     @Test
@@ -103,11 +107,112 @@ class SecurityViewModelTest {
     }
 
     @Test
-    fun `remove pin`() = runTest(dispatcher) {
+    fun `remove pin with the current pin`() = runTest(dispatcher) {
         pins.set("493027")
         val vm = vm(); advanceUntilIdle()
-        vm.removePin(); advanceUntilIdle()
+        vm.startPinRemoval(); advanceUntilIdle()
+        assertThat(vm.uiState.value.removal).isNotNull()
+        vm.confirmPinRemoval("493027"); advanceUntilIdle()
         assertThat(vm.uiState.value.pinConfigured).isFalse()
+        assertThat(vm.uiState.value.removal).isNull()
         assertThat(pins.isSet()).isFalse()
+    }
+
+    // ---- attacks on "turn off app lock": the PIN is the lock, so removing it must prove the owner is here.
+
+    @Test
+    fun `attack - starting a removal alone removes nothing`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm(); advanceUntilIdle()
+        vm.startPinRemoval(); vm.startPinRemoval(); advanceUntilIdle()
+        vm.cancelPinRemoval(); advanceUntilIdle()
+        assertThat(pins.isSet()).isTrue()
+        assertThat(vm.uiState.value.pinConfigured).isTrue()
+        assertThat(vm.uiState.value.removal).isNull()
+    }
+
+    @Test
+    fun `attack - a confirmation without a started removal is ignored`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm(); advanceUntilIdle()
+        vm.confirmPinRemoval("493027"); vm.confirmPinRemovalWithBiometric("Turn off"); advanceUntilIdle()
+        assertThat(pins.isSet()).isTrue()
+        assertThat(biometric.prompts).isEqualTo(0)
+    }
+
+    @Test
+    fun `attack - a wrong pin keeps the lock and counts toward the lockout`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm(); advanceUntilIdle()
+        vm.startPinRemoval(); advanceUntilIdle()
+        vm.confirmPinRemoval("000000"); advanceUntilIdle()
+        val removal = vm.uiState.value.removal!!
+        assertThat(removal.error).isEqualTo(PinRemovalError.WRONG_PIN)
+        assertThat(removal.remainingAttempts).isEqualTo(PinManager.MAX_ATTEMPTS - 1)
+        assertThat(removal.attempts).isEqualTo(1)
+        assertThat(pins.isSet()).isTrue()
+        assertThat(vm.uiState.value.pinConfigured).isTrue()
+    }
+
+    @Test
+    fun `attack - brute force locks out, and then even the right pin is refused`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm(); advanceUntilIdle()
+        vm.startPinRemoval(); advanceUntilIdle()
+        repeat(PinManager.MAX_ATTEMPTS) { vm.confirmPinRemoval("11122$it"); advanceUntilIdle() }
+        assertThat(vm.uiState.value.removal!!.error).isEqualTo(PinRemovalError.LOCKED_OUT)
+        assertThat(vm.uiState.value.removal!!.lockoutRemainingMillis).isGreaterThan(0L)
+        vm.confirmPinRemoval("493027"); advanceUntilIdle()
+        assertThat(vm.uiState.value.removal!!.error).isEqualTo(PinRemovalError.LOCKED_OUT)
+        assertThat(pins.isSet()).isTrue()
+    }
+
+    @Test
+    fun `attack - a failed, cancelled or unavailable biometric keeps the lock`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm(); advanceUntilIdle()
+        vm.startPinRemoval(); advanceUntilIdle()
+        for (result in listOf(BiometricResult.Failed("no match"), BiometricResult.Cancelled, BiometricResult.Unavailable)) {
+            biometric.result = result
+            vm.confirmPinRemovalWithBiometric("Turn off"); advanceUntilIdle()
+            assertThat(pins.isSet()).isTrue()
+        }
+        assertThat(vm.uiState.value.removal!!.error).isEqualTo(PinRemovalError.BIOMETRIC_FAILED)
+        biometric.result = BiometricResult.Success
+        vm.confirmPinRemovalWithBiometric("Turn off"); advanceUntilIdle()
+        assertThat(pins.isSet()).isFalse()
+        assertThat(vm.uiState.value.pinConfigured).isFalse()
+    }
+
+    @Test
+    fun `attack - biometric is not offered when the phone has none`() = runTest(dispatcher) {
+        pins.set("493027")
+        biometric.availability = BiometricAvailability.NONE_ENROLLED
+        val vm = vm(); advanceUntilIdle()
+        vm.startPinRemoval(); advanceUntilIdle()
+        assertThat(vm.uiState.value.removal!!.biometricAvailable).isFalse()
+        vm.confirmPinRemovalWithBiometric("Turn off"); advanceUntilIdle()
+        assertThat(biometric.prompts).isEqualTo(0)
+        assertThat(pins.isSet()).isTrue()
+    }
+
+    @Test
+    fun `attack - racing confirmations verify once`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm(); advanceUntilIdle()
+        vm.startPinRemoval(); advanceUntilIdle()
+        repeat(50) { vm.confirmPinRemoval("000000") }
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.removal!!.remainingAttempts).isEqualTo(PinManager.MAX_ATTEMPTS - 1)
+    }
+
+    @Test
+    fun `app lock status follows a pin set or removed anywhere else`() = runTest(dispatcher) {
+        val vm = vm(); advanceUntilIdle()
+        assertThat(vm.uiState.value.pinConfigured).isFalse()
+        pins.set("493027"); advanceUntilIdle()
+        assertThat(vm.uiState.value.pinConfigured).isTrue()
+        pins.clear(); advanceUntilIdle()
+        assertThat(vm.uiState.value.pinConfigured).isFalse()
     }
 }

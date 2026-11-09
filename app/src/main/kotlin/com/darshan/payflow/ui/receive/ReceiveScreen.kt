@@ -3,44 +3,33 @@ package com.darshan.payflow.ui.receive
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -57,12 +46,13 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,13 +62,28 @@ import com.darshan.payflow.data.upi.QrCodeGenerator
 import com.darshan.payflow.data.upi.QrMatrix
 import com.darshan.payflow.domain.model.ProfileFieldError
 import com.darshan.payflow.ui.PayFlowTestTags
-import com.darshan.payflow.ui.components.BannerTone
-import com.darshan.payflow.ui.components.InfoBanner
-import com.darshan.payflow.ui.components.InitialAvatar
-import com.darshan.payflow.ui.components.LoadingView
-import com.darshan.payflow.ui.components.SecureWindow
-import com.darshan.payflow.ui.components.SectionCard
-import com.darshan.payflow.ui.theme.ScreenPadding
+import com.darshan.payflow.ui.designsystem.components.AvatarRing
+import com.darshan.payflow.ui.designsystem.components.BrandLoader
+import com.darshan.payflow.ui.designsystem.components.DisplayText
+import com.darshan.payflow.ui.designsystem.components.GhostButton
+import com.darshan.payflow.ui.designsystem.components.GhostTone
+import com.darshan.payflow.ui.designsystem.components.PayFlowAvatar
+import com.darshan.payflow.ui.designsystem.components.PayFlowIconButton
+import com.darshan.payflow.ui.designsystem.components.PayFlowSurface
+import com.darshan.payflow.ui.designsystem.components.PayFlowTextField
+import com.darshan.payflow.ui.designsystem.components.PayFlowToastHost
+import com.darshan.payflow.ui.designsystem.components.PayFlowTopBar
+import com.darshan.payflow.ui.designsystem.components.PrimaryButton
+import com.darshan.payflow.ui.designsystem.components.SectionHeader
+import com.darshan.payflow.ui.designsystem.components.SurfaceLevel
+import com.darshan.payflow.ui.designsystem.components.ToastHostState
+import com.darshan.payflow.ui.designsystem.effects.ToastTone
+import com.darshan.payflow.ui.designsystem.components.rememberToastHostState
+import com.darshan.payflow.ui.designsystem.motion.LocalMotion
+import com.darshan.payflow.ui.designsystem.tokens.Radii
+import com.darshan.payflow.ui.designsystem.tokens.Sizes
+import com.darshan.payflow.ui.designsystem.tokens.Spacing
+import com.darshan.payflow.ui.theme.PayFlowTheme
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -104,7 +109,7 @@ fun ReceiveRoute(onBack: () -> Unit, viewModel: ReceiveViewModel = hiltViewModel
     val resources = LocalResources.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    val snackbar = remember { SnackbarHostState() }
+    val toasts = rememberToastHostState()
     val copied = stringResource(R.string.receive_copied)
     val shareFailed = stringResource(R.string.receive_share_failed)
     val shareTitle = stringResource(R.string.receive_share)
@@ -113,14 +118,15 @@ fun ReceiveRoute(onBack: () -> Unit, viewModel: ReceiveViewModel = hiltViewModel
         val content = state.qrContent ?: return
         val text = resources.getString(R.string.receive_share_text, profile.name, profile.vpa, content)
         runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), shareTitle)) }
+            .onFailure { toasts.show(shareFailed, ToastTone.Failed) }
     }
     fun shareImage() {
         val content = state.qrContent ?: return
         scope.launch {
             val uri = runCatching { withContext(Dispatchers.IO) { writeQrPng(context, content) } }.getOrNull()
-            if (uri == null) { snackbar.showSnackbar(shareFailed); return@launch }
+            if (uri == null) { toasts.show(shareFailed, ToastTone.Failed); return@launch }
             val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            runCatching { context.startActivity(Intent.createChooser(send, shareTitle)) }.onFailure { snackbar.showSnackbar(shareFailed) }
+            runCatching { context.startActivity(Intent.createChooser(send, shareTitle)) }.onFailure { toasts.show(shareFailed, ToastTone.Failed) }
         }
     }
     ReceiveScreen(
@@ -128,13 +134,12 @@ fun ReceiveRoute(onBack: () -> Unit, viewModel: ReceiveViewModel = hiltViewModel
         ReceiveCallbacks(
             onBack = onBack, onNameChange = viewModel::onNameChange, onVpaChange = viewModel::onVpaChange, onAmountChange = viewModel::onAmountChange,
             onSave = viewModel::save, onEdit = viewModel::edit, onCancelEdit = viewModel::cancelEdit,
-            onCopy = {
-                state.profile?.let { clipboard.setText(AnnotatedString(it.vpa)); scope.launch { snackbar.showSnackbar(copied) } }
-            },
+            // Your own UPI ID is meant to be shared, so it's copied as plain text, unlike payment references.
+            onCopy = { state.profile?.let { clipboard.setText(AnnotatedString(it.vpa)); toasts.show(copied, ToastTone.Success) } },
             onShareText = ::shareText,
             onShareImage = ::shareImage,
         ),
-        snackbar,
+        toasts,
     )
 }
 
@@ -161,67 +166,75 @@ fun ProfileFieldError.message(): String = stringResource(
     },
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Your QR on a graphite card, the code itself always black on white paper so any scanner reads it in either theme. It rises
+ * in once; the amount, when set, sits under it in the display numerals. One primary action: share the QR.
+ */
 @Composable
-fun ReceiveScreen(state: ReceiveUiState, callbacks: ReceiveCallbacks, snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }) {
-    SecureWindow()
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.receive_title)) },
-                navigationIcon = { IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+fun ReceiveScreen(state: ReceiveUiState, callbacks: ReceiveCallbacks, toasts: ToastHostState = rememberToastHostState()) {
+    val colors = PayFlowTheme.colors
+    Box(Modifier.fillMaxSize().background(colors.bg)) {
+        Column(Modifier.fillMaxSize()) {
+            PayFlowTopBar(
+                title = stringResource(R.string.receive_title),
+                onBack = callbacks.onBack,
                 actions = {
                     if (!state.editing && state.profile != null) {
-                        IconButton(onClick = callbacks.onEdit, modifier = Modifier.testTag(PayFlowTestTags.RECEIVE_EDIT)) {
-                            Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.receive_edit))
-                        }
+                        PayFlowIconButton(Icons.Outlined.Edit, stringResource(R.string.receive_edit), callbacks.onEdit, Modifier.testTag(PayFlowTestTags.RECEIVE_EDIT), tint = colors.text)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        if (state.loading) {
-            LoadingView(Modifier.padding(padding))
-            return@Scaffold
+            if (state.loading) {
+                Box(Modifier.fillMaxSize().testTag(PayFlowTestTags.LOADING), contentAlignment = Alignment.Center) { BrandLoader() }
+                return@Column
+            }
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.screen)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                if (state.editing || state.profile == null) ProfileForm(state, callbacks) else QrContent(state, callbacks)
+                Text(stringResource(R.string.receive_note), style = PayFlowTheme.type.label, color = colors.textSecondary, modifier = Modifier.padding(bottom = Spacing.xl))
+            }
         }
-        Column(
-            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (state.editing || state.profile == null) ProfileForm(state, callbacks) else QrContent(state, callbacks)
-            InfoBanner(stringResource(R.string.receive_note), icon = Icons.Outlined.Info, tone = BannerTone.Info)
-        }
+        PayFlowToastHost(toasts, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 
 @Composable
 private fun ProfileForm(state: ReceiveUiState, callbacks: ReceiveCallbacks) {
-    SectionCard(stringResource(R.string.receive_setup_title), icon = Icons.Outlined.QrCode2) {
-        Text(stringResource(R.string.receive_setup_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(
-            value = state.nameInput, onValueChange = callbacks.onNameChange, singleLine = true, enabled = !state.saving,
-            label = { Text(stringResource(R.string.receive_name)) },
-            leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-            isError = state.nameError != null,
-            supportingText = state.nameError?.let { { Text(it.message()) } },
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        SectionHeader(stringResource(R.string.receive_setup_title))
+        Text(stringResource(R.string.receive_setup_hint), style = PayFlowTheme.type.body, color = PayFlowTheme.colors.textSecondary)
+        PayFlowTextField(
+            value = state.nameInput,
+            onValueChange = callbacks.onNameChange,
+            label = stringResource(R.string.receive_name),
+            enabled = !state.saving,
+            error = state.nameError?.message(),
+            leading = { Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(Sizes.icon)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.RECEIVE_NAME),
+            modifier = Modifier.fillMaxWidth(),
+            fieldTag = PayFlowTestTags.RECEIVE_NAME,
         )
-        OutlinedTextField(
-            value = state.vpaInput, onValueChange = callbacks.onVpaChange, singleLine = true, enabled = !state.saving,
-            label = { Text(stringResource(R.string.receive_vpa)) },
-            placeholder = { Text(stringResource(R.string.pay_vpa_placeholder)) },
-            leadingIcon = { Icon(Icons.Outlined.AlternateEmail, contentDescription = null) },
-            isError = state.vpaError != null,
-            supportingText = state.vpaError?.let { { Text(it.message()) } },
+        PayFlowTextField(
+            value = state.vpaInput,
+            onValueChange = callbacks.onVpaChange,
+            label = stringResource(R.string.receive_vpa),
+            placeholder = stringResource(R.string.pay_vpa_placeholder),
+            enabled = !state.saving,
+            error = state.vpaError?.message(),
+            leading = { Icon(Icons.Outlined.AlternateEmail, contentDescription = null, modifier = Modifier.size(Sizes.icon)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.RECEIVE_VPA),
+            modifier = Modifier.fillMaxWidth(),
+            fieldTag = PayFlowTestTags.RECEIVE_VPA,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = callbacks.onSave, enabled = !state.saving, modifier = Modifier.testTag(PayFlowTestTags.RECEIVE_SAVE)) { Text(stringResource(R.string.receive_save)) }
-            if (state.profile != null) TextButton(onClick = callbacks.onCancelEdit) { Text(stringResource(R.string.receive_cancel)) }
+        PrimaryButton(stringResource(R.string.receive_save), callbacks.onSave, Modifier.fillMaxWidth().testTag(PayFlowTestTags.RECEIVE_SAVE), loading = state.saving)
+        if (state.profile != null) {
+            GhostButton(stringResource(R.string.receive_cancel), callbacks.onCancelEdit, Modifier.fillMaxWidth(), outlined = false, tone = GhostTone.Neutral)
         }
     }
 }
@@ -230,51 +243,59 @@ private fun ProfileForm(state: ReceiveUiState, callbacks: ReceiveCallbacks) {
 private fun QrContent(state: ReceiveUiState, callbacks: ReceiveCallbacks) {
     val profile = state.profile ?: return
     val content = state.qrContent ?: return
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            InitialAvatar(profile.name, size = 56.dp)
-            Text(profile.name, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(profile.vpa, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                IconButton(onClick = callbacks.onCopy, modifier = Modifier.size(36.dp).testTag(PayFlowTestTags.RECEIVE_COPY)) {
-                    Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.receive_copy), modifier = Modifier.size(18.dp))
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    val motion = LocalMotion.current
+    // The card rises in once per visit; reduced motion makes that a short fade.
+    val appear = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(visibleState = appear, enter = motion.popIn()) {
+        PayFlowSurface(Modifier.fillMaxWidth(), level = SurfaceLevel.Hero, shape = Radii.largeShape) {
+            Column(
+                Modifier.fillMaxWidth().padding(Spacing.lg),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    PayFlowAvatar(profile.name, size = Sizes.avatar, ring = AvatarRing.Accent)
+                    Column(Modifier.weight(1f)) {
+                        Text(DisplayText.safe(profile.name), style = type.bodyStrong, color = colors.onHero, maxLines = 2)
+                        Text(profile.vpa, style = type.label, color = colors.onHero.copy(alpha = HERO_SECONDARY_ALPHA), maxLines = 1)
+                    }
+                    PayFlowIconButton(Icons.Outlined.ContentCopy, stringResource(R.string.receive_copy), callbacks.onCopy, Modifier.testTag(PayFlowTestTags.RECEIVE_COPY), tint = colors.onHero)
                 }
+                QrCode(content, description = stringResource(R.string.receive_qr_description, profile.vpa), modifier = Modifier.padding(vertical = Spacing.xs))
+                state.amountPaise?.let { Text(Money.formatInr(it), style = type.display, color = colors.onHero) }
+                Text(stringResource(R.string.receive_scan_hint), style = type.label, color = colors.onHero.copy(alpha = HERO_SECONDARY_ALPHA), textAlign = TextAlign.Center)
             }
-            QrCode(content, description = stringResource(R.string.receive_qr_description, profile.vpa), modifier = Modifier.padding(vertical = 8.dp))
-            state.amountPaise?.let { Text(Money.formatInr(it), style = MaterialTheme.typography.headlineMedium) }
-            Text(stringResource(R.string.receive_scan_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
-    OutlinedTextField(
-        value = state.amountText, onValueChange = callbacks.onAmountChange, singleLine = true,
-        label = { Text(stringResource(R.string.receive_amount)) },
-        prefix = { Text("₹") },
-        supportingText = { Text(stringResource(R.string.receive_amount_hint)) },
+    PayFlowTextField(
+        value = state.amountText,
+        onValueChange = callbacks.onAmountChange,
+        label = stringResource(R.string.receive_amount),
+        helper = stringResource(R.string.receive_amount_hint),
+        leading = { Text("₹", style = PayFlowTheme.type.bodyStrong, color = colors.textSecondary) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.RECEIVE_AMOUNT),
+        modifier = Modifier.fillMaxWidth(),
+        fieldTag = PayFlowTestTags.RECEIVE_AMOUNT,
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Button(onClick = callbacks.onShareText, modifier = Modifier.weight(1f).testTag(PayFlowTestTags.RECEIVE_SHARE)) {
-            Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(stringResource(R.string.receive_share), modifier = Modifier.padding(start = 6.dp))
-        }
-        OutlinedButton(onClick = callbacks.onShareImage, modifier = Modifier.weight(1f).testTag(PayFlowTestTags.RECEIVE_SHARE_IMAGE)) {
-            Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(stringResource(R.string.receive_share_image), modifier = Modifier.padding(start = 6.dp))
-        }
-    }
+    PrimaryButton(stringResource(R.string.receive_share_image), callbacks.onShareImage, Modifier.fillMaxWidth().testTag(PayFlowTestTags.RECEIVE_SHARE_IMAGE), leadingIcon = Icons.Outlined.Image)
+    GhostButton(stringResource(R.string.receive_share), callbacks.onShareText, Modifier.fillMaxWidth().testTag(PayFlowTestTags.RECEIVE_SHARE), leadingIcon = Icons.Outlined.Share)
+    Spacer(Modifier.height(Spacing.xxs))
 }
 
-/** Draws the QR on a white card with a quiet zone, always black-on-white so any scanner reads it in dark mode too. */
+private const val HERO_SECONDARY_ALPHA = 0.72f
+
+/** Draws the QR on a white tile with a quiet zone, always black on white so any scanner reads it in dark mode too. */
 @Composable
-fun QrCode(content: String, description: String, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 220.dp) {
+fun QrCode(content: String, description: String, modifier: Modifier = Modifier, size: Dp = Sizes.qrCode) {
     val matrix: QrMatrix? = remember(content) { runCatching { QrCodeGenerator.encode(content) }.getOrNull() }
     Canvas(
         modifier = modifier
             .size(size)
-            .clip(MaterialTheme.shapes.medium)
+            .clip(Radii.mediumShape)
             .background(Color.White)
-            .padding(12.dp)
+            .padding(Spacing.sm)
             .testTag(PayFlowTestTags.RECEIVE_QR)
             .semantics { contentDescription = description },
     ) {

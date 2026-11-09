@@ -217,6 +217,8 @@ class PayViewModelMoneyPathTest {
             vm.onUpiAppResult(UpiLaunchResult.Responded("Status=SUCCESS"))
             advanceUntilIdle()
             assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Confirm))
+            // The chime is asked for once too; the sound setting decides whether it plays.
+            assertThat(awaitItem()).isEqualTo(UiEffect.Sound(com.darshan.payflow.ui.designsystem.effects.UiSoundEvent.Success))
             expectNoEvents()
         }
     }
@@ -246,6 +248,7 @@ class PayViewModelMoneyPathTest {
             expectNoEvents()
             advanceUntilIdle()
             assertThat(awaitItem()).isEqualTo(UiEffect.Haptic(HapticEvent.Confirm))
+            assertThat(awaitItem()).isEqualTo(UiEffect.Sound(com.darshan.payflow.ui.designsystem.effects.UiSoundEvent.Success))
             expectNoEvents()
         }
     }

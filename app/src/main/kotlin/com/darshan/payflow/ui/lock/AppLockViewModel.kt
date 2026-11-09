@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,6 +94,15 @@ class AppLockViewModel @Inject constructor(
                     pinConfigured = withContext(dispatchers.io) { pins.isSet() }
                     _uiState.value = LockUiState.Unlocked(pinConfigured)
                 }
+            }
+        }
+        // A PIN set or removed from Security reaches Home's banner at once. Only an unlocked state follows it: opening a lock
+        // is the lock flow's job alone.
+        viewModelScope.launch {
+            pins.changes.drop(1).collect {
+                val configured = withContext(dispatchers.io) { pins.isSet() }
+                pinConfigured = configured
+                _uiState.update { state -> if (state is LockUiState.Unlocked) LockUiState.Unlocked(configured) else state }
             }
         }
     }

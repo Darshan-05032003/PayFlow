@@ -326,6 +326,25 @@ class AppLockViewModelTest {
         assertThat(vm.lastUnlockMethod).isEqualTo(UnlockMethod.Biometric)
     }
 
+    /** Home's "set up app lock" banner reads this state: a PIN removed or added elsewhere must reach it at once. */
+    @Test
+    fun `a pin removed or added from security updates the unlocked state at once, and never opens a lock`() = runTest(dispatcher) {
+        pins.set("493027")
+        val vm = vm()
+        vm.uiState.test { awaitItem(); awaitItem() }
+        vm.onPinEntered("493027"); advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = true))
+        pins.clear(); advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = false))
+        pins.set("583921"); advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = true))
+
+        // A change while locked leaves the lock alone: only the lock's own flow may open it.
+        appLock.lock(); advanceUntilIdle()
+        pins.set("493027"); advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
     @Test
     fun `pin entry only accepts digits and clears after each attempt`() = runTest(dispatcher) {
         pins.set("493027")

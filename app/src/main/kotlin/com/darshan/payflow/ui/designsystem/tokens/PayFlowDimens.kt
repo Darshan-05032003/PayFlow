@@ -112,6 +112,9 @@ object Sizes {
 
     /** The finger's width when scratching. */
     val scratchBrush = 28.dp
+
+    /** A receive QR code, quiet zone included. Large enough for an older phone's camera at arm's length. */
+    val qrCode = 220.dp
 }
 
 /**

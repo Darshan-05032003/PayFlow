@@ -34,9 +34,9 @@ class SecurityScreenTest {
                 )
             }
         }
-        rule.onNodeWithTag(PayFlowTestTags.SECURITY_MODE_UPI).assertIsSelected()
-        rule.onNodeWithText("Pay through GPay, PhonePe, Paytm or any UPI app on this phone. Real money moves. The result is reported by that app; PayFlow cannot verify it with a bank.").assertIsDisplayed()
-        rule.onNodeWithText("This setting is protected by the app lock.").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.SECURITY_MODE_UPI).performScrollTo().assertIsSelected()
+        rule.onNodeWithText("Pay through GPay, PhonePe, Paytm or any UPI app on this phone. Real money moves. The result is reported by that app; PayFlow cannot verify it with a bank.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("This setting is protected by the app lock.").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.SECURITY_MODE_SANDBOX).performScrollTo().performClick()
         assertThat(chosen).isEqualTo(PaymentMode.SANDBOX)
     }
@@ -48,8 +48,8 @@ class SecurityScreenTest {
                 SecurityScreen(SecurityUiState(loading = false, paymentMode = PaymentMode.SANDBOX, upiAppAvailable = false), SecurityCallbacks())
             }
         }
-        rule.onNodeWithTag(PayFlowTestTags.SECURITY_MODE_UPI).assertIsNotEnabled()
-        rule.onNodeWithText("No UPI app is installed on this device, so UPI apps mode cannot be used.").assertIsDisplayed()
-        rule.onNodeWithTag(PayFlowTestTags.SANDBOX_BADGE).assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.SECURITY_MODE_UPI).performScrollTo().assertIsNotEnabled()
+        rule.onNodeWithText("No UPI app is installed on this device, so UPI apps mode cannot be used.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.SANDBOX_BADGE).performScrollTo().assertIsDisplayed()
     }
 }

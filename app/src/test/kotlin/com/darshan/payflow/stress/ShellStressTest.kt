@@ -40,7 +40,7 @@ import com.darshan.payflow.ui.navigation.HistoryDestination
 import com.darshan.payflow.ui.navigation.HomeDestination
 import com.darshan.payflow.ui.navigation.LocalNavAnimatedScope
 import com.darshan.payflow.ui.navigation.LocalSharedTransitionScope
-import com.darshan.payflow.ui.navigation.SecurityDestination
+import com.darshan.payflow.ui.navigation.MeDestination
 import com.darshan.payflow.ui.navigation.ShellLogic
 import com.darshan.payflow.ui.navigation.ShellRoute
 import com.darshan.payflow.ui.navigation.openTab
@@ -106,18 +106,18 @@ class ShellStressTest {
                 NavHost(nav, startDestination = HomeDestination) {
                     composable<HomeDestination> { Box(Modifier.fillMaxSize().testTag("home")) }
                     composable<HistoryDestination> { Box(Modifier.fillMaxSize().testTag("history")) }
-                    composable<SecurityDestination> { Box(Modifier.fillMaxSize().testTag("me")) }
+                    composable<MeDestination> { Box(Modifier.fillMaxSize().testTag("me")) }
                 }
             }
         }
         rule.waitForIdle()
-        val destinations = listOf(HistoryDestination, SecurityDestination, HomeDestination)
+        val destinations = listOf(HistoryDestination, MeDestination, HomeDestination)
         val ms = measureTimeMillis {
             repeat(1_000) { i ->
                 rule.runOnUiThread { nav.openTab(destinations[i % destinations.size]) }
                 if (i % 50 == 0) rule.waitForIdle()
             }
-            rule.runOnUiThread { nav.openTab(SecurityDestination) }
+            rule.runOnUiThread { nav.openTab(MeDestination) }
             rule.waitForIdle()
         }
         var depth = 1

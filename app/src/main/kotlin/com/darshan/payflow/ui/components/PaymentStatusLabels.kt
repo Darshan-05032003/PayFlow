@@ -1,7 +1,6 @@
 package com.darshan.payflow.ui.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.darshan.payflow.R
 import com.darshan.payflow.domain.model.PaymentStatus
@@ -17,7 +16,3 @@ fun PaymentStatus.label(): String = stringResource(
         PaymentStatus.REFUNDED -> R.string.status_refunded
     },
 )
-
-/** Foreground colour for a status, usable on plain surfaces (headlines, detail text). */
-@Composable
-fun PaymentStatus.color(): Color = statusColor().content
