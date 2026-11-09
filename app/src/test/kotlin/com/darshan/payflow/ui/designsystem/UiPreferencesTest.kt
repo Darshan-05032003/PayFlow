@@ -40,6 +40,7 @@ class UiPreferencesTest {
         assertThat(s.soundEnabled).isFalse()
         assertThat(s.reduceMotion).isFalse()
         assertThat(s.theme).isEqualTo(ThemeMode.System)
+        assertThat(s.amountsHidden).isFalse()
     }
 
     @Test
@@ -71,6 +72,8 @@ class UiPreferencesTest {
             assertThat(awaitItem().reduceMotion).isTrue()
             prefs.setTheme(ThemeMode.Dark)
             assertThat(awaitItem().theme).isEqualTo(ThemeMode.Dark)
+            prefs.setAmountsHidden(true)
+            assertThat(awaitItem().amountsHidden).isTrue()
         }
     }
 

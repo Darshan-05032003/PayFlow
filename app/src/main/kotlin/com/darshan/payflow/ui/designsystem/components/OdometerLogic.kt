@@ -90,6 +90,9 @@ object OdometerLogic {
         repeat(HIDDEN_DOTS) { add(OdometerSlot.Mask(it)) }
     }
 
+    /** The hidden amount as plain text, for rows and lines that don't roll. */
+    fun hiddenText(): String = hiddenSlots().joinToString("") { it.char.toString() }
+
     fun text(paise: Long, decimals: AmountDecimals, sign: AmountSign): String =
         slots(paise, decimals, sign).joinToString("") { it.char.toString() }
 
