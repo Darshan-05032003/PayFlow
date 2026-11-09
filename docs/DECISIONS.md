@@ -310,3 +310,28 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 
 ### Compromises
 - No device look for this row: the emulator refused (4,552 MB free, needs 8,200). The row-to-sheet transform, the stack's fling feel and the scratch on a real GPU are JVM-checked only.
+
+## UI overhaul: settings and security decisions (2026-11-10)
+- **Me is a landing, not Security.** The Me tab shows who you are on UPI (name and UPI ID on a graphite card), a door to the Security centre and to Receive, the look-and-feel toggles and About. Security is a page inside Me with a back arrow. The one primary action on Me is "Set up your UPI ID", and only while there isn't one.
+- **Toggles live on Me, act at once, with no save button.** Haptics, sound, reduce motion and theme (system, light, dark) write the same `UiPreferences` that `MainActivity` feeds into the theme, so each takes effect across the app when flipped. About is an in-window sheet.
+- **Sound: one code-synthesised chime, off by default.** Two sine notes a fifth apart with a short attack and an exponential tail, built in `ChimeSynth` (no audio asset). It plays only for a provider-confirmed success, the same moment as the coin burst, and only when the ringer is on normal.
+- **Five checks, each from the real security layer.** Device binding, root and tamper scan, Play Integrity, app lock, biometric unlock. A row ticks only when its check ran and passed. A sandbox verdict, a build with no Play Integrity project, a debug build (the debuggable flag alone) and a phone without biometrics are "Note", drawn as a level dash, never a tick. A row still running shows the loader and holds the sequence.
+- **The ticks play in sequence, 280 ms apart, on the frame clock.** Each one draws its glyph on the Small token. While an answer is out, the sequence waits without asking for frames. Reduced motion shows every final state at once.
+- **The headline guides.** "Checking this phone…", "Everything checks out" (every row passed), "Nothing needs you" (notes only), "N things need you", or "Payments are paused on this phone". It was "0 of 4 protections active" in red, which alarmed without saying what to do. Below the checks is one primary action, the most important next step: what the pause means, set up app lock, bind this phone, or check integrity again.
+- **Each row opens a sheet with what it means and what to do.** The binding OTP flow, the findings list, the integrity explanation, and turning the lock on or off live there, so the centre stays calm.
+- **Turning the app lock off needs the current PIN or a biometric.** It was one tap. The PIN check is the same PBKDF2 verify with the same lockout as the lock screen.
+- **`PinManager.changes`.** A counter that moves on every set or clear. The lock, Security and Me re-read whether a PIN exists when it moves, so Home's banner can't go stale.
+- **The root/tamper warning replaces the blocked-payment toast.** It's a full-screen, calm page: a shield holding a pause mark, "Payments are paused on this phone", what was found in plain words, why that matters for money, what still works, and what would fix it. It changes nothing about the block: the payment guard runs before every payment, the page has no way to pay, and the form behind it is hidden from TalkBack. In the Security centre it also offers "Check again", and it closes by itself once a re-scan comes back clean. Its reasons come from the same facts the guard reads, tested against the real guard.
+- **Receive:** your card is graphite with the QR on white paper (black on white in both themes, so any scanner reads it), the amount in the display numerals, one primary action ("Share QR image"), text share as a ghost button, and toasts instead of the Material snackbar. The card rises in once.
+- **Checkout:** a graphite store header, products in one card with a quiet Buy each, the last outcome as a card with its status pill. `BrandLoader` replaces the progress bars here and in Security.
+- **Retired:** `ui/components` `LoadingView`, `EmptyView`, `ErrorView`, `StateIcon`, `SectionCard`, `InfoBanner`, `DetailRow`, `StatusChip`, `InitialAvatar` and `PaymentStatus.color()`. Nothing used them any more.
+- **Copied payment references are flagged sensitive** on the clipboard (`SensitiveClip`). Your own UPI ID is copied plainly, because you copy it to share it.
+- **New size token:** `Sizes.qrCode` (220dp).
+
+### CheckoutKit boundary
+- **CheckoutKit 1.0.0 has no theming API.** `CheckoutSheetOptions` takes methods, a merchant name and the secure-window flag, nothing about colour or shape. CheckoutKit is read-only for this overhaul, so it wasn't changed.
+- **What PayFlow does instead:** the sheet reads the ambient Material theme, so `CheckoutKitTheme` scopes one built from PayFlow's tokens around it (surface, text, primary, accent tint, outline, error, scrim, and the large top corner radius). The sheet's own entry and exit are `ModalBottomSheet`'s window animation, which a host can't drive, so the store behind it recedes on PayFlow's Settle spring (6 % smaller, rounded edge) while the sheet is up and comes back when its result arrives. Under reduced motion it stays still.
+- **Scope for improvement: add a theming API to CheckoutKit** (colours, shapes, type and an entry/exit motion spec in `CheckoutSheetOptions`), and an in-window variant of the sheet so a host's `filterTouchesWhenObscured` and in-window sheet rules apply to it. Until then the sheet is a separate window that sets `FLAG_SECURE` itself.
+
+### Compromises
+- No device look for this row; JVM screenshots only. The real BiometricPrompt over the removal sheet and CheckoutKit's sheet over the receded store are unseen on a device.

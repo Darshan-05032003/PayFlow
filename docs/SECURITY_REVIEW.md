@@ -501,3 +501,35 @@ Severity scale: Critical / High / Medium / Low.
   - Scratched demo cards are remembered for the run only (`DemoRewardLedger`), so a reinstall shows them again. Harmless, since the card is a demo.
   - Tapjacking on the review sheet relies on the app-wide `filterTouchesWhenObscured` from `SecureWindow`; it has not been tried with a real overlay.
 - Not checked on a device: overlay touch filtering, the recents thumbnail with a sheet open, real TalkBack, the row-to-sheet container transform. The emulator refused to start (4,552 MB free, needs 8,200).
+
+## UI Feature: Security centre, root/tamper warning, Me settings, Receive, Checkout
+- Attacks tried:
+  - Turning the app lock off with no proof: the old Security screen removed the PIN on one tap of "Remove PIN".
+  - Brute-forcing the PIN through the new "turn off" sheet, 1,000 guesses; racing 1,000 confirmations; failed, cancelled and unavailable biometrics; confirming a removal that was never started.
+  - Leaving another screen stale after a PIN change (Home's "set up app lock" banner, the lock, Security).
+  - A check shown as passed when it never ran, or ran in a sandbox: Play Integrity verdicts come from a fake verifier, and most builds have no Cloud project number.
+  - Dismissing or getting round the root/tamper block: closing the warning, back, TalkBack reaching the Pay form behind it, a "pay anyway" path.
+  - The warning disagreeing with the guard: explaining a block the guard doesn't apply, or hiding one it does.
+  - Clipboard exposure of copied payment references.
+  - CheckoutKit's sheet: a double tap on Buy while the sheet is opening; the sheet being a separate window (not in-window like PayFlow's sheets).
+  - Settings toggles reaching security: reduce motion skipping a confirmation, the theme or sound settings changing a payment path.
+  - Huge names and amounts on the Receive card at 1.3× text.
+- What broke:
+  - High: removing the app lock needed no PIN or biometric. Anyone holding an unlocked phone could turn the lock off for good.
+  - Medium: after a PIN was removed (or set) from Security, Home's app-lock banner kept its old state until the app restarted.
+  - Medium: a second Buy tap while CheckoutKit's sheet was opening replaced the active order, so the sheet could charge one product and the result be recorded against another.
+  - Low: copied payment references weren't flagged sensitive, so keyboards' clipboard previews could show them.
+  - Low: the old Security headline counted an unverified (sandbox) Play Integrity verdict toward "protections active".
+- Fixed now:
+  - "Turn off app lock" opens a sheet that needs the current PIN (PBKDF2 verify, counted toward the same lockout as the lock screen) or a biometric. One verification at a time; refusals clear the field and show tries left; a lockout disables the field and says how long. Attack tests: `attack - starting a removal alone removes nothing`, `attack - a confirmation without a started removal is ignored`, `attack - a wrong pin keeps the lock and counts toward the lockout`, `attack - brute force locks out, and then even the right pin is refused`, `attack - a failed, cancelled or unavailable biometric keeps the lock`, `attack - biometric is not offered when the phone has none`, `attack - racing confirmations verify once`, `turnOffOnlyAsksForProofItNeverRemovesOnATap`; stress: 1,000 guesses never remove the lock and only 5 reach PBKDF2.
+  - `PinManager.changes` moves on every set or clear; the lock ViewModel, Security and Me follow it (`a pin removed or added from security updates the unlocked state at once, and never opens a lock`). A change while locked never opens the lock.
+  - Checkout refuses a second order while one is out (`starting an order while one is open is refused`; stress: 1,000 Buy taps = 1 order).
+  - Copied references are flagged with `ClipDescription.EXTRA_IS_SENSITIVE` on API 33+ and the same `android.content.extra.IS_SENSITIVE` key below (`SensitiveClipTest`, `copiedReferencesAreMarkedSensitiveOnTheClipboard`). Your own UPI ID on Receive stays plain, since it's meant to be shared.
+  - The security centre's rules are pure (`SecurityChecks`): a row is a pass only when its check ran and passed; sandbox verdicts, an unconfigured Play Integrity project, a debug build and a phone with no biometrics are notes; a row still running is "Checking" and holds the sequence (`nothing reads as passed before it was checked`, `a sandbox verdict or a missing configuration is never a pass`, `aCheckStillRunningHoldsTheSequenceAndIsNeverShownAsPassed`).
+  - The tamper warning is an explanation, not a gate: the payment guard still runs before every payment, the warning offers no way to pay, hides the Pay form from TalkBack while open, and lists exactly what the guard blocks on (`theWarningsReasonsMatchWhatThePaymentGuardBlocksForEveryFinding` runs the real `DefaultPaymentGuard` for every finding and verdict; `aRefusedPaymentOpensTheWarningOverPayAndHidesTheFormFromTalkBack`).
+  - Settings toggles change look and feel only: reduce motion keeps every step (the removal sheet and confirmation paths are the same), and sound only plays for a provider-confirmed success.
+- Scope for improvement:
+  - CheckoutKit's sheet is a `ModalBottomSheet` window, not in-window. It sets `FLAG_SECURE` itself (`secureWindow = true` unless the debug screenshot build), so screenshots stay blocked, but PayFlow can't add `filterTouchesWhenObscured` to that window. Logged with the theming API request in DECISIONS.
+  - The device check on the security centre runs when it opens; the guard's own check per payment is what blocks. A live signal (for example a Frida port opened after the screen was drawn) shows on the next scan.
+  - Biometric removal accepts the phone's screen lock as a fallback (`DEVICE_CREDENTIAL`), the same as the lock screen. A stricter build could require `BIOMETRIC_STRONG` alone for this one action.
+- Not checked on a device: the real BiometricPrompt over the removal sheet, a rooted phone, Play Integrity with a configured project, CheckoutKit's sheet over the receded store. No emulator look in this row.

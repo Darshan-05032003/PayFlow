@@ -165,3 +165,19 @@ Live outside the design system, built only from it. Rules are plain classes in `
 
 - Motion: search reveal and row tray on Snap; heads-up and stack rise on Bouncy, with the stagger token; countdown sweep on Small between one-second ticks; pause/resume morph on Bouncy; foil fade on Small, glints on Screen and off under reduced motion.
 - New size tokens: `Sizes.rowSwipeAction`, `countdownRing`, `ringStroke`, `mandateCard`, `mandateStackPeek`, `timelineDot`, `scratchCard`, `scratchBrush`.
+
+## Settings and security
+Live outside the design system, built only from it. Rules are plain classes in `ui/security/SecurityLogic.kt` and `ui/security/TamperWarning.kt` (`TamperWarningLogic`).
+
+| Piece | File | Notes |
+|---|---|---|
+| Security centre | `ui/security/SecurityScreen.kt` | Five checks tick in sequence (`CheckReveal`, 280 ms apart on the frame clock), each from the real security layer (`SecurityChecks`). Pass, failure, attention and note glyphs draw once, in the draw phase. One next step as the primary action; each row opens its sheet |
+| Turn off app lock | `ui/security/SecurityScreen.kt` | In-window sheet; needs the current PIN or a biometric |
+| `TamperWarning`, `TamperWarningOverlay` | `ui/security/TamperWarning.kt` | Full-screen explanation of a payment-guard block. No way to pay from it |
+| Me | `ui/me/MeScreen.kt` | Profile card, Security and Receive rows, toggles for haptics, sound, reduce motion and theme, About sheet |
+| Receive | `ui/receive/ReceiveScreen.kt` | Graphite card, QR on white paper (`Sizes.qrCode`), share image as the primary action |
+| Checkout | `ui/checkout/CheckoutScreen.kt` | `CheckoutKitTheme` passes tokens to CheckoutKit's sheet through Material slots; the store recedes on the Settle spring while it's up |
+| `ChimeSynth`, `ChimeUiSound` | `ui/designsystem/effects/ChimeSound.kt` | The optional success chime, synthesised in code, off by default |
+| `SensitiveClip`, `copySensitive` | `ui/components/SensitiveClipboard.kt` | Clipboard copies flagged sensitive |
+
+- Motion: ticks on Small, one per 280 ms step; radio fill on Bounce; store recede on Settle; Receive's card pops in once. Reduced motion: final states at once, no recede, a short fade for the card.

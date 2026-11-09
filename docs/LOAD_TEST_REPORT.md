@@ -389,3 +389,28 @@ To keep these benchmarks working as the UI changes:
   - Recommendation: move History to Paging 3 on the existing `historyPage` query once histories pass about 20,000 rows.
   - Benchmark contracts untouched: `PAYMENT_LIST` is still on History's list, `HOME_HISTORY` on the bar, `SeedDataReceiver` unchanged.
 - Not measured: frame times and jank on a device. Emulator refused (4,552 MB free, needs 8,200). Row 7's `historyScroll` benchmark will measure a different screen than the baseline did, so that comparison needs a label.
+
+## UI Feature: Security centre, root/tamper warning, Me settings, Receive, Checkout
+- Scenario and scale:
+  - 1,000 racing "turn off" confirmations; 1,000 sequential wrong PINs; 1,000 failed biometric retries (`SettingsStressTest`).
+  - 1,000 Buy taps on Checkout; 4,000 Me toggles (theme, reduce motion, haptics, sound).
+  - 1,000,000 security-centre evaluations (`SecurityChecks.of` + `summary`) and 1,000,000 reveal steps.
+  - The reveal sequence composed with a paused clock for 105 frames, counting recomposition cycles (`SettingsUiStressTest`).
+  - Receive at 1.3× text with a 50-character name, a 38-character UPI ID and ₹1,00,000.
+- Results (JVM, Robolectric):
+  - 1,000 racing confirmations: 1 verification (4 tries left), 2 ms. 1,000 wrong PINs: lock kept, LOCKED_OUT, 5 PBKDF2 runs, 44 ms. 1,000 biometric failures: 1,000 prompts, lock kept.
+  - 1,000 Buy taps: 1 order. 4,000 toggles: 98 ms, the Me state equals the stored settings at the end.
+  - 1,000,000 evaluations: 74 ms. 1,000,000 reveal steps: 6 ms.
+  - Reveal: 5 recomposition cycles over 105 frames (one per tick, none per frame); glyphs draw in the draw phase.
+  - Receive at 1.3× with the longest name and the largest amount: QR and share buttons reachable, nothing clipped in the baseline (`settings/receive_large_font`).
+  - Release APK: 25,789,271 → 25,822,755 bytes, +33,484 bytes (+0.1 %), with four old `ui/components` files removed.
+- What broke:
+  - Nothing at scale. The 1,000-tap Checkout case found that a second tap replaced the order under an open sheet (see SECURITY_REVIEW), fixed before the run.
+- Failure flow (brute force through the removal sheet):
+  1. An attacker holding an unlocked phone opens Security and taps "Turn off app lock".
+  2. Five wrong PINs hash and fail; the fifth starts a 30 s lockout, doubling per round up to an hour.
+  3. Every later guess is refused before hashing, so the CPU cost stays at five PBKDF2 runs; the PIN stays set.
+- Fix applied / recommendation:
+  - The reveal waits on `snapshotFlow` while a row's answer is out and steps on `withFrameMillis` only during the 1.4 s sequence, so an unanswered check costs no frames.
+  - The store's recede reads its spring in `graphicsLayer`; no recomposition while it moves.
+- Not measured: frame times on a device (no emulator look in this row).
