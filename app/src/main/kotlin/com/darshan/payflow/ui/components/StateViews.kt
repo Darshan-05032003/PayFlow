@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.darshan.payflow.R
 import com.darshan.payflow.ui.PayFlowTestTags
+import com.darshan.payflow.ui.designsystem.components.BrandLoader
 
 @Composable
 fun LoadingView(modifier: Modifier = Modifier) {
@@ -37,7 +37,7 @@ fun LoadingView(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize().testTag(PayFlowTestTags.LOADING).semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        BrandLoader(label = label)
     }
 }
 

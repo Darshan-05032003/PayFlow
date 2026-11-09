@@ -13,6 +13,7 @@ import com.darshan.payflow.ui.designsystem.effects.perform
 import com.darshan.payflow.ui.designsystem.effects.ToastTone
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -40,6 +41,11 @@ class EffectsTest {
     fun each_event_maps_to_a_distinct_constant_on_a_modern_device() {
         val constants = HapticEvent.entries.map { feedbackConstantFor(it, 35) }
         assertThat(constants).containsNoDuplicates()
+    }
+
+    @Test
+    fun haptics_add_no_vibrate_permission_to_the_app() {
+        assertThat(File("src/main/AndroidManifest.xml").readText()).doesNotContain("android.permission.VIBRATE")
     }
 
     @Test

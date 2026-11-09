@@ -1,5 +1,6 @@
 package com.darshan.payflow.ui.designsystem
 
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -14,6 +15,11 @@ const val SCREENSHOT_DIR = "src/test/screenshots"
 private val DsOptions = RoborazziOptions(
     compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.002f),
 )
+
+/** Captures one node, for content taller or narrower than the window. */
+fun SemanticsNodeInteraction.captureNode(name: String) {
+    captureRoboImage("$SCREENSHOT_DIR/$name.png", roborazziOptions = DsOptions)
+}
 
 /** Captures the composition root as `<name>.png` in the baseline folder. A no-op outside the Roborazzi tasks. */
 fun ComposeTestRule.captureScreenshot(name: String) {
