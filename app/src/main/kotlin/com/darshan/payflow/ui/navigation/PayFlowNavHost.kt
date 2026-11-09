@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -26,10 +28,10 @@ import com.darshan.payflow.ui.history.HistoryRoute
 import com.darshan.payflow.ui.history.PaymentDetailRoute
 import com.darshan.payflow.ui.home.HomeCallbacks
 import com.darshan.payflow.ui.home.HomeRoute
+import com.darshan.payflow.ui.designsystem.effects.CollectUiEffects
+import com.darshan.payflow.ui.lock.AppGate
 import com.darshan.payflow.ui.lock.AppLockViewModel
 import com.darshan.payflow.ui.lock.LockCallbacks
-import com.darshan.payflow.ui.lock.LockScreen
-import com.darshan.payflow.ui.lock.LockUiState
 import com.darshan.payflow.ui.mandates.CreateMandateRoute
 import com.darshan.payflow.ui.mandates.MandateDetailRoute
 import com.darshan.payflow.ui.mandates.MandatesRoute
@@ -87,24 +89,32 @@ fun AppRoot(
     // The whole app is secure, not screen by screen: Home and History show payees and amounts, and a flag that follows the
     // screen would change mid-transition.
     SecureWindow()
+    CollectUiEffects(lockViewModel.uiEffects)
+    val lockCallbacks = remember(lockViewModel) {
+        LockCallbacks(
+            onDigit = lockViewModel::onPinDigit, onBackspace = lockViewModel::onPinBackspace, onBiometric = lockViewModel::onBiometricRequested,
+            onTick = lockViewModel::onTick, onSetupDigit = lockViewModel::onSetupDigit, onSetupBackspace = lockViewModel::onSetupBackspace,
+            onCancelSetup = lockViewModel::cancelSetup,
+        )
+    }
+    // The app leaves the composition while locked. Its saved state stays here, so unlocking returns to the same screen, as a
+    // rotation would, with the ViewModels of that back stack still alive.
+    val appState = rememberSaveableStateHolder()
     CompositionLocalProvider(LocalPaymentMode provides mode) {
-        when (lockState) {
-            is LockUiState.Unlocked -> PayFlowNavHost(
-                upiAppLauncher, cameraController, cameraPermission, checkoutKit,
-                pinConfigured = (lockState as LockUiState.Unlocked).pinConfigured,
-                onSetupPin = lockViewModel::startSetup,
-                incomingLinks = incomingLinks,
-            )
-            else -> LockScreen(
-                lockState,
-                LockCallbacks(
-                    onDigit = lockViewModel::onPinDigit, onBackspace = lockViewModel::onPinBackspace, onBiometric = lockViewModel::onBiometricRequested,
-                    onTick = lockViewModel::onTick, onSetupDigit = lockViewModel::onSetupDigit, onSetupBackspace = lockViewModel::onSetupBackspace, onCancelSetup = lockViewModel::cancelSetup,
-                ),
-            )
+        AppGate(lockState, lockViewModel.lastUnlockMethod, lockCallbacks) { pinConfigured ->
+            appState.SaveableStateProvider(APP_STATE_KEY) {
+                PayFlowNavHost(
+                    upiAppLauncher, cameraController, cameraPermission, checkoutKit,
+                    pinConfigured = pinConfigured,
+                    onSetupPin = lockViewModel::startSetup,
+                    incomingLinks = incomingLinks,
+                )
+            }
         }
     }
 }
+
+private const val APP_STATE_KEY = "app"
 
 @Composable
 fun PayFlowNavHost(

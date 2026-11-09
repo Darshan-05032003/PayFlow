@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
@@ -239,6 +240,24 @@ class LockBypassAttackTest {
             scenario.onActivity { appLock.lock() }
             awaitLock()
             assertNothingBehindTheLock()
+        }
+    }
+
+    @Test
+    fun unlockingAfterARelockReturnsToTheSameScreenAndBackStillWorks() {
+        setPin()
+        launch().use { scenario ->
+            awaitLock()
+            unlock()
+            compose.onNodeWithTag(PayFlowTestTags.HOME_MANDATES).performScrollTo().performClick()
+            compose.waitUntilWithMainLooper(10_000) { exists(PayFlowTestTags.MANDATE_CREATE) }
+            scenario.onActivity { appLock.lock() }
+            awaitLock()
+            assertThat(exists(PayFlowTestTags.MANDATE_CREATE)).isFalse()
+            enterPin()
+            compose.waitUntilWithMainLooper(10_000) { exists(PayFlowTestTags.MANDATE_CREATE) }
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            awaitHome()
         }
     }
 

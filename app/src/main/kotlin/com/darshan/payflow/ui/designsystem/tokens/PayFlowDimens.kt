@@ -62,6 +62,11 @@ object Sizes {
     val tactileDepth = 4.dp
     val switchWidth = 52.dp
     val switchHeight = 32.dp
+    val pinKey = 72.dp
+    val pinDot = 14.dp
+
+    /** Moves a Newsreader numeral down to the optical centre of a round key. */
+    val numeralNudge = 3.dp
 }
 
 /**
