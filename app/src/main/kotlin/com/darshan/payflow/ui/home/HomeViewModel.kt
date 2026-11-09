@@ -1,5 +1,6 @@
 package com.darshan.payflow.ui.home
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.darshan.payflow.core.DispatcherProvider
@@ -49,7 +50,9 @@ sealed interface HomeUiState {
     /**
      * [summary] is all-time; [month] covers payments created since the start of the current month (device zone);
      * [recentPayees] are distinct outgoing payees for the "pay again" row.
+     * Immutable: each emission builds new read-only lists and nothing mutates them, so Home can skip on equality.
      */
+    @Immutable
     data class Content(
         val recent: List<Payment>,
         val summary: HistorySummary,

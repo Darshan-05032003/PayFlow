@@ -414,3 +414,35 @@ To keep these benchmarks working as the UI changes:
   - The reveal waits on `snapshotFlow` while a row's answer is out and steps on `withFrameMillis` only during the 1.4 s sequence, so an unanswered check costs no frames.
   - The store's recede reads its spring in `graphicsLayer`; no recomposition while it moves.
 - Not measured: frame times on a device (no emulator look in this row).
+
+## UI Feature: Compose stability (QA row)
+- Scenario and scale:
+  - Compose compiler reports and metrics for the release variant, whole app module (685 composables, 528 classes, 9,219 call arguments), with strong skipping on (Kotlin 2.4 default).
+  - Turned on with `./gradlew :app:compileReleaseKotlin -PcomposeReports=true` (add `--rerun` if the task is up to date); output in `app/build/compose_compiler/`. Off by default.
+  - Hot screens checked by hand: Home, History, Pay, and the shared row in `ui/components`.
+- Results (numbers, before vs after):
+
+  | Metric | Before | After |
+  |---|---:|---:|
+  | Composable parameters reported unstable | 26 | 7 |
+  | Unstable parameters on Home, History, Pay and the shared row | 5 (`ZoneId` ×3, `Instant`, `Clock`) plus `Random` | 1 (`Random`) |
+  | `knownUnstableArguments` (call sites) | 127 | 101 |
+  | Classes inferred unstable | 101 | 82 |
+  | Effectively stable classes | 358 | 373 |
+  | Unstable or runtime-checked classes in `domain.model` and the hot `ui` packages | 29 | 21 |
+  | Named restartable composables that are skippable | 233 of 233 | 233 of 233 |
+
+  `Payment`, `RecentPayee`, `HistorySummary`, `ReceiptContent`, `DayLabel.Date` and `HomeUiState.Content` went from unstable or runtime-checked to stable.
+- What broke:
+  - Nothing broke, but `Payment` was unstable for one field: `createdAt: Instant`. The compiler can't see that `java.time` types are immutable, so every class holding a date (the payment, the receipt, day headers, summaries) was compared by instance rather than by value.
+  - The module total of 362 skippable out of 637 restartable counts composable lambdas; every named composable is skippable under strong skipping, before and after.
+- Failure flow (what an unstable parameter costs):
+  1. Home's ViewModel emits a new `HomeUiState.Content` with the same payments (a reconcile that changed nothing).
+  2. With `Payment` unstable, strong skipping compares by instance; the new list holds new instances, so the feed rows recompose.
+  3. With `Payment` stable and the state `@Immutable`, equal values skip, and the rows don't recompose.
+- Fix applied / recommendation:
+  - `app/compose_stability.conf` declares `java.time.*` stable (immutable value types by the JDK's contract), wired through `composeCompiler.stabilityConfigurationFiles`.
+  - `HomeUiState.Content` is `@Immutable`: each emission builds new read-only lists and nothing mutates them. `HistoryUiState.Content` and `PayUiState` were already stable.
+  - Left alone on purpose: the CheckoutKit SDK object and `NavHostController` at the root (one instance for the app's life), `remember` keys typed `Any?`, and `VeiledAmount`'s `Random` (a stateful generator passed once). Converting the lists to `ImmutableList` would add a dependency and touch every ViewModel for no measured gain; revisit if the device benchmarks in row 7b show feed recomposition.
+  - Recomposition counts per frame were already measured in earlier rows (Home 6 cycles over 600 scroll steps, History 0 over 300 flings).
+- Not measured: frame times on a device. Row 7b re-runs the Macrobenchmarks on the emulator.

@@ -28,6 +28,9 @@ val expectedSigningSha256: String = localProperty("EXPECTED_SIGNING_SHA256") ?: 
 // Debug-only screenshot mode: `./gradlew assembleDebug -PscreenshotMode=true` lets FLAG_SECURE screens be captured
 // (README screenshots, UI review on an emulator). Release builds always keep FLAG_SECURE on.
 val screenshotMode: Boolean = (project.findProperty("screenshotMode") as? String)?.toBoolean() ?: false
+// Compose compiler reports and metrics, off by default (they slow compilation):
+// `./gradlew :app:compileReleaseKotlin -PcomposeReports=true` writes them to app/build/compose_compiler/.
+val composeReports: Boolean = (project.findProperty("composeReports") as? String)?.toBoolean() ?: false
 
 android {
     namespace = "com.darshan.payflow"
@@ -96,6 +99,14 @@ androidComponents {
 
 kotlin {
     jvmToolchain(17)
+}
+
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
+    if (composeReports) {
+        reportsDestination.set(layout.buildDirectory.dir("compose_compiler"))
+        metricsDestination.set(layout.buildDirectory.dir("compose_compiler"))
+    }
 }
 
 room {
