@@ -264,7 +264,7 @@ To keep these benchmarks working as the UI changes:
 | 100,000 toasts | 13 ms, 4 kept |
 | 100,000 effects into a 16-slot channel | 24 ms |
 
-- Release APK: 25,265,073 → 25,523,345 bytes, +258,272 bytes (+1.0 %). The two fonts take 239,440 bytes compressed. Subsetting saved about 117 KB compressed.
+- Release APK: 25,265,073 → 25,523,345 bytes, +258,272 bytes (+1.0 %). The two fonts take 239,440 bytes compressed. Subsetting saved about 117 KB compressed. This is almost all fonts for now: R8 removes components no screen uses yet, so code size grows as screens adopt them.
 - What broke: the first version of the 1,000-tap test expected 1 action from injected taps. Those taps move the simulated clock about 30ms each, so they pass the 500ms window 59 times. That is correct for a debounce: over 30 seconds of tapping, the loading state is what guarantees one action, so the test now covers each case separately.
 - Failure flow:
   1. A screen relies on the debounce alone for a payment.
