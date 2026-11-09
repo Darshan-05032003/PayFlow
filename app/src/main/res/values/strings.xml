@@ -458,12 +458,10 @@
 
     <!-- Security screen -->
     <string name="security_title">Security</string>
-    <string name="security_pin_title">App lock</string>
     <string name="security_pin_on">On. PayFlow locks after a minute away.</string>
     <string name="security_pin_off">Off. Anyone holding this phone can open PayFlow.</string>
     <string name="security_pin_setup">Set up app lock</string>
     <string name="security_pin_remove">Turn off app lock</string>
-    <string name="security_binding_title">Device binding</string>
     <string name="security_unbound">Link this device to your phone number (sandbox: the OTP is shown here instead of an SMS).</string>
     <string name="security_phone">Mobile number</string>
     <string name="security_phone_invalid">Enter a valid Indian mobile number</string>
@@ -479,7 +477,6 @@
     <string name="security_unbind">Unbind</string>
     <string name="security_binding_mismatch">Your data was bound to a different device (%1$s). Re-verify to continue.</string>
     <string name="security_rebind">Re-verify</string>
-    <string name="security_tamper_title">Device integrity</string>
     <string name="security_tamper_clean">No root, hooking or tampering detected.</string>
     <string name="security_tamper_blocked">Payments are paused: root, hooking tools or a modified app were found.</string>
     <string name="security_rescan">Scan again</string>
@@ -491,19 +488,11 @@
     <string name="tamper_debuggable">Debuggable build</string>
     <string name="tamper_signature">App signature does not match (repackaged)</string>
     <string name="tamper_signature_unreadable">Could not read the app signature</string>
-    <string name="security_integrity_title">Play Integrity</string>
-    <string name="security_integrity_not_checked">Not checked yet.</string>
-    <string name="security_integrity_not_configured">Not configured: add PLAY_INTEGRITY_CLOUD_PROJECT to local.properties.</string>
     <string name="security_integrity_error">Request failed: %1$s</string>
     <string name="security_integrity_ok">Device meets integrity requirements.</string>
     <string name="security_integrity_failed">Google Play says this phone fails its integrity check.</string>
     <string name="security_integrity_unevaluated">Integrity could not be evaluated.</string>
-    <string name="security_integrity_sandbox">(verified by the sandbox verifier; real verification needs a server)</string>
     <string name="security_integrity_check">Check integrity again</string>
-    <string name="security_overview_title">%1$d of %2$d protections active</string>
-    <string name="security_overview_hint">App lock, device binding, tamper checks and Play Integrity.</string>
-    <string name="security_state_on">On</string>
-    <string name="security_state_off">Off</string>
     <string name="security_phone_placeholder">98765 43210</string>
     <string name="security_tamper_debug_hint">Debug builds always report the debuggable flag; that is expected during development.</string>
     <string name="security_mode_title">Payment mode</string>
@@ -524,7 +513,6 @@
     <string name="checkout_title">Checkout</string>
     <string name="checkout_intro">Sandbox merchant demo: pay with the CheckoutKit payment sheet (UPI, card or wallet). Every outcome lands in your history.</string>
     <string name="checkout_buy">Buy</string>
-    <string name="checkout_merchant">Sold by %1$s</string>
     <string name="checkout_section_products">Products</string>
     <string name="checkout_section_outcome">Last checkout</string>
     <string name="checkout_powered_by">Powered by the CheckoutKit SDK (JitPack)</string>
