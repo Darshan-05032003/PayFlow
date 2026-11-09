@@ -332,6 +332,10 @@ recomposition, and the release Compose compiler metrics in LOAD_TEST_REPORT ("Co
 - **Touch targets** are at least 48dp (a token, checked by a test). **Contrast** meets WCAG AA for every text pair in both themes.
 - **Haptics and sound** can be turned off; sound is off by default.
 
+| Home at 1.3× text | Collect requests with reduced motion |
+|---|---|
+| ![Home at 1.3x](docs/screenshots/home-1_3x-light.png) | ![Collect, reduced motion](docs/screenshots/collect-reduced-motion-dark.png) |
+
 ## Security highlights
 
 Full review per feature: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
