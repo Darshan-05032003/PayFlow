@@ -43,7 +43,7 @@ object PspModule {
                 .build()
             HttpPspClient(url, ok, Json { ignoreUnknownKeys = true })
         } else {
-            FakePsp(clock, FakePspConfig(latencyMillis = 400, pendingPolls = 1)).also { psp ->
+            FakePsp(clock, FakePspConfig(latencyMillis = 400, pendingPolls = 1, demoPayees = true)).also { psp ->
                 // Sandbox demo data: a few incoming collect requests, one of them about to expire.
                 psp.simulateIncomingCollect("demo-chai", "shop@okbank", "Chai Point", 4_500, "Table 4", ttlMillis = 30 * 60_000)
                 psp.simulateIncomingCollect("demo-rent", "landlord@ybl", "Mr Rao", 1_500_000, "October rent", ttlMillis = 24 * 60 * 60_000)

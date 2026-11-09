@@ -1,6 +1,7 @@
 package com.darshan.payflow.integration
 
 import android.content.Intent
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
@@ -43,7 +44,7 @@ class IncomingUpiLinkTest {
             composeRule.onNodeWithTag(PayFlowTestTags.PAY_VPA).assertIsNotEnabled()
             composeRule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).assertIsNotEnabled()
             composeRule.onNodeWithText("test@upi").assertIsDisplayed()
-            composeRule.onNodeWithText("Pay ₹1.00").performScrollTo().assertIsDisplayed()
+            composeRule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT_DISPLAY).assertContentDescriptionEquals("Amount to pay: ₹1.00")
         }
     }
 

@@ -73,6 +73,23 @@ object Sizes {
     val quickAction = 56.dp
     val pinDot = 14.dp
 
+    /** Swipe-to-pay: a track tall enough to read as a control, and a handle inside it with a real grab area. */
+    val swipeTrack = 64.dp
+    val swipeHandle = 56.dp
+
+    /** The amount keypad's key height. */
+    val keypadKey = 52.dp
+
+    /** Below this window height the keypad scrolls with the form, and only the slider stays pinned. */
+    val keypadDockMinHeight = 600.dp
+
+    /** The scanner's frame before it has found a code, and its bracket arms. */
+    val viewfinder = 240.dp
+    val viewfinderBracket = 36.dp
+
+    /** One tooth of a receipt's perforated edge. */
+    val receiptPerforation = 4.dp
+
     /** Moves a Newsreader numeral down to the optical centre of a round key. */
     val numeralNudge = 3.dp
 }

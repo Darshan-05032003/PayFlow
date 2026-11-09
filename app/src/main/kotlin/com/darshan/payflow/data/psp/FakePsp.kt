@@ -4,6 +4,7 @@ import com.darshan.payflow.domain.model.CollectStatus
 import com.darshan.payflow.domain.model.MandateAction
 import com.darshan.payflow.domain.model.MandateStateMachine
 import com.darshan.payflow.domain.model.MandateStatus
+import com.darshan.payflow.domain.model.SandboxDemoPayees
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -26,6 +27,8 @@ data class FakePspConfig(
     val timeoutRate: Double = 0.0,
     val serverErrorRate: Double = 0.0,
     val rateLimitRate: Double = 0.0,
+    /** The in-app sandbox: [com.darshan.payflow.domain.model.SandboxDemoPayees] each end their own way. */
+    val demoPayees: Boolean = false,
 )
 
 /** Simulated incoming collect request held by the sandbox PSP. */
@@ -58,6 +61,10 @@ class FakeOrder(
 ) {
     val polls = AtomicInteger()
     @Volatile var refundId: String? = null
+    /** Demo payee: stays pending for this many status checks, on top of the configured pending polls. */
+    @Volatile var extraPendingPolls: Int = 0
+    /** Demo payee: the provider's answer carries a different amount. */
+    @Volatile var wrongAmountAnswer: Boolean = false
 }
 
 /** In-memory sandbox PSP. Thread-safe; deterministic for a given [seed]. */
@@ -97,8 +104,19 @@ class FakePsp(
                 else -> FakeOutcome.SUCCESS
             }
             val order = FakeOrder(request.txnRef, "PSP${orders.size + 1}${request.txnRef.takeLast(6)}", request.amountPaise, request.payeeVpa, outcome, clock.millis())
+            if (config.demoPayees) applyDemoPayee(order)
             orders[request.txnRef] = order
             PspInitiateResponse(order.pspTxnId, order.txnRef)
+        }
+    }
+
+    private fun applyDemoPayee(order: FakeOrder) {
+        when (order.payeeVpa.lowercase()) {
+            SandboxDemoPayees.SLOW -> order.extraPendingPolls = SandboxDemoPayees.SLOW_PENDING_POLLS
+            SandboxDemoPayees.STUCK -> order.finalOutcome = FakeOutcome.PENDING_UNTIL_SETTLED
+            SandboxDemoPayees.DECLINED -> order.finalOutcome = FakeOutcome.FAILED
+            SandboxDemoPayees.REFUNDED -> order.refundId = "RF${order.txnRef.takeLast(8)}"
+            SandboxDemoPayees.MISMATCH -> order.wrongAmountAnswer = true
         }
     }
 
@@ -109,10 +127,10 @@ class FakePsp(
         val order = orders[txnRef] ?: return PspPaymentStatus.NotFound(txnRef)
         val poll = order.polls.incrementAndGet()
         order.refundId?.let { return PspPaymentStatus.Refunded(txnRef, order.pspTxnId, order.amountPaise, it) }
-        if (poll <= config.pendingPolls) return PspPaymentStatus.Pending(txnRef)
+        if (poll <= config.pendingPolls + order.extraPendingPolls) return PspPaymentStatus.Pending(txnRef)
         return when (order.finalOutcome) {
             FakeOutcome.PENDING_UNTIL_SETTLED -> PspPaymentStatus.Pending(txnRef)
-            FakeOutcome.SUCCESS -> PspPaymentStatus.Success(txnRef, order.pspTxnId, "UPI${order.pspTxnId}", order.amountPaise, order.payeeVpa)
+            FakeOutcome.SUCCESS -> PspPaymentStatus.Success(txnRef, order.pspTxnId, "UPI${order.pspTxnId}", order.amountPaise + if (order.wrongAmountAnswer) 1 else 0, order.payeeVpa)
             FakeOutcome.FAILED -> PspPaymentStatus.Failed(txnRef, "ZA", "Declined by the payer (sandbox)")
         }
     }
@@ -240,6 +258,11 @@ class FakePsp(
             "landlord@ybl" to "Mr Rao",
             "9876543210@upi" to "Ravi Sharma",
             "payflow.store@okbank" to "PayFlow Store",
+            SandboxDemoPayees.SLOW to "Demo: Slow Bank",
+            SandboxDemoPayees.STUCK to "Demo: Stays Pending",
+            SandboxDemoPayees.DECLINED to "Demo: Declined",
+            SandboxDemoPayees.REFUNDED to "Demo: Refunded",
+            SandboxDemoPayees.MISMATCH to "Demo: Wrong Answer",
         )
 
         /** Order reference the sandbox uses for an approved collect request (alphanumeric, ≤ 35 chars). */

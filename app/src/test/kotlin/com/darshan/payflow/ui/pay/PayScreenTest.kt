@@ -3,6 +3,7 @@ package com.darshan.payflow.ui.pay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performScrollTo
@@ -46,22 +48,33 @@ class PayScreenTest {
         }
     }
 
+    private fun key(k: AmountKey) = rule.onNodeWithTag(PayFlowTestTags.payKey(k.name))
+
     @Test
     fun formInputsCallBackAndSubmit() {
         var submitted = false
+        val keys = mutableListOf<AmountKey>()
         show(
-            PayUiState(),
+            PayUiState(paymentMode = PaymentMode.UPI_APPS, verification = VpaVerificationState.Skipped),
             PayCallbacks(
                 onVpaChange = { holder.value = holder.value.copy(vpa = it) },
-                onAmountChange = { holder.value = holder.value.copy(amountText = it) },
+                onAmountKey = { k ->
+                    keys += k
+                    holder.value = holder.value.copy(amountText = (AmountInput.press(holder.value.amountText, k) as AmountPress.Accepted).text)
+                },
                 onSubmit = { submitted = true },
             ),
         )
         rule.onNodeWithTag(PayFlowTestTags.PAY_VPA).performTextInput("alice@okbank")
-        rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).performTextInput("10")
-        rule.onNodeWithTag(PayFlowTestTags.PAY_SUBMIT).performClick()
+        key(AmountKey.D1).performClick()
+        key(AmountKey.D0).performClick()
         assertThat(holder.value.vpa).isEqualTo("alice@okbank")
         assertThat(holder.value.amountText).isEqualTo("10")
+        assertThat(keys).containsExactly(AmountKey.D1, AmountKey.D0).inOrder()
+        // The plain route is a real, separate step: opening the sheet pays nothing.
+        rule.onNodeWithTag(PayFlowTestTags.PAY_PLAIN_ACTION).performClick()
+        assertThat(submitted).isFalse()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SUBMIT).performClick()
         assertThat(submitted).isTrue()
     }
 
@@ -73,10 +86,11 @@ class PayScreenTest {
     }
 
     @Test
-    fun submittingDisablesTheButtonAndShowsProgress() {
-        show(PayUiState(phase = PayPhase.Submitting), dark = true)
-        rule.onNodeWithTag(PayFlowTestTags.PAY_SUBMIT).assertIsNotEnabled()
-        rule.onNodeWithTag(PayFlowTestTags.LOADING).assertIsDisplayed()
+    fun submittingLocksTheSliderAndShowsProgress() {
+        show(PayUiState(vpa = "alice@okbank", amountText = "10", phase = PayPhase.Submitting, paymentMode = PaymentMode.SANDBOX), dark = true)
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SWIPE).assertIsNotEnabled()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_PLAIN_ACTION).assertIsNotEnabled()
+        rule.onNodeWithText("Starting payment…").assertIsDisplayed()
     }
 
     @Test
@@ -99,7 +113,10 @@ class PayScreenTest {
         assertThat(checked).isTrue()
         rule.onNodeWithText("View payment").performClick()
         assertThat(opened).isEqualTo("p1")
+        // Pending: paying again could charge twice, so it takes a second step and the safe choice is the primary one.
         rule.onNodeWithTag(PayFlowTestTags.PAY_AGAIN).performClick()
+        assertThat(again).isFalse()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_AGAIN_ANYWAY).performClick()
         assertThat(again).isTrue()
         rule.onNodeWithText("Done").performClick()
         assertThat(done).isTrue()
@@ -107,20 +124,30 @@ class PayScreenTest {
 
     @Test
     fun resultReceiptShowsAmountPayeeSourceAndShares() {
-        var shared = false
+        var sharedText = 0; var sharedImage = 0
         val payment = testPayment("p1", status = PaymentStatus.SUCCESS, payeeName = "Rahul Verma", payeeVpa = "rahul@okaxis", amountPaise = 12_345_67)
             .copy(handlerPackage = "com.example.gpay", statusSource = StatusSource.UPI_APP, upiTxnId = "GP777")
         show(
             PayUiState(phase = PayPhase.Done("p1", PaymentStatus.SUCCESS, null, payment, handlerLabel = "GPay"), paymentMode = PaymentMode.UPI_APPS),
-            PayCallbacks(onShare = { shared = true }),
+            PayCallbacks(onShare = { sharedText++ }, onShareImage = { sharedImage++ }),
         )
-        rule.onNodeWithText("Payment successful").assertIsDisplayed()
+        // App-reported: the title says who reported it, and never claims the payment succeeded on PayFlow's own authority.
+        rule.onNodeWithText("GPay reports this as paid").assertIsDisplayed()
+        rule.onAllNodesWithText("Payment successful").assertCountEquals(0)
         rule.onNodeWithTag(PayFlowTestTags.PAY_RESULT_AMOUNT).assertTextEquals("₹12,345.67")
         rule.onNodeWithText("Rahul Verma").assertIsDisplayed()
-        rule.onNodeWithText("Reported by GPay. Not verified by PayFlow.").assertIsDisplayed()
+        rule.onNodeWithText("Reported by GPay. Not verified by PayFlow.").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("GP777").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithTag(PayFlowTestTags.PAY_SHARE).performScrollTo().performClick()
-        assertThat(shared).isTrue()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SHARE).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SHARE_TEXT).performClick()
+        assertThat(sharedText).isEqualTo(1)
+        rule.waitForIdle()
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(600)) // past the button's debounce
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SHARE).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SHARE_IMAGE).performClick()
+        assertThat(sharedImage).isEqualTo(1)
         rule.onAllNodesWithTag(PayFlowTestTags.PAY_CHECK_STATUS).assertCountEquals(0) // no PSP to ask in UPI-apps mode
     }
 
@@ -132,11 +159,11 @@ class PayScreenTest {
             PayUiState(phase = PayPhase.Done("p1", PaymentStatus.PENDING, null, payment, handlerLabel = "PhonePe"), paymentMode = PaymentMode.UPI_APPS),
             PayCallbacks(onMarkPaid = { marked = true }, onMarkNotPaid = { marked = false }),
         )
-        rule.onNodeWithText("Not confirmed yet. Check in PhonePe.").assertIsDisplayed()
+        rule.onNodeWithText("Not confirmed yet. Check in PhonePe.").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithTag(PayFlowTestTags.PAY_CHECK_STATUS).assertCountEquals(0)
-        rule.onNodeWithTag(PayFlowTestTags.PAY_MARK_PAID).performScrollTo().performClick()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_MARK_PAID).performClick()
         assertThat(marked).isTrue()
-        rule.onNodeWithTag(PayFlowTestTags.PAY_MARK_NOT_PAID).performScrollTo().performClick()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_MARK_NOT_PAID).performClick()
         assertThat(marked).isFalse()
     }
 
@@ -160,11 +187,12 @@ class PayScreenTest {
     fun amountDisplayUsesIndianGroupingAndModeBannersAreHonest() {
         show(PayUiState(amountText = "123456.7", paymentMode = PaymentMode.UPI_APPS, verification = VpaVerificationState.Skipped))
         rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT_DISPLAY).assertContentDescriptionEquals("Amount to pay: ₹1,23,456.70")
-        rule.onNodeWithText("Pay ₹1,23,456.70").assertIsDisplayed()
+        rule.onNodeWithText("You confirm in your UPI app. PayFlow records what it reports.").assertIsDisplayed()
         rule.onNodeWithText("Your UPI app shows the registered name before you confirm.").assertIsDisplayed()
         rule.onAllNodesWithTag(PayFlowTestTags.SANDBOX_BADGE).assertCountEquals(0)
         holder.value = PayUiState(paymentMode = PaymentMode.SANDBOX)
         rule.onNodeWithTag(PayFlowTestTags.SANDBOX_BADGE).assertIsDisplayed()
+        rule.onNodeWithText("Sandbox: no real money moves.").assertExists()
         rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT_DISPLAY).assertContentDescriptionEquals("Amount to pay: ₹0.00")
     }
 
@@ -173,8 +201,12 @@ class PayScreenTest {
         show(PayUiState(phase = PayPhase.Done("p1", PaymentStatus.FAILED, "Declined by bank")))
         rule.onNodeWithText("Payment failed").assertIsDisplayed()
         rule.onNodeWithText("Declined by bank").assertIsDisplayed()
+        rule.onNodeWithText("Try again").assertIsDisplayed()
         holder.value = PayUiState(phase = PayPhase.Unresolved("p1"))
         rule.onNodeWithText("We could not reach the payment provider").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_CHECK_STATUS).assertIsDisplayed()
+        holder.value = PayUiState(phase = PayPhase.Unresolved("p1", mismatch = true))
+        rule.onNodeWithText("The provider's answer didn't match this payment").assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.PAY_CHECK_STATUS).assertIsDisplayed()
     }
 
@@ -184,5 +216,23 @@ class PayScreenTest {
         rule.onNodeWithContentDescription("Registered name, verified with the payment provider").assertExists()
         holder.value = PayUiState(vpa = "shop@okbank", name = "Chai Point", amountText = "45.00", payeeLocked = true, amountLocked = true)
         rule.onAllNodesWithContentDescription("Filled from the payment QR or link").assertCountEquals(3)
+        rule.onNodeWithTag(PayFlowTestTags.PAY_VPA).assertIsNotEnabled()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).assertIsNotEnabled()
+        // A fixed amount has no keypad to change it with.
+        rule.onAllNodesWithTag(PayFlowTestTags.payKey(AmountKey.D1.name)).assertCountEquals(0)
+    }
+
+    @Test
+    fun theSliderSaysWhatItIsWaitingFor() {
+        show(PayUiState(paymentMode = PaymentMode.SANDBOX))
+        rule.onNodeWithText("Enter a UPI ID").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SWIPE).assertIsNotEnabled()
+        holder.value = PayUiState(vpa = "alice@okbank", paymentMode = PaymentMode.SANDBOX, verification = VpaVerificationState.Verifying)
+        rule.onNodeWithText("Checking the payee…").assertIsDisplayed()
+        holder.value = PayUiState(vpa = "alice@okbank", name = "Alice Kumar", paymentMode = PaymentMode.SANDBOX, verification = VpaVerificationState.Verified("Alice Kumar"))
+        rule.onNodeWithText("Enter an amount").assertIsDisplayed()
+        holder.value = holder.value.copy(amountText = "10")
+        rule.onNodeWithText("Swipe to pay").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_SWIPE).assertIsEnabled()
     }
 }

@@ -30,7 +30,9 @@ import com.darshan.payflow.testutil.runOffMain
 import com.darshan.payflow.testutil.waitUntilWithMainLooper
 import com.darshan.payflow.ui.PayFlowTestTags
 import com.darshan.payflow.ui.pay.PayCallbacks
+import com.darshan.payflow.ui.pay.AmountKey
 import com.darshan.payflow.ui.pay.PayEvent
+import com.darshan.payflow.ui.pay.PayReadiness
 import com.darshan.payflow.ui.pay.PayPhase
 import com.darshan.payflow.ui.pay.PayScreen
 import com.darshan.payflow.ui.pay.PayViewModel
@@ -80,7 +82,7 @@ class UpiIntentFlowIntegrationTest {
                 PayScreen(
                     state,
                     PayCallbacks(
-                        onVpaChange = vm::onVpaChange, onNameChange = vm::onNameChange, onAmountChange = vm::onAmountChange,
+                        onVpaChange = vm::onVpaChange, onNameChange = vm::onNameChange, onAmountChange = vm::onAmountChange, onAmountKey = vm::onAmountKey,
                         onNoteChange = vm::onNoteChange, onSubmit = vm::submit, onCheckStatus = vm::checkStatus, onReset = vm::reset,
                     ),
                 )
@@ -88,7 +90,16 @@ class UpiIntentFlowIntegrationTest {
         }
         rule.onNodeWithTag(PayFlowTestTags.PAY_VPA).performTextInput("alice@okbank")
         rule.onNodeWithTag(PayFlowTestTags.PAY_NAME).performTextInput("Alice")
-        rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).performTextInput("1")
+        rule.onNodeWithTag(PayFlowTestTags.payKey(AmountKey.D1.name)).performClick()
+        // The slider and its plain route both wait for the directory: the registered name is on screen before any payment.
+        // Simulated time has to move for the verify debounce to fire; nothing else moves it reliably.
+        rule.waitUntilWithMainLooper {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100))
+            PayReadiness.blockOf(vm.uiState.value) == null
+        }
+        rule.onNodeWithText("Alice Kumar").assertIsDisplayed()
+        rule.onNodeWithTag(PayFlowTestTags.PAY_PLAIN_ACTION).performClick()
+        rule.waitForIdle()
         rule.onNodeWithTag(PayFlowTestTags.PAY_SUBMIT).performClick()
         rule.waitUntilWithMainLooper { events.any { it is PayEvent.LaunchUpiApp } }
         return vm

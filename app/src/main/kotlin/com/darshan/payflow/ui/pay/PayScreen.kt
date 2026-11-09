@@ -1,75 +1,41 @@
 package com.darshan.payflow.ui.pay
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Notes
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Science
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Verified
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,27 +45,40 @@ import com.darshan.payflow.data.upi.UpiApp
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentMode
-import com.darshan.payflow.domain.model.PaymentStatus
-import com.darshan.payflow.domain.model.StatusSource
 import com.darshan.payflow.ui.PayFlowTestTags
-import com.darshan.payflow.ui.components.BannerTone
-import com.darshan.payflow.ui.components.DetailRow
-import com.darshan.payflow.ui.components.InfoBanner
-import com.darshan.payflow.ui.components.InitialAvatar
-import com.darshan.payflow.ui.components.LoadingView
 import com.darshan.payflow.ui.components.SandboxBadge
 import com.darshan.payflow.ui.components.SecureWindow
-import com.darshan.payflow.ui.components.SectionCard
-import com.darshan.payflow.ui.components.StateIcon
-import com.darshan.payflow.ui.components.formattedDate
+import com.darshan.payflow.ui.designsystem.components.BrandLoader
+import com.darshan.payflow.ui.designsystem.components.DisplayText
+import com.darshan.payflow.ui.designsystem.components.GhostButton
+import com.darshan.payflow.ui.designsystem.components.GhostTone
+import com.darshan.payflow.ui.designsystem.components.AmountDecimals
+import com.darshan.payflow.ui.designsystem.components.AmountText
+import com.darshan.payflow.ui.designsystem.components.PayFlowBottomSheet
+import com.darshan.payflow.ui.designsystem.components.PayFlowListRow
+import com.darshan.payflow.ui.designsystem.components.PayFlowToastHost
+import com.darshan.payflow.ui.designsystem.components.PayFlowTopBar
+import com.darshan.payflow.ui.designsystem.components.PrimaryButton
+import com.darshan.payflow.ui.designsystem.components.ToastHostState
+import com.darshan.payflow.ui.designsystem.components.rememberToastHostState
+import com.darshan.payflow.ui.designsystem.effects.CollectUiEffects
+import com.darshan.payflow.ui.designsystem.effects.LocalHaptics
+import com.darshan.payflow.ui.designsystem.effects.ToastTone
+import com.darshan.payflow.ui.designsystem.motion.LocalMotion
+import com.darshan.payflow.ui.designsystem.tokens.Sizes
+import com.darshan.payflow.ui.designsystem.tokens.Spacing
 import com.darshan.payflow.ui.theme.PayFlowTheme
-import com.darshan.payflow.ui.theme.ScreenPadding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class PayCallbacks(
     val onBack: () -> Unit = {},
     val onVpaChange: (String) -> Unit = {},
     val onNameChange: (String) -> Unit = {},
     val onAmountChange: (String) -> Unit = {},
+    val onAmountKey: (AmountKey) -> Unit = {},
     val onNoteChange: (String) -> Unit = {},
     val onSubmit: () -> Unit = {},
     val onCheckStatus: () -> Unit = {},
@@ -108,6 +87,7 @@ data class PayCallbacks(
     val onAppChosen: (String) -> Unit = {},
     val onDismissChooser: () -> Unit = {},
     val onShare: () -> Unit = {},
+    val onShareImage: () -> Unit = {},
     val onPayAgain: () -> Unit = {},
     /** "Done" on the result screen: leave the Pay screen. */
     val onDone: () -> Unit = {},
@@ -123,29 +103,44 @@ fun PayRoute(
     viewModel: PayViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbar = remember { SnackbarHostState() }
+    val toasts = rememberToastHostState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val noUpiApp = stringResource(R.string.pay_no_upi_app)
     val shareTitle = stringResource(R.string.pay_share_receipt)
+    val shareFailed = stringResource(R.string.pay_share_failed)
     val activityLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         viewModel.onUpiAppResult(upiAppLauncher.parseActivityResult(result.resultCode, result.data))
     }
     val blocked = stringResource(R.string.pay_blocked)
     val warning = stringResource(R.string.pay_guard_warning)
+    CollectUiEffects(viewModel.uiEffects)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is PayEvent.LaunchUpiApp -> {
                     val intent = event.packageName?.let { upiAppLauncher.targetedIntent(event.upiUri, it) } ?: upiAppLauncher.chooserIntent(event.upiUri)
-                    runCatching { activityLauncher.launch(intent) }.onFailure { snackbar.showSnackbar(noUpiApp) }
+                    runCatching { activityLauncher.launch(intent) }.onFailure { toasts.show(noUpiApp, ToastTone.Failed) }
                 }
-                PayEvent.NoUpiApp -> snackbar.showSnackbar(noUpiApp)
-                is PayEvent.Blocked -> snackbar.showSnackbar(blocked)
-                is PayEvent.Warning -> snackbar.showSnackbar(warning)
-                is PayEvent.ShareReceiptImage -> Unit
+                PayEvent.NoUpiApp -> toasts.show(noUpiApp, ToastTone.Failed)
+                is PayEvent.Blocked -> toasts.show(blocked, ToastTone.Failed)
+                is PayEvent.Warning -> toasts.show(warning, ToastTone.Pending)
                 is PayEvent.ShareReceipt -> {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, event.text)
-                    runCatching { context.startActivity(Intent.createChooser(send, shareTitle)) }
+                    runCatching { context.startActivity(Intent.createChooser(send, shareTitle)) }.onFailure { toasts.show(shareFailed, ToastTone.Failed) }
+                }
+                is PayEvent.ShareReceiptImage -> scope.launch {
+                    val uri = runCatching {
+                        withContext(Dispatchers.Default) {
+                            val file = ReceiptExporter.write(context, ReceiptImage.render(event.receipt, context))
+                            ReceiptExporter.uriOf(context, file)
+                        }
+                    }.getOrNull()
+                    if (uri == null) {
+                        toasts.show(shareFailed, ToastTone.Failed)
+                    } else {
+                        runCatching { context.startActivity(Intent.createChooser(ReceiptExporter.shareIntent(uri), shareTitle)) }.onFailure { toasts.show(shareFailed, ToastTone.Failed) }
+                    }
                 }
             }
         }
@@ -157,6 +152,7 @@ fun PayRoute(
             onVpaChange = viewModel::onVpaChange,
             onNameChange = viewModel::onNameChange,
             onAmountChange = viewModel::onAmountChange,
+            onAmountKey = viewModel::onAmountKey,
             onNoteChange = viewModel::onNoteChange,
             onSubmit = viewModel::submit,
             onCheckStatus = viewModel::checkStatus,
@@ -165,12 +161,13 @@ fun PayRoute(
             onAppChosen = viewModel::onAppChosen,
             onDismissChooser = viewModel::dismissChooser,
             onShare = viewModel::shareReceipt,
+            onShareImage = viewModel::shareReceiptImage,
             onPayAgain = viewModel::payAgain,
-            onDone = { viewModel.reset(); onBack() },
+            onDone = { ReceiptExporter.clear(context); viewModel.reset(); onBack() },
             onMarkPaid = { viewModel.markManually(paid = true) },
             onMarkNotPaid = { viewModel.markManually(paid = false) },
         ),
-        snackbarHostState = snackbar,
+        toasts = toasts,
     )
 }
 
@@ -183,359 +180,224 @@ fun PayFieldError.message(): String = when (this) {
     PayFieldError.AMOUNT_TOO_LARGE -> stringResource(R.string.error_amount_too_large, Money.formatInr(Payment.MAX_AMOUNT_PAISE))
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Which of the main views the phase belongs to. Keyed so a change of phase is one fade, not a rebuild per state update. */
+private enum class PayView { Form, Awaiting, Confirming, Result, Unresolved }
+
+private fun PayPhase.view(): PayView = when (this) {
+    PayPhase.Idle, PayPhase.Submitting, is PayPhase.ChoosingApp -> PayView.Form
+    is PayPhase.AwaitingApp -> PayView.Awaiting
+    is PayPhase.Confirming -> PayView.Confirming
+    is PayPhase.Done -> PayView.Result
+    is PayPhase.Unresolved -> PayView.Unresolved
+}
+
+/** How long the current wait has lasted, in the steps the copy and the back rule care about. It delays; it doesn't tick. */
 @Composable
-fun PayScreen(state: PayUiState, callbacks: PayCallbacks, snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }) {
+private fun rememberWaitMillis(key: Any?, waiting: Boolean): Long {
+    val elapsed by produceState(0L, key, waiting) {
+        value = 0L
+        if (!waiting) return@produceState
+        delay(ProcessingStage.STILL_CHECKING_MS)
+        value = ProcessingStage.STILL_CHECKING_MS
+        delay(PayBackPolicy.BLOCK_LIMIT_MS - ProcessingStage.STILL_CHECKING_MS)
+        value = PayBackPolicy.BLOCK_LIMIT_MS
+    }
+    return elapsed
+}
+
+@Composable
+fun PayScreen(state: PayUiState, callbacks: PayCallbacks, toasts: ToastHostState = rememberToastHostState()) {
     SecureWindow()
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.pay_title)) },
-                navigationIcon = {
-                    IconButton(onClick = callbacks.onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = { if (state.paymentMode == PaymentMode.SANDBOX) SandboxBadge(Modifier.padding(end = 12.dp)) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
+    val colors = PayFlowTheme.colors
+    val motion = LocalMotion.current
+    val haptics = LocalHaptics.current
+    val phase = state.phase
+
+    val waitKey: Any = (phase as? PayPhase.Confirming)?.paymentId ?: (phase as? PayPhase.Done)?.paymentId ?: (phase as? PayPhase.Unresolved)?.paymentId ?: phase.view()
+    val running = PayBackPolicy.isRunning(phase)
+    val waitMillis = rememberWaitMillis(waitKey, running || state.polling)
+    val stage = ProcessingStage.at(waitMillis)
+    val backBlocked = PayBackPolicy.blocksBack(phase, waitMillis)
+
+    var confirmOpen by rememberSaveable { mutableStateOf(false) }
+    var shareOpen by rememberSaveable { mutableStateOf(false) }
+    var againOpen by rememberSaveable { mutableStateOf(false) }
+    // A refused attempt closes the confirmation: the screen behind it says what went wrong.
+    LaunchedEffect(state.attemptsRefused) { confirmOpen = false }
+
+    val confirmVisible = confirmOpen && (phase is PayPhase.Idle || phase is PayPhase.Submitting)
+    val appSheet = phase as? PayPhase.ChoosingApp
+    val shareVisible = shareOpen && phase is PayPhase.Done
+    val againVisible = againOpen && phase is PayPhase.Done
+    val sheetOpen = confirmVisible || appSheet != null || shareVisible || againVisible
+    val blockedMessage = stringResource(R.string.pay_back_blocked)
+
+    // Registered before the sheets' own handlers, so an open sheet still takes back first.
+    BackHandler(enabled = backBlocked) {
+        haptics.reject()
+        toasts.show(blockedMessage, ToastTone.Pending)
+    }
+
+    Box(Modifier.fillMaxSize().background(colors.bg)) {
         Column(
-            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier
+                .fillMaxSize()
+                // Sheets are in-window, so without this TalkBack would walk the form behind one.
+                .then(if (sheetOpen) Modifier.clearAndSetSemantics {} else Modifier),
         ) {
-            when (val phase = state.phase) {
-                PayPhase.Idle, PayPhase.Submitting, is PayPhase.ChoosingApp -> PayForm(state, callbacks)
-                is PayPhase.AwaitingApp -> StatusBlock(
-                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
-                    colors = PayFlowTheme.status.pending,
-                    title = stringResource(R.string.pay_awaiting_app),
-                    hint = stringResource(if (state.paymentMode == PaymentMode.UPI_APPS) R.string.pay_awaiting_app_hint_real else R.string.pay_awaiting_app_hint),
-                ) {
-                    if (state.paymentMode != PaymentMode.UPI_APPS) {
-                        OutlinedButton(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
-                            Text(stringResource(R.string.pay_check_status))
-                        }
+            PayFlowTopBar(
+                title = stringResource(R.string.pay_title),
+                onBack = callbacks.onBack.takeUnless { backBlocked },
+                actions = { if (state.paymentMode == PaymentMode.SANDBOX) SandboxBadge(Modifier.padding(end = Spacing.sm)) },
+            )
+            AnimatedContent(
+                targetState = phase.view(),
+                transitionSpec = { motion.fadeThrough() },
+                label = "payView",
+                modifier = Modifier.fillMaxSize(),
+            ) { view ->
+                // The target's data, read once it's current: a leaving view keeps drawing its last good state.
+                when (view) {
+                    PayView.Form -> PayFormContent(state, callbacks, onConfirmRequest = { confirmOpen = true })
+                    PayView.Awaiting -> (phase as? PayPhase.AwaitingApp)?.let { AwaitingAppView(it, state.paymentMode, callbacks) }
+                    PayView.Confirming -> ConfirmingView(state.paymentMode, stage, callbacks)
+                    PayView.Result -> (phase as? PayPhase.Done)?.let {
+                        ResultView(it, state.paymentMode, state.polling, stage, callbacks, onShareRequest = { shareOpen = true }, onPayAgainRequest = { againOpen = true })
                     }
-                }
-                is PayPhase.Confirming -> Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(56.dp))
-                    Text(
-                        stringResource(if (state.paymentMode == PaymentMode.UPI_APPS) R.string.pay_recording else R.string.pay_confirming),
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    if (state.paymentMode != PaymentMode.UPI_APPS) {
-                        Text(
-                            stringResource(R.string.pay_confirming_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                is PayPhase.Done -> ResultBlock(phase, state.paymentMode, callbacks)
-                is PayPhase.Unresolved -> StatusBlock(
-                    icon = Icons.Outlined.CloudOff,
-                    colors = PayFlowTheme.status.failed,
-                    title = stringResource(R.string.pay_unresolved),
-                    hint = stringResource(R.string.pay_unresolved_hint),
-                ) {
-                    Button(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
-                        Text(stringResource(R.string.pay_check_status))
-                    }
-                    OutlinedButton(onClick = { callbacks.onOpenPayment(phase.paymentId) }) { Text(stringResource(R.string.pay_view_payment)) }
+                    PayView.Unresolved -> (phase as? PayPhase.Unresolved)?.let { UnresolvedView(it, state.polling, stage, callbacks) }
                 }
             }
         }
-    }
-    (state.phase as? PayPhase.ChoosingApp)?.let { UpiAppChooserSheet(it.apps, state, callbacks) }
-}
-
-/** PayFlow's own "Pay with" sheet: icon + name per installed UPI app, built from the package manager query. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun UpiAppChooserSheet(apps: List<UpiApp>, state: PayUiState, callbacks: PayCallbacks) {
-    ModalBottomSheet(onDismissRequest = callbacks.onDismissChooser, modifier = Modifier.testTag(PayFlowTestTags.PAY_APP_SHEET)) {
-        Column(Modifier.padding(horizontal = ScreenPadding).padding(bottom = 24.dp)) {
-            Text(stringResource(R.string.pay_chooser_title), style = MaterialTheme.typography.titleLarge)
-            Text(
-                stringResource(R.string.pay_chooser_subtitle, state.amountPaise?.let(Money::formatInr) ?: "", state.vpa),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
-            )
-            apps.forEachIndexed { index, app ->
-                val description = stringResource(R.string.pay_chooser_app, app.label)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { callbacks.onAppChosen(app.packageName) }
-                        .padding(vertical = 12.dp)
-                        .testTag(PayFlowTestTags.payApp(app.packageName))
-                        .semantics(mergeDescendants = true) { contentDescription = description },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val bitmap = remember(app.packageName) { runCatching { app.icon?.toBitmap(96, 96)?.asImageBitmap() }.getOrNull() }
-                    if (bitmap != null) {
-                        Image(bitmap, contentDescription = null, modifier = Modifier.size(44.dp))
-                    } else {
-                        StateIcon(Icons.Outlined.AccountBalanceWallet, modifier = Modifier.size(44.dp))
-                    }
-                    Text(app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp).weight(1f))
-                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                }
-                if (index < apps.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
-            Text(
-                stringResource(R.string.pay_chooser_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PayForm(state: PayUiState, callbacks: PayCallbacks) {
-    val busy = state.isBusy || state.phase is PayPhase.ChoosingApp
-    val realMode = state.paymentMode == PaymentMode.UPI_APPS
-    AmountDisplay(state.amountPaise)
-    SectionCard(stringResource(R.string.pay_section_payee), icon = Icons.Outlined.Person) {
-        OutlinedTextField(
-            value = state.vpa, onValueChange = callbacks.onVpaChange, enabled = !busy && !state.payeeLocked, singleLine = true,
-            label = { Text(stringResource(R.string.pay_vpa)) },
-            placeholder = { Text(stringResource(R.string.pay_vpa_placeholder)) },
-            leadingIcon = { Icon(Icons.Outlined.AlternateEmail, contentDescription = null) },
-            trailingIcon = when {
-                state.payeeLocked -> ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) })
-                state.verification is VpaVerificationState.Verified -> ({ Icon(Icons.Outlined.Verified, contentDescription = null, tint = PayFlowTheme.status.success.content) })
-                else -> null
-            },
-            isError = state.errors.vpa != null,
-            supportingText = {
-                val error = state.errors.vpa
-                when {
-                    error != null -> Text(error.message())
-                    state.verification is VpaVerificationState.Verifying -> Text(stringResource(R.string.pay_verifying))
-                    state.verification is VpaVerificationState.Verified -> Text(
-                        stringResource(R.string.pay_verified, state.verification.payeeName),
-                        color = PayFlowTheme.status.success.content,
-                        modifier = Modifier.testTag(PayFlowTestTags.PAY_VERIFIED),
-                    )
-                    state.verification is VpaVerificationState.NotFound -> Text(stringResource(R.string.error_vpa_not_found), color = MaterialTheme.colorScheme.error)
-                    state.verification is VpaVerificationState.Unavailable -> Text(stringResource(R.string.pay_verify_unavailable), color = MaterialTheme.colorScheme.tertiary)
-                    state.verification is VpaVerificationState.Skipped -> Text(stringResource(R.string.pay_vpa_hint_real))
-                    else -> Text(stringResource(R.string.pay_vpa_hint))
-                }
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_VPA),
-        )
-        OutlinedTextField(
-            value = state.name, onValueChange = callbacks.onNameChange, enabled = !busy && !state.nameLocked, singleLine = true,
-            label = { Text(stringResource(if (realMode) R.string.pay_payee_name_optional else R.string.pay_payee_name)) },
-            leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-            trailingIcon = when {
-                state.payeeLocked -> ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) })
-                state.nameLocked -> ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_name_registered)) })
-                else -> null
-            },
-            isError = state.errors.name != null,
-            supportingText = state.errors.name?.let { { Text(it.message()) } },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NAME),
-        )
-    }
-    SectionCard(stringResource(R.string.pay_section_amount), icon = Icons.Outlined.Notes) {
-        OutlinedTextField(
-            value = state.amountText, onValueChange = callbacks.onAmountChange, enabled = !busy && !state.amountLocked, singleLine = true,
-            label = { Text(stringResource(R.string.pay_amount)) },
-            prefix = { Text("₹", style = MaterialTheme.typography.headlineSmall) },
-            textStyle = MaterialTheme.typography.headlineSmall,
-            trailingIcon = if (state.amountLocked) ({ Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.pay_field_locked)) }) else null,
-            isError = state.errors.amount != null,
-            supportingText = { Text(state.errors.amount?.message() ?: stringResource(R.string.pay_amount_hint, Money.formatInr(Payment.MAX_AMOUNT_PAISE))) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_AMOUNT),
-        )
-        OutlinedTextField(
-            value = state.note, onValueChange = callbacks.onNoteChange, enabled = !busy, singleLine = true,
-            label = { Text(stringResource(R.string.pay_note)) },
-            leadingIcon = { Icon(Icons.Outlined.Notes, contentDescription = null) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_NOTE),
-        )
-    }
-    val label = state.amountPaise?.takeIf { it > 0 }?.let { stringResource(R.string.pay_submit_amount, Money.formatInr(it)) } ?: stringResource(R.string.pay_submit)
-    Button(
-        onClick = callbacks.onSubmit,
-        enabled = !busy,
-        contentPadding = ButtonDefaults.ContentPadding,
-        modifier = Modifier.fillMaxWidth().height(52.dp).testTag(PayFlowTestTags.PAY_SUBMIT),
-    ) {
-        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-        Text(label, modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
-    }
-    if (state.isBusy) LoadingView(Modifier.height(72.dp))
-    when (state.paymentMode) {
-        PaymentMode.SANDBOX -> InfoBanner(stringResource(R.string.pay_sandbox_note), icon = Icons.Outlined.Science, tone = BannerTone.Info)
-        PaymentMode.UPI_APPS -> InfoBanner(stringResource(R.string.pay_real_note), icon = Icons.Outlined.Info, tone = BannerTone.Info)
-        null -> Unit
-    }
-}
-
-/** The big rupee read-out above the form, with Indian digit grouping (₹1,23,456.78). */
-@Composable
-private fun AmountDisplay(amountPaise: Long?) {
-    val text = amountPaise?.takeIf { it > 0 }?.let(Money::formatInr) ?: stringResource(R.string.pay_amount_placeholder)
-    val description = stringResource(R.string.pay_amount_display, text)
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp).testTag(PayFlowTestTags.PAY_AMOUNT_DISPLAY).semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.displayMedium,
-            color = if (amountPaise != null && amountPaise > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
-        Text(stringResource(R.string.pay_amount_display_hint), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** Centred status block: a big tinted icon, a title, a hint and the actions for this phase. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StatusBlock(
-    icon: ImageVector,
-    colors: com.darshan.payflow.ui.theme.StatusColor,
-    title: String,
-    hint: String?,
-    detail: @Composable (() -> Unit)? = null,
-    actions: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        StateIcon(icon, container = colors.container, tint = colors.content, modifier = Modifier.size(96.dp))
-        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-        if (hint != null) {
-            Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        }
-        detail?.invoke()
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 8.dp),
-        ) { actions() }
-    }
-}
-
-/** Who established the status, in words the user can act on. Never says "verified" for an app-reported or user-marked result. */
-@Composable
-fun statusSourceLabel(payment: Payment, handlerLabel: String?): String {
-    val app = handlerLabel ?: payment.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)
-    val pending = payment.status == PaymentStatus.PENDING || payment.status == PaymentStatus.CREATED
-    return when {
-        pending && payment.isUpiAppPayment -> stringResource(R.string.pay_source_unconfirmed, app)
-        pending -> stringResource(R.string.pay_source_pending_psp)
-        payment.statusSource == StatusSource.UPI_APP -> stringResource(R.string.pay_source_reported_by, app)
-        payment.statusSource == StatusSource.USER -> stringResource(R.string.pay_source_marked_by_user)
-        else -> stringResource(R.string.pay_source_psp)
+        PayFlowToastHost(toasts, Modifier.align(Alignment.BottomCenter))
+        ConfirmSheet(confirmVisible, state, phase is PayPhase.Submitting && backBlocked, callbacks) { confirmOpen = false }
+        AppChooserSheet(appSheet, state, backBlocked, callbacks)
+        ShareSheet(shareVisible, onDismiss = { shareOpen = false }, callbacks)
+        PayAgainSheet(againVisible, onDismiss = { againOpen = false }, callbacks)
     }
 }
 
 /**
- * The payment result "receipt": big status icon, amount, payee, who reported the status, references and time; actions share,
- * pay again, view and done. A pending UPI-app payment offers the manual "I paid / not paid" settlement; a pending sandbox payment
- * offers a PSP status check.
+ * The plain way to pay: TalkBack's activate and the button under the slider both land here, and so does anyone who'd rather not
+ * swipe. It's a separate confirmation, so no route to a payment is a single accidental action.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ResultBlock(phase: PayPhase.Done, mode: PaymentMode?, callbacks: PayCallbacks) {
-    val pending = phase.status == PaymentStatus.PENDING || phase.status == PaymentStatus.CREATED
-    val success = phase.status == PaymentStatus.SUCCESS || phase.status == PaymentStatus.REFUND_PENDING || phase.status == PaymentStatus.REFUNDED
-    val payment = phase.payment
-    val realPayment = payment?.isUpiAppPayment == true
-    val (icon, colors) = when {
-        success -> Icons.Outlined.CheckCircle to PayFlowTheme.status.success
-        pending -> Icons.Outlined.Schedule to PayFlowTheme.status.pending
-        else -> Icons.Outlined.ErrorOutline to PayFlowTheme.status.failed
+private fun ConfirmSheet(visible: Boolean, state: PayUiState, locked: Boolean, callbacks: PayCallbacks, onDismiss: () -> Unit) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    val paise = state.amountPaise ?: 0L
+    PayFlowBottomSheet(
+        visible = visible,
+        onDismissRequest = onDismiss,
+        dismissible = !locked,
+        modifier = Modifier.testTag(PayFlowTestTags.PAY_CONFIRM_SHEET),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(bottom = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(stringResource(R.string.pay_confirm_title), style = type.label, color = colors.textSecondary)
+            AmountText(paise, style = type.display, color = colors.text, decimals = AmountDecimals.Always)
+            Text(stringResource(R.string.pay_confirm_to, DisplayText.safe(state.name.ifBlank { state.vpa })), style = type.bodyStrong, color = colors.text, maxLines = 2)
+            Text(DisplayText.safe(state.vpa), style = type.label, color = colors.textSecondary, maxLines = 1)
+            PrimaryButton(
+                stringResource(R.string.pay_submit_amount, Money.formatInr(paise)),
+                callbacks.onSubmit,
+                loading = state.phase is PayPhase.Submitting,
+                enabled = visible,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs).testTag(PayFlowTestTags.PAY_SUBMIT),
+            )
+            GhostButton(stringResource(R.string.pay_cancel), onDismiss, outlined = false, tone = GhostTone.Neutral, enabled = !locked, modifier = Modifier.fillMaxWidth())
+        }
     }
-    val title = when {
-        success -> stringResource(R.string.pay_done_success)
-        pending -> stringResource(R.string.pay_done_pending)
-        else -> stringResource(R.string.pay_done_failed)
+}
+
+/** PayFlow's own "Pay with" sheet. Once an app is picked it locks, and only opens up again at the back limit. */
+@Composable
+private fun AppChooserSheet(phase: PayPhase.ChoosingApp?, state: PayUiState, backBlocked: Boolean, callbacks: PayCallbacks) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    // Kept through the exit animation.
+    val last = remember { mutableStateOf<PayPhase.ChoosingApp?>(null) }
+    if (phase != null) last.value = phase
+    val shown = last.value
+    val picked = phase?.picked
+    PayFlowBottomSheet(
+        visible = phase != null,
+        onDismissRequest = if (picked != null) callbacks.onBack else callbacks.onDismissChooser,
+        dismissible = !(picked != null && backBlocked),
+        modifier = Modifier.testTag(PayFlowTestTags.PAY_APP_SHEET),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(bottom = Spacing.md)) {
+            Column(Modifier.padding(horizontal = Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                Text(stringResource(R.string.pay_chooser_title), style = type.title, color = colors.text)
+                Text(
+                    stringResource(R.string.pay_chooser_subtitle, state.amountPaise?.let(Money::formatInr) ?: "", DisplayText.safe(state.vpa)),
+                    style = type.body,
+                    color = colors.textSecondary,
+                )
+            }
+            shown?.apps?.forEach { app -> AppRow(app, picked, callbacks) }
+            Text(
+                stringResource(R.string.pay_chooser_note),
+                style = type.label,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(horizontal = Spacing.screen).padding(top = Spacing.xs),
+            )
+        }
     }
-    val hint = when {
-        payment != null -> statusSourceLabel(payment, phase.handlerLabel)
-        success -> stringResource(R.string.pay_done_success_hint)
-        pending -> stringResource(R.string.pay_done_pending_hint)
-        else -> null
-    }
-    StatusBlock(
-        icon = icon,
-        colors = colors,
-        title = title,
-        hint = hint,
-        detail = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (payment != null) {
-                    Text(Money.formatInr(payment.amountPaise), style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag(PayFlowTestTags.PAY_RESULT_AMOUNT))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        InitialAvatar(payment.payeeName, size = 32.dp)
-                        Column {
-                            Text(payment.payeeName, style = MaterialTheme.typography.titleMedium)
-                            Text(payment.payeeVpa, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                phase.reason?.let { reason -> Text(reason, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium) }
-                if (pending && realPayment) {
-                    InfoBanner(stringResource(R.string.pay_pending_real_hint, phase.handlerLabel ?: payment?.knownHandlerPackage ?: stringResource(R.string.pay_source_app_generic)), icon = Icons.Outlined.Info, tone = BannerTone.Warning)
-                }
-                if (payment != null) {
-                    Card(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            DetailRow(stringResource(R.string.detail_txn_ref), payment.txnRef)
-                            payment.upiTxnId?.let { DetailRow(stringResource(R.string.detail_upi_txn), it) }
-                            payment.pspTxnId?.let { DetailRow(stringResource(R.string.detail_psp_txn), it) }
-                            phase.handlerLabel?.let { DetailRow(stringResource(R.string.detail_paid_via), it) }
-                            DetailRow(stringResource(R.string.detail_created), payment.formattedDate())
-                        }
-                    }
-                }
+}
+
+@Composable
+private fun AppRow(app: UpiApp, picked: String?, callbacks: PayCallbacks) {
+    val description = stringResource(R.string.pay_chooser_app, app.label)
+    val bitmap = remember(app.packageName) { runCatching { app.icon?.toBitmap(96, 96)?.asImageBitmap() }.getOrNull() }
+    PayFlowListRow(
+        title = app.label,
+        leading = {
+            if (bitmap != null) {
+                Image(bitmap, contentDescription = null, modifier = Modifier.size(Sizes.avatar))
+            } else {
+                Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = PayFlowTheme.colors.accent, modifier = Modifier.size(Sizes.avatar))
             }
         },
-    ) {
-        if (pending && realPayment) {
-            Button(onClick = callbacks.onMarkPaid, modifier = Modifier.testTag(PayFlowTestTags.PAY_MARK_PAID)) { Text(stringResource(R.string.pay_mark_paid)) }
-            OutlinedButton(onClick = callbacks.onMarkNotPaid, modifier = Modifier.testTag(PayFlowTestTags.PAY_MARK_NOT_PAID)) { Text(stringResource(R.string.pay_mark_not_paid)) }
-        } else if (pending && mode != PaymentMode.UPI_APPS) {
-            OutlinedButton(onClick = callbacks.onCheckStatus, modifier = Modifier.testTag(PayFlowTestTags.PAY_CHECK_STATUS)) {
-                Text(stringResource(R.string.pay_check_status))
-            }
+        trailing = { if (picked == app.packageName) BrandLoader(size = Sizes.loaderSmall) },
+        onClick = if (picked == null) ({ callbacks.onAppChosen(app.packageName) }) else null,
+        modifier = Modifier.testTag(PayFlowTestTags.payApp(app.packageName)).semantics { contentDescription = description },
+    )
+}
+
+/** Sharing is the user's choice of format: screenshots are blocked app-wide, so this is the only way a receipt leaves. */
+@Composable
+private fun ShareSheet(visible: Boolean, onDismiss: () -> Unit, callbacks: PayCallbacks) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    PayFlowBottomSheet(visible, onDismiss, Modifier.testTag(PayFlowTestTags.PAY_SHARE_SHEET)) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(bottom = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(stringResource(R.string.pay_share_title), style = type.title, color = colors.text)
+            Text(stringResource(R.string.pay_share_note), style = type.body, color = colors.textSecondary)
+            PrimaryButton(stringResource(R.string.pay_share_as_image), { onDismiss(); callbacks.onShareImage() }, modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs).testTag(PayFlowTestTags.PAY_SHARE_IMAGE))
+            GhostButton(stringResource(R.string.pay_share_as_text), { onDismiss(); callbacks.onShare() }, modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_SHARE_TEXT))
         }
-        if (payment != null) {
-            OutlinedButton(onClick = callbacks.onShare, modifier = Modifier.testTag(PayFlowTestTags.PAY_SHARE)) {
-                Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text(stringResource(R.string.pay_share_receipt), modifier = Modifier.padding(start = 6.dp))
-            }
+    }
+}
+
+/** Paying again while the last payment is unresolved is how people pay twice, so it takes a second, plainly worded step. */
+@Composable
+private fun PayAgainSheet(visible: Boolean, onDismiss: () -> Unit, callbacks: PayCallbacks) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    PayFlowBottomSheet(visible, onDismiss, Modifier.testTag(PayFlowTestTags.PAY_AGAIN_SHEET)) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(bottom = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(stringResource(R.string.pay_again_title), style = type.title, color = colors.text)
+            Text(stringResource(R.string.pay_again_warning), style = type.body, color = colors.textSecondary)
+            PrimaryButton(stringResource(R.string.pay_again_wait), onDismiss, modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs))
+            GhostButton(stringResource(R.string.pay_again_anyway), { onDismiss(); callbacks.onPayAgain() }, tone = GhostTone.Danger, modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.PAY_AGAIN_ANYWAY))
         }
-        if (phase.paymentId.isNotEmpty()) {
-            OutlinedButton(onClick = { callbacks.onOpenPayment(phase.paymentId) }) { Text(stringResource(R.string.pay_view_payment)) }
-        }
-        OutlinedButton(onClick = callbacks.onPayAgain, modifier = Modifier.testTag(PayFlowTestTags.PAY_AGAIN)) { Text(stringResource(R.string.pay_again)) }
-        Button(onClick = callbacks.onDone, modifier = Modifier.testTag(PayFlowTestTags.PAY_RESET)) { Text(stringResource(R.string.pay_done)) }
     }
 }

@@ -37,6 +37,7 @@ import com.darshan.payflow.ui.pay.PayCallbacks
 import com.darshan.payflow.ui.pay.PayPhase
 import com.darshan.payflow.ui.pay.PayScreen
 import com.darshan.payflow.ui.pay.PayViewModel
+import com.darshan.payflow.ui.pay.VpaVerificationState
 import com.darshan.payflow.ui.scan.ScanCallbacks
 import com.darshan.payflow.ui.scan.ScanEvent
 import com.darshan.payflow.ui.scan.ScanScreen
@@ -120,6 +121,10 @@ class QrToPayFlowIntegrationTest {
         rule.waitForIdle()
         rule.onNodeWithTag(PayFlowTestTags.PAY_VPA).assertIsNotEnabled()
         rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).assertIsNotEnabled()
+        // The registered name replaces the QR's text before anything can be paid.
+        rule.waitUntilWithMainLooper { payVm.uiState.value.verification is VpaVerificationState.Verified }
+        rule.onNodeWithTag(PayFlowTestTags.PAY_PLAIN_ACTION).performClick()
+        rule.waitForIdle()
         rule.onNodeWithTag(PayFlowTestTags.PAY_SUBMIT).performClick()
         rule.waitUntilWithMainLooper { payVm.uiState.value.phase is PayPhase.AwaitingApp }
         val txnRef = runOffMain { repo.observeRecent(1).first() }.single().txnRef
