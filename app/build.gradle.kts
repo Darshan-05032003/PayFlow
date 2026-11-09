@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.room)
     alias(libs.plugins.kover)
     alias(libs.plugins.baselineprofile)
+    alias(libs.plugins.roborazzi)
 }
 
 // Local, gitignored configuration. PLAY_INTEGRITY_CLOUD_PROJECT is the Google Cloud project number
@@ -149,7 +150,16 @@ dependencies {
     kspTest(libs.hilt.compiler)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+// Screenshot tests: `recordRoborazziDebug` writes baselines, `verifyRoborazziDebug` compares against them.
+// Baselines are committed; a plain `testDebugUnitTest` runs the same tests without touching images.
+roborazzi {
+    outputDir.set(file("src/test/screenshots"))
 }
 
 // Stress / load simulations live in the `stress` package. They are excluded from the normal unit test

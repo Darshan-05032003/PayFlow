@@ -9,4 +9,5 @@ plugins {
     alias(libs.plugins.room) apply false
     alias(libs.plugins.kover) apply false
     alias(libs.plugins.baselineprofile) apply false
+    alias(libs.plugins.roborazzi) apply false
 }
