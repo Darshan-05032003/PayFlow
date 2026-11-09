@@ -435,3 +435,38 @@ Severity scale: Critical / High / Medium / Low.
   - Payment counts stay visible when hidden. They say how often, not how much.
   - `performScrollTo` and TalkBack focus can leave an element under the pinned header or the floating bar, because the scroller doesn't know about either. A TalkBack action still works there, since it doesn't use coordinates.
 - Not checked on a device: all of this ran on the JVM under Robolectric. `FLAG_SECURE` is unchanged and is covered by an existing test on the window flag, but the recents thumbnail, real TalkBack and overlay touch filtering need a device.
+
+## UI Feature: Pay (scan, amount and payee, swipe-to-pay, outcomes, receipt)
+- Attacks tried:
+  - 1,000 swipes on the slider, 1,000 taps on the confirmation's pay button, 1,000 taps on one app in the app sheet, 3,000 submits across a process death. Each made one payment and one UPI launch.
+  - A drag cancelled past the commit mark, a short swipe, a fling that stops short, a drag that starts off the handle, a second finger, and a swipe on a disabled slider. None paid.
+  - TalkBack's activate on the slider, and reduced motion. Both reach a separate confirmation sheet; neither pays in one action.
+  - Back and predictive back during a running payment, and a hung provider. Back is blocked for at most 15 s, then "Leave and check History" appears; the payment is already stored and stays pending.
+  - Every sheet checked for a second window (the one that wouldn't inherit `FLAG_SECURE`): one root, no dialog, while the confirmation and app sheets are open. Content behind an open sheet is cleared from semantics.
+  - Spoofed "SUCCESS" from the UPI app against a declining provider, a provider answer with the wrong amount, an order refunded at the provider, a user-marked result. None gets the celebration; mismatch stays PENDING with its own unresolved view.
+  - Receipt text and image: every status × source × handler combination; a payee name with a newline, a fake "Status:" line, U+202E and NUL; checked for internal IDs, the provider's transaction ID, the idempotency key, the failure text, the app's package name and the user's note.
+  - Hostile QR payee names (U+202E) on the found card. Several UPI codes in one gallery image. The largest displayable amount (₹99,99,99,999.99) on a locked amount.
+  - Rotation during the success moment, process death with a typed payee, 500 rapid keypad presses.
+- What broke:
+  - High: the result phase reported an order refunded at the provider as SUCCESS, because `ConfirmResult.Success` was mapped to the word success, not the record's status. The new screen would have celebrated a refund.
+  - High: a gallery image with several payment codes paid to the first one with no step in between. A crafted image could put a second payee ahead of the one the user meant.
+  - Medium: after "Pay again", the previous payment's poller could land its answer on the new attempt's screen.
+  - Medium: the shared receipt carried the user's private note and an ISO timestamp, and its status line was built by hand separately from the screen.
+  - Medium: a typed payee restored after process death was never re-checked, so the slider would have waited forever for the directory.
+  - Medium (found in this row's own first draft): the success moment cancelled itself on its first frame, and a draft waited on a non-frame `delay`, so the receipt didn't print in tests.
+  - Low: the old app sheet was a `ModalBottomSheet`, a separate window that doesn't inherit `FLAG_SECURE`. It showed payee and amount.
+- Fixed now:
+  - Result phase carries the stored status; `PayOutcomes` decides every celebration from the record: full burst and sheen only for a provider-confirmed SUCCESS, a quiet check for an app-reported one, nothing for marked, pending, mismatch, refund or failure (`PayOutcomesTest`, `PayMotionTest.nothingElseBursts`, `SandboxDemoOutcomesTest`).
+  - Several codes in one image wait on the found card, which says how many there were; one code still goes straight on (`ScanMultipleCodesTest`).
+  - `payAgain` and `reset` cancel the poller (`pay again stops the old poller…`).
+  - `ReceiptContent` is the only source for the screen's receipt, the shared text and the shared image. It drops the note, internal IDs and package names, and flattens outside text to one line (`ReceiptContentTest`, `ReceiptImageTest`).
+  - The VPA restored after process death is re-verified (`a typed payee restored after process death is checked again…`).
+  - The played flag is captured once per outcome and held above the cross-fade; the print waits on the frame clock (`aRotationDoesNotReplayTheMoment`, `theReceiptPrintsDown…`).
+  - Every sheet is `PayFlowBottomSheet`, in the window (`confirmationAndAppSheetsStayInTheWindow`). The app sheet can't be dismissed once an app is picked, until the back limit.
+  - The slider sets its own committed state on the first accepted lift and only opens again when the ViewModel says the attempt was refused; the ViewModel's `phase != Idle` check and the idempotency key in Room before the call stay the real guards.
+  - Receipt images go to `cache/receipts/`, one file at a time, deleted on Done; the FileProvider exposes only `qr/` and `receipts/`, read-only grant, no new permission.
+- Scope for improvement:
+  - The scanner's brackets lock on to a fixed square, not the code's real bounds: ML Kit's bounding box isn't mapped to preview coordinates yet.
+  - The 15 s back limit is a fixed number. A provider that answers in 16 s is still fine (the payment is stored), but the user may already have left.
+  - Sandbox demo payees (`slowbank@okbank` and others) are only meaningful to the in-app fake provider. A real PSP never sees them as special.
+- Not checked on a device: overlay touch filtering on the slider, the recents thumbnail with a sheet open, real TalkBack, the camera preview inside the container transform. The emulator refused to start (8,068 MB free, needs 8,200).

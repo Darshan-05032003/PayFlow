@@ -135,3 +135,17 @@ Lives outside the design system, built only from it. Rules are in `ui/home/HomeL
 - Motion: scroll is direct. Hide is `Micro` then `Small`. Stagger is the standard token, once per visit; a new row plays its own. A new total rolls from the last one seen, with one sheen sweep.
 - Bottom bar: content fades out in the 24dp above the dock. From the dock's top edge down, the base is solid background.
 - A tab screen's end spacer needs the navigation bar inset as well as `LocalBottomBarInset`. Tests don't catch this, because Robolectric reports no inset.
+
+## Pay and Scan
+Live outside the design system, built only from it. Rules are plain classes in `ui/pay/PayLogic.kt`, `ui/pay/SwipeToPayHolder.kt`, `ui/pay/ReceiptContent.kt` and `ui/scan/ViewfinderMotion.kt`.
+
+| Piece | File | Notes |
+|---|---|---|
+| `SwipeToPay` | `ui/pay/SwipeToPay.kt` | Commits on lift past 90 %, detent ticks, spring home, TalkBack activate opens a confirmation |
+| `AmountKeypad` | `ui/pay/PayForm.kt` | Refuses keys that would make the amount invalid; the amount is an `AmountOdometer` |
+| `ResultView`, `PrintingReceipt` | `ui/pay/PayOutcomeViews.kt` | One outcome per record (`PayOutcomes`); receipt prints on the Settle spring, readable from its first frame |
+| `CoinBurst`, glyphs, `ProcessingRing` | `ui/pay/OutcomeGlyphs.kt` | Burst only for a provider-confirmed success; nothing composed under reduced motion |
+| `ReceiptImage`, `ReceiptExporter` | `ui/pay/ReceiptImage.kt` | Off-screen image from `ReceiptContent`, one file in `cache/receipts/` |
+| `Viewfinder` | `ui/scan/ScanScreen.kt` | Breathing brackets and AGSL beam, read in draw |
+
+New size tokens: `Sizes.swipeTrack`, `swipeHandle`, `keypadKey`, `keypadDockMinHeight`, `viewfinder`, `viewfinderBracket`, `receiptPerforation`.

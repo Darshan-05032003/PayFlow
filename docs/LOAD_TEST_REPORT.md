@@ -334,3 +334,32 @@ To keep these benchmarks working as the UI changes:
 - Release APK: 25,591,195 → 25,661,427 bytes, +70,232 bytes (+0.3 %).
 - Benchmark contracts kept: `HOME_HISTORY` on the bar, `PAYMENT_LIST`, `EXPOSE_TEST_TAGS` at the root, Home vertically scrollable (tallest scrollable node is the page), `SeedDataReceiver` unchanged, no new first-launch screen. With 200 seeded rows Home still shows 5, so `homeScroll` still measures a short page. Its content changed entirely, so a before and after comparison shows the rebuild's cost, not the cost of a longer list.
 - Not measured: frame times, jank, cold start, and the cost of film grain plus a full-width header layer on a real GPU. No device run in this row.
+
+## UI Feature: Pay (scan, amount and payee, swipe-to-pay, outcomes, receipt)
+- Scenario and scale (all JVM under Robolectric on this laptop; none of these are frame times):
+  - 3,000 submits on one attempt, including a process death in the middle (`PayStressTest`).
+  - 1,000 sequential payments through the ViewModel: submit, app result, provider confirm, pay again.
+  - 100,000 random keypad presses through `AmountInput`; 500 presses past the limit through the ViewModel.
+  - 1,000 random drags on `SwipeToPayHolder`, half cancelled; 1,000 injected swipes and 1,000 injected taps on the Compose screen.
+  - Receipt image for a 336-character payee name at ₹1,00,000; 20 renders.
+  - ₹99,99,99,999.99 on a locked amount, the longest names and notes at 1.3×, light and dark (Roborazzi).
+  - 60 frames of the success burst and receipt print, counting recompositions.
+- Results:
+  - 3,000 submits: 1 payment, 1 provider initiate call, 8 ms.
+  - 1,000 sequential payments: 247 ms (247 µs each). Nothing left scheduled afterwards (no leaked poller or timer). The heap figure was GC noise (−8 MB), so it says only that nothing grew measurably.
+  - 100,000 keypad presses: 89 ms, 83,390 refused, highest value reached ₹61,683.69, never over ₹1,00,000.00.
+  - 1,000 holder drags: 1 commit, 4 ms. 1,000 injected swipes: 1 payment in 0.49 s; 1,000 injected taps on the confirm button: 1 payment in 0.93 s.
+  - Receipt image: 6 ms per render, 1080 × 1275 px for the longest name; the name is capped at 3 lines.
+  - Burst plus print: at most 3 recomposition cycles over 60 frames (`theBurstAndThePrintDoNotRecomposePerFrame`). The slider's position, the beam, brackets and burst are read in layer or draw lambdas.
+  - Release APK: 25,661,427 → 25,734,087 bytes, +72,660 bytes (+0.3 %).
+- What broke:
+  - Nothing broke at scale. The one limit by design: the locked-amount display case ₹99,99,99,999.99 is above the payment cap, so the slider says "Over the limit per payment" and stays disabled.
+- Failure flow (the limit case):
+  1. A QR or link carries an amount above ₹1,00,000 (the QR parser already refuses this; only a forged route argument could carry it).
+  2. The amount shows, shrunk to fit, with the lock.
+  3. `PayReadiness` blocks: the slider and the plain route are disabled and say why. `validate()` in the ViewModel blocks again on submit.
+- Fix applied / recommendation:
+  - The keypad refuses any key that would pass the limit, with a reject haptic and a nudge, so it can't produce an invalid amount.
+  - Keypad has no debounce on purpose; the ViewModel reads the latest text on each press, so presses inside one frame can't drop a digit (`keypad presses inside one frame all land…`).
+  - Benchmark contracts untouched: `HOME_HISTORY`, `PAYMENT_LIST`, `EXPOSE_TEST_TAGS`, `SeedDataReceiver`, no new first-launch screen.
+- Not measured: frame times, jank, and the AGSL beam's cost on a real GPU. No device run (emulator refused: 8,068 MB free, needs 8,200). Row 7 benchmarks the scan → success flow.
