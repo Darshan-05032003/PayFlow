@@ -182,7 +182,7 @@ private fun rememberNow(clock: Clock, ticking: Boolean): State<Instant> = produc
     }
 }
 
-private const val TICK_MS = 1_000L
+private const val TICK_MS = 1_000L // token-audit: allow (clock tick for the countdown)
 
 /**
  * Payment requests. Open ones arrive like heads-up cards, each with a ring counting down to its expiry, and are paid by

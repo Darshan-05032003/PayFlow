@@ -99,7 +99,7 @@ object PayReadiness {
  * History, where the reconciler keeps asking.
  */
 object PayBackPolicy {
-    const val BLOCK_LIMIT_MS = 15_000L
+    const val BLOCK_LIMIT_MS = 15_000L // token-audit: allow (product timing: back is blocked this long)
 
     fun isRunning(phase: PayPhase): Boolean = when (phase) {
         PayPhase.Submitting, is PayPhase.Confirming -> true
@@ -115,7 +115,7 @@ enum class ProcessingStage {
     NORMAL, STILL_CHECKING, BANK_SLOW;
 
     companion object {
-        const val STILL_CHECKING_MS = 5_000L
+        const val STILL_CHECKING_MS = 5_000L // token-audit: allow (product timing: when the copy evolves)
 
         fun at(elapsedMs: Long): ProcessingStage = when {
             elapsedMs >= PayBackPolicy.BLOCK_LIMIT_MS -> BANK_SLOW

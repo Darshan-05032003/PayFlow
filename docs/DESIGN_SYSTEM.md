@@ -7,7 +7,7 @@ Code lives in `app/src/main/kotlin/com/darshan/payflow/ui/designsystem/`. The di
 Rendered on the JVM from the debug-only catalog. The per-component baselines are in `app/src/test/screenshots/`.
 
 ## Rules for screens
-- Use only these tokens and components: no raw hex, `dp`, `sp`, durations or easing in screen code.
+- Use only these tokens and components: no raw hex, `dp`, `sp`, durations or easing in screen code. `scripts/token_audit.py` and `TokenAuditTest` check this; a deliberate exception carries `// token-audit: allow (reason)`.
 - One primary action per screen.
 - Anything touched or dragged moves on a spring. No linear easing on UI motion.
 - Read animated values in `graphicsLayer` or `drawBehind`, not in composition.
@@ -47,7 +47,7 @@ Read with `PayFlowTheme.motion` or `LocalMotion`.
 | `Shake` | Essential | 420ms | 150ms fade (inputs skip the shake and keep colour, icon and text) |
 | `Ambient`, `Shimmer`, `Sheen` | Decorative | 2400ms, 1400ms, 900ms | Off |
 
-- Duration bands: micro 90 to 150ms, small 200 to 300ms, screen 350 to 500ms. Stagger is 40ms per item, capped at 320ms.
+- Duration bands: micro 90 to 150ms, small 200 to 300ms, screen 350 to 500ms. Stagger is 40ms per item, capped at 320ms. A sequence that plays one item at a time steps every 280ms (`MotionDurations.SequenceStep`).
 - Motion is reduced when the in-app setting is on or the system animator scale is 0 (`resolveMotionLevel`).
 - Helpers: `motion.spec<T>(token)`, `motion.enter()`, `motion.exit()`, `motion.popIn()`, `motion.sharedAxisX(forward)`, `motion.fadeThrough()`, `motion.staggerDelayMs(index)`, `motion.decorativeEnabled`.
 

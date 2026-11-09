@@ -412,5 +412,5 @@ private fun IconKey(icon: ImageVector, description: String, enabled: Boolean, ti
 }
 
 private val DIGIT_ROWS = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"))
-private const val TICK_MS = 1_000L
+private const val TICK_MS = 1_000L // token-audit: allow (clock tick for the lockout countdown)
 private const val KEY_PRESSED_SCALE = 0.94f

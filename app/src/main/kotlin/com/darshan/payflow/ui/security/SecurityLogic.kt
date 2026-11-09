@@ -5,6 +5,7 @@ import com.darshan.payflow.data.security.BindingStatus
 import com.darshan.payflow.data.security.BiometricAvailability
 import com.darshan.payflow.data.security.IntegrityVerdict
 import com.darshan.payflow.data.security.TamperFinding
+import com.darshan.payflow.ui.designsystem.motion.MotionDurations
 
 enum class CheckId { BINDING, DEVICE, INTEGRITY, APP_LOCK, BIOMETRIC }
 
@@ -150,7 +151,7 @@ class CheckReveal(private val stepMs: Long = STEP_MS, initial: Int = 0) {
     fun done(count: Int): Boolean = revealed >= count
 
     companion object {
-        const val STEP_MS = 280L
+        const val STEP_MS: Long = MotionDurations.SequenceStep.toLong()
 
         fun shown(index: Int, revealed: Int, resolved: List<Boolean>, reduced: Boolean): Boolean =
             resolved.getOrElse(index) { false } && (reduced || index < revealed)

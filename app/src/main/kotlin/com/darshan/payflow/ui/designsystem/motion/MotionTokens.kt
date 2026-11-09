@@ -30,6 +30,9 @@ object MotionDurations {
     const val Shimmer = 1400
     const val Ambient = 2400
     const val Shake = 420
+
+    /** Gap between the steps of a sequence that plays one item at a time, such as the Security centre's checks. */
+    const val SequenceStep = 280
 }
 
 /** The only easing curves. There is deliberately no linear curve: UI motion always has weight. */

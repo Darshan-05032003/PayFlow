@@ -176,7 +176,7 @@ fun ScratchCard(reward: DemoReward, revealed: Boolean, onRevealed: () -> Unit, m
                             drawRect(fill)
                             drawRect(glint)
                             drawContent()
-                            drawPath(path, Color.Black, style = ink, blendMode = BlendMode.Clear)
+                            drawPath(path, Color.Black, style = ink, blendMode = BlendMode.Clear) // token-audit: allow (Clear erases; the colour is never drawn)
                         }
                     }
                     // Scratching starts on touch, with no slop: the first contact already marks the foil. Moves are consumed

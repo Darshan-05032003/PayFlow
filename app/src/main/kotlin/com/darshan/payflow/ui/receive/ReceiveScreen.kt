@@ -294,7 +294,7 @@ fun QrCode(content: String, description: String, modifier: Modifier = Modifier, 
         modifier = modifier
             .size(size)
             .clip(Radii.mediumShape)
-            .background(Color.White)
+            .background(Color.White) // token-audit: allow (QR paper is white in both themes so any scanner reads it)
             .padding(Spacing.sm)
             .testTag(PayFlowTestTags.RECEIVE_QR)
             .semantics { contentDescription = description },
@@ -303,7 +303,7 @@ fun QrCode(content: String, description: String, modifier: Modifier = Modifier, 
         val cell = this.size.minDimension / matrix.size
         for (y in 0 until matrix.size) {
             for (x in 0 until matrix.size) {
-                if (matrix[x, y]) drawRect(Color.Black, topLeft = Offset(x * cell, y * cell), size = Size(cell + 0.5f, cell + 0.5f))
+                if (matrix[x, y]) drawRect(Color.Black, topLeft = Offset(x * cell, y * cell), size = Size(cell + 0.5f, cell + 0.5f)) // token-audit: allow (QR modules)
             }
         }
     }

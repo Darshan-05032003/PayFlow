@@ -15,7 +15,7 @@ import com.darshan.payflow.ui.designsystem.motion.resolveMotionLevel
 /** The splash's rules, without the Android classes. */
 object SplashPolicy {
     /** A settings read that hangs must not trap a payments app on its splash. The lock still covers the app afterwards. */
-    const val MAX_HOLD_MS = 2_500L
+    const val MAX_HOLD_MS = 2_500L // token-audit: allow (product timing: longest splash hold, not motion)
 
     /** How long a finished launch may wait for the icon animation to end. It never delays a slow launch further. */
     const val MAX_ICON_WAIT_MS = MotionDurations.ScreenFast.toLong()

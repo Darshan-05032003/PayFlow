@@ -151,6 +151,6 @@ class HomeViewModel @Inject constructor(
         const val PAYEE_LIMIT = 8
 
         /** Long enough for the coin to turn at least once, so an instant answer doesn't read as nothing having happened. */
-        const val MIN_REFRESH_MS = 700L
+        const val MIN_REFRESH_MS = 700L // token-audit: allow (product timing: shortest visible refresh, not motion)
     }
 }

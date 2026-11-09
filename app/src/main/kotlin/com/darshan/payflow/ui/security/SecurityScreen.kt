@@ -734,4 +734,4 @@ private fun RemovePinContent(r: PinRemovalState, callbacks: SecurityCallbacks) {
     }
 }
 
-private const val MINUTE_MS = 60_000L
+private const val MINUTE_MS = 60_000L // token-audit: allow (unit conversion)

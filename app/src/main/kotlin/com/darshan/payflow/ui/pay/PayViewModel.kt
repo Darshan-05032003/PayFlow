@@ -553,7 +553,7 @@ class PayViewModel @Inject constructor(
         const val SOURCE_LINK = "link"
         /** A recent payee tapped on Home: prefilled, not locked. */
         const val SOURCE_PAYEE = "payee"
-        const val VERIFY_DEBOUNCE_MS = 600L
+        const val VERIFY_DEBOUNCE_MS = 600L // token-audit: allow (product timing: input debounce)
         const val MISMATCH_REASON = "The UPI app answered for a different payment reference; that answer was ignored."
         private val AMOUNT_INPUT = Regex("""^\d{0,7}(\.\d{0,2})?$""")
 
