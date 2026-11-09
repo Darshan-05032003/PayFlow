@@ -470,3 +470,34 @@ Severity scale: Critical / High / Medium / Low.
   - The 15 s back limit is a fixed number. A provider that answers in 16 s is still fine (the payment is stored), but the user may already have left.
   - Sandbox demo payees (`slowbank@okbank` and others) are only meaningful to the in-app fake provider. A real PSP never sees them as special.
 - Not checked on a device: overlay touch filtering on the slider, the recents thumbnail with a sheet open, real TalkBack, the camera preview inside the container transform. The emulator refused to start (8,068 MB free, needs 8,200).
+
+## UI Feature: Money screens (history, payment sheet, collect requests, AutoPay, demo scratch card)
+- Attacks tried:
+  - Collect requests as a fraud vector: opening and refreshing the screen 20 times with a request pending; TalkBack's activate on the slider; the reduced-motion path; 1,000 rapid approves on one request (ViewModel, Room with 1,000 racing coroutines, and 1,000 injected taps on the review's Pay button); approve and decline racing; a request expiring while its card and its review sheet are open; a requester name with a right-to-left override ("Refund from PayFlow" written backwards); a 200-character name at 1.3× text.
+  - History: paying again from a pending row (the double-pay path); 1,000 "Check status" taps; amounts in rows, day totals and the payment sheet with Home's hide setting on; RTL, Arabic, Devanagari and emoji names in 10,000 rows; copying references.
+  - AutoPay: 1,000 taps on a card's pause control; 1,000 sequential pause/resume cycles plus 500 racing ones against the provider; revoke and expire sent as quick actions; a card showing a state the data layer doesn't hold.
+  - Demo scratch card: offered on pending, failed, refunded, app-reported, user-marked and received payments; whether revealing it changes any amount, payment or total; reopening a payment to fish for a bigger reward.
+  - Sheets: every new sheet (collect review, revoke) checked to be in-window `PayFlowBottomSheet`, so `FLAG_SECURE` covers it, and content behind it hidden from TalkBack.
+- What broke:
+  - High: approving a collect request was one tap on a full-width "Approve" button, with no review. Collect requests are how "approve to receive your refund" scams work; one accidental or coached tap paid a stranger.
+  - Medium: History and the payment detail ignored Home's hide-amounts setting, so hiding on Home protected nothing two taps away.
+  - Medium (found by this row's own test): a swipe on the AutoPay stack did nothing, because the holder's index was read after `release()` had already moved it, so the stack always sprang back.
+  - Low: History's old title sat 4dp off the screen gutter; Collect still had stock progress bars.
+- Fixed now:
+  - Paying a request is a full swipe on Pay's own `SwipeToPay` (commit on lift past 90 %), or the review sheet, which names the payee, the UPI ID and the amount and says in the pending tone that approving sends money and receives nothing. TalkBack's activate, "Pay with a button" and reduced motion (no slider at all) all land on that review (`talkBackActivateOnTheSliderOpensTheReviewInsteadOfPaying`, `reducedMotionHasNoSliderAndStillNeedsTheReview`).
+  - Nothing answers a request but the user (`opening and refreshing never answers a request`, `showingARequestNeverAnswersIt`).
+  - 1,000 approves = 1 payment at every layer (`1,000 rapid approves create exactly one payment`, `aThousandTapsOnPayAnswerOnce`, `STRESS [collect-1000-racing-answers]`): the ViewModel's busy set, the use case's per-request mutex and Room's compare-and-set.
+  - Expiry: the screen ticks once a second on the same clock the use case checks; at zero the review closes and the request moves to Earlier with no slider or button left; the use case refuses again and writes EXPIRED (`anExpiredRequestLocksEveryWayToPayIt`, `a request that expired while on screen cannot be paid`).
+  - Declining is one tap, offered on exactly the requests that can be paid, and locks with paying while an answer is in flight (`declineIsOneTapAndLocksWhileAnAnswerIsInFlight`).
+  - Requester names pass through `DisplayText.safe`; the UPI ID is always shown under the name, on the card and in the review (`aSpoofedNameCannotHideWhoGetsTheMoney`).
+  - History, its day totals, the payment sheet and a mandate's debits follow the hide setting through `AmountVisibility`, masked until the stored choice is read; TalkBack hears "Amount hidden" (`hidingAmountsMasksRowsAndDayTotals`, `detailHonoursHideAmountsAndItsEyeTogglesIt`, `payment detail masks the amount until the stored choice is read`).
+  - "Pay again" is never offered on a pending, refund-pending or received payment, and it fills in only the payee, never the amount (`HistoryRowActions`, `swipe actions never offer paying again while a payment is unsettled`). "Check status" is single-flight.
+  - The AutoPay card's control shows only what the data layer reports: the icon morphs when the stored status changes, not on tap; floods send one action; revoke and expire are never quick actions; revoking asks first (`MandatesStackViewModelTest`, `revokingAsksFirst`).
+  - The scratch card exists only for a provider-confirmed outgoing success, says "Demo" and "nothing is credited" before and after, uses an amount fixed by the payment ID, and touches no payment, balance or total (`ScratchLogicTest`, `revealingNeverChangesTheAmountShown`).
+  - Stack swipe bug fixed: the holder's index is captured before release (`listStatesAndNavigation` now swipes to the second card).
+- Scope for improvement:
+  - A row's "Check status" asks about every pending sandbox payment, not just that row's.
+  - Copied references aren't flagged sensitive on the clipboard (`ClipDescription.EXTRA_IS_SENSITIVE`, API 33+). They're IDs, not secrets, but a keyboard's clipboard preview would show them.
+  - Scratched demo cards are remembered for the run only (`DemoRewardLedger`), so a reinstall shows them again. Harmless, since the card is a demo.
+  - Tapjacking on the review sheet relies on the app-wide `filterTouchesWhenObscured` from `SecureWindow`; it has not been tried with a real overlay.
+- Not checked on a device: overlay touch filtering, the recents thumbnail with a sheet open, real TalkBack, the row-to-sheet container transform. The emulator refused to start (4,552 MB free, needs 8,200).

@@ -363,3 +363,29 @@ To keep these benchmarks working as the UI changes:
   - Keypad has no debounce on purpose; the ViewModel reads the latest text on each press, so presses inside one frame can't drop a digit (`keypad presses inside one frame all land…`).
   - Benchmark contracts untouched: `HOME_HISTORY`, `PAYMENT_LIST`, `EXPOSE_TEST_TAGS`, `SeedDataReceiver`, no new first-launch screen.
 - Not measured: frame times, jank, and the AGSL beam's cost on a real GPU. No device run (emulator refused: 8,068 MB free, needs 8,200). Row 7 benchmarks the scan → success flow.
+
+## UI Feature: Money screens (history, payment sheet, collect requests, AutoPay, demo scratch card)
+- Scenario and scale (JVM, Robolectric; `MoneyScreensStressTest` plus the screen tests):
+  - 100,000 payments grouped into day sections; 10,000 rows scrolled with sticky day headers and swipe rows (300 flings, then a jump to the end); 10,000 rows composed to count what's live.
+  - 1,000 racing answers to one collect request through Room and the sandbox provider; 1,000 approves through the ViewModel; 1,000 injected taps on the review's Pay button; 10,000 requests split and counted down for 60 ticks.
+  - 1,000 sequential pause/resume cycles plus 500 racing ones; expected-debit schedules for 10,000 mandates; a daily mandate's schedule 3,650 dates long.
+  - 1,000,000 scratch strokes on the coverage grid; demo rewards for 10,000 payments.
+  - The largest per-payment amount (₹1,00,000) 288 times in one day; names in Arabic, Devanagari, emoji, with bidi controls, and over 250 characters.
+- Results (numbers, before vs after where possible):
+  - Day sections: 100,000 payments → 100,348 entries in 12 ms, keys unique; the biggest day total 2,880,000,000 paise, exact in `Long`.
+  - History scroll: 300 flings over 10,000 rows in 11.7 s on the JVM (39 ms per fling including layout, no drawing), recomposer cycles 0 during the flings, jump to the last row 8 ms. Fewer than 40 rows composed at a time (`tenThousandPaymentsComposeOnlyWhatIsVisible`).
+  - Collect: 1,000 racing answers → 1 payment in 53 ms; 1,000 ViewModel approves → 1 payment, 1 ID generated; 1,000 taps → 1 approve. 10,000 requests split in 1 ms per tick.
+  - AutoPay: 1,000 sequential pause/resume cycles in 193 ms, all applied; after 500 racing taps the stored and provider states agree (PAUSED/PAUSED). 10,000 schedules in 198 ms; 3,650 daily dates in 1 ms.
+  - Scratch: 1,000,000 strokes in 48 ms; 10,000 rewards in 5 ms, all between ₹1 and ₹50.
+  - Release APK: 25,734,087 → 25,789,271 bytes, +55,184 bytes (+0.2 %).
+- What broke:
+  - Nothing at scale. The data layer still returns the whole filtered history as one list (no Paging): 100,000 rows read in 2.4 s from Room (`STRESS [room-100k] fullList`), which the screen then windows.
+- Failure flow (very large histories):
+  1. The user has 100,000 payments and opens History.
+  2. Room reads every row matching the filter and query into one list (about 2.4 s on the JVM for 100,000).
+  3. The ViewModel groups them into days off the main thread (12 ms) and the list composes only what's visible, so scrolling stays flat; the wait is all in the read.
+- Fix applied / recommendation:
+  - Windowing: `LazyColumn` with stable keys and two content types; sticky day headers; swipe offsets, the search reveal, the countdown sweep, the stack's drag and the pause/resume morph are read in layer or draw lambdas.
+  - Recommendation: move History to Paging 3 on the existing `historyPage` query once histories pass about 20,000 rows.
+  - Benchmark contracts untouched: `PAYMENT_LIST` is still on History's list, `HOME_HISTORY` on the bar, `SeedDataReceiver` unchanged.
+- Not measured: frame times and jank on a device. Emulator refused (4,552 MB free, needs 8,200). Row 7's `historyScroll` benchmark will measure a different screen than the baseline did, so that comparison needs a label.

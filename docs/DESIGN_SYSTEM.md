@@ -82,6 +82,7 @@ All in `ui/designsystem/components/` unless noted.
 | `PayFlowBottomNav`, `rememberBottomNavState`, `NavGlyphs` | `BottomNav.kt` | Floating dock, sliding pill, morphing icons. Rules in `BottomNavLogic` |
 | `SectionHeader`, `PayFlowTopBar`, `PayFlowListRow`, `PayFlowSurface`, `HairlineDivider` | `Surfaces.kt` | Structure and depth. `SurfaceLevel`: flat, card, raised, hero |
 | `PayFlowChoiceChip`, `PayFlowSwitch` | `Selection.kt` | Filter and quick-amount chips, settings toggles |
+| `PayFlowSearchField` | `SearchField.kt` | Pill search for a header: glyph, text, close button with the owner's meaning, focus glow, no label |
 
 Modifiers in `ui/designsystem/modifiers/`:
 
@@ -149,3 +150,18 @@ Live outside the design system, built only from it. Rules are plain classes in `
 | `Viewfinder` | `ui/scan/ScanScreen.kt` | Breathing brackets and AGSL beam, read in draw |
 
 New size tokens: `Sizes.swipeTrack`, `swipeHandle`, `keypadKey`, `keypadDockMinHeight`, `viewfinder`, `viewfinderBracket`, `receiptPerforation`.
+
+## Money screens
+Live outside the design system, built only from it. Rules are plain classes in `ui/history/HistoryLogic.kt`, `ui/history/ScratchLogic.kt`, `ui/collect/CollectLogic.kt` and `ui/mandates/MandateLogic.kt`.
+
+| Piece | File | Notes |
+|---|---|---|
+| `PaymentFeedRow` | `ui/components/PaymentFeedRow.kt` | The payment row everywhere: Home, History, a mandate's debits. Hide-aware, one TalkBack sentence, one end of the container transform |
+| History | `ui/history/HistoryScreen.kt` | Sticky day headers with what was sent, search that grows from its button, swipe tray (`RowSwipeHolder`) with TalkBack actions |
+| Payment sheet | `ui/history/PaymentDetailScreen.kt` | A destination drawn as a sheet; the row grows into it; drag down to close. Pay's `ReceiptCard` inside |
+| Collect requests | `ui/collect/CollectScreen.kt` | Heads-up entrance, countdown ring, `SwipeToPay` to pay, review sheet, one-tap decline |
+| AutoPay | `ui/mandates/MandateScreens.kt` | Card stack (`CardStackHolder`), pause/resume morph (`PauseResumeGlyph`), expected-debit timeline (`MandateSchedule`) |
+| `ScratchCard` | `ui/history/ScratchCard.kt` | Demo cashback: offscreen foil cleared under the finger, reveal at 55 %, ring of glints. Only after a provider-confirmed payment |
+
+- Motion: search reveal and row tray on Snap; heads-up and stack rise on Bouncy, with the stagger token; countdown sweep on Small between one-second ticks; pause/resume morph on Bouncy; foil fade on Small, glints on Screen and off under reduced motion.
+- New size tokens: `Sizes.rowSwipeAction`, `countdownRing`, `ringStroke`, `mandateCard`, `mandateStackPeek`, `timelineDot`, `scratchCard`, `scratchBrush`.
