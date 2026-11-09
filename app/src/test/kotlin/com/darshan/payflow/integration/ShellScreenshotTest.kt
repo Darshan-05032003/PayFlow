@@ -78,6 +78,18 @@ class ShellScreenshotTest {
         shot("history-dark")
     }
 
+    /** Part way through Scan & Pay growing into the scanner: the one frame that shows the container transform is really running. */
+    @Test
+    fun homeToScanMidTransformDark() {
+        theme(ThemeMode.Dark)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag(PayFlowTestTags.HOME_SCAN).performClick()
+        compose.mainClock.advanceTimeBy(180)
+        compose.onRoot().captureRoboImage("$SCREENSHOT_DIR/shell/home-to-scan-midway-dark.png")
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test
     fun meTabLight() {
         theme(ThemeMode.Light)

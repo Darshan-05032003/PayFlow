@@ -133,7 +133,7 @@ class HomeScreenshotTest {
     @Test fun contentSandboxDark() = show(content(), "content-sandbox-dark", dark = true, mode = PaymentMode.SANDBOX)
     @Test fun lockBannerLight() = show(content(), "lock-banner-light", dark = false, pinConfigured = false)
     @Test fun lockBannerDark() = show(content(), "lock-banner-dark", dark = true, pinConfigured = false)
-    @Test fun emptyLight() = show(HomeUiState.Empty, "empty-light", dark = false, scrollTo = 400f)
+    @Test fun emptyLight() = show(HomeUiState.Empty, "empty-light", dark = false)
     @Test fun emptyDark() = show(HomeUiState.Empty, "empty-dark", dark = true)
     @Test fun loadingLight() = show(HomeUiState.Loading, "loading-light", dark = false)
     @Test fun loadingDark() = show(HomeUiState.Loading, "loading-dark", dark = true)

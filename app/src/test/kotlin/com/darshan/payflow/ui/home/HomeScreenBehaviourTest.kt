@@ -275,6 +275,20 @@ class HomeScreenBehaviourTest {
         assertThat(hero.fetchSemanticsNode().boundsInRoot.bottom).isGreaterThan(0f)
     }
 
+    /** A short page on a tall screen must not stop half-collapsed, with Scan & Pay left half faded. */
+    @Test
+    @Config(qualifiers = "w411dp-h2000dp-xhdpi")
+    fun aShortPageOnATallScreenCanStillDockAllTheWay() {
+        show(HomeUiState.Empty)
+        rule.waitForIdle()
+        val hero = rule.onNodeWithTag(PayFlowTestTags.HOME_HERO)
+        val restBottom = hero.fetchSemanticsNode().boundsInRoot.bottom
+        scrollBy(100_000f)
+        val range = restBottom - rule.density.run { com.darshan.payflow.ui.designsystem.tokens.Sizes.topBarHeight.toPx() }
+        assertThat(scroll.value.toFloat()).isAtLeast(range - 1f)
+        assertThat(hero.fetchSemanticsNode().boundsInRoot.bottom).isWithin(1f).of(restBottom - range)
+    }
+
     @Test
     fun scrollingHomeRecomposesAtMostAtTheDockingThreshold() {
         show()

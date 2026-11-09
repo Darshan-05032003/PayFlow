@@ -46,8 +46,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +62,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -79,6 +82,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.darshan.payflow.R
 import com.darshan.payflow.core.Money
+import com.darshan.payflow.domain.model.HistorySummary
 import com.darshan.payflow.domain.model.Payment
 import com.darshan.payflow.domain.model.PaymentDirection
 import com.darshan.payflow.domain.model.PaymentMode
@@ -240,13 +244,15 @@ fun HomeScreen(
     val hero = when (state) {
         HomeUiState.Loading -> HeroContent.Loading
         is HomeUiState.Error -> HeroContent.Unavailable
-        HomeUiState.Empty -> HeroContent.Known(com.darshan.payflow.domain.model.HistorySummary.EMPTY)
+        HomeUiState.Empty -> HeroContent.Known(HistorySummary.EMPTY)
         is HomeUiState.Content -> HeroContent.Known(state.month)
     }
 
+    var viewportPx by remember { mutableIntStateOf(0) }
     Box(
         Modifier
             .fillMaxSize()
+            .onSizeChanged { viewportPx = it.height }
             .pullToRefresh(isRefreshing = refreshing, state = pull, onRefresh = callbacks.onRefresh)
             .semantics { customActions = listOf(CustomAccessibilityAction(refreshLabel) { onRefresh(); true }) }
             .drawBehind {
@@ -266,7 +272,16 @@ fun HomeScreen(
         )
         Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
             // The pull moves this inner layer, not the scroller: moving the scroller would shift the pointer it measures from.
-            Column(Modifier.fillMaxWidth().graphicsLayer { translationY = PullLogic.stretchPx(fraction(), thresholdPx) }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { translationY = PullLogic.stretchPx(fraction(), thresholdPx) }
+                    // Always tall enough to dock: a short page must not stop half-collapsed, with Scan & Pay half faded.
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints.copy(minHeight = viewportPx + header.rangePx))
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    },
+            ) {
                 HomeHero(
                     header = header,
                     content = hero,
