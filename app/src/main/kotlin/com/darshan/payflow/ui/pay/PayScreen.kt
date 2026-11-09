@@ -142,6 +142,7 @@ fun PayRoute(
                 PayEvent.NoUpiApp -> snackbar.showSnackbar(noUpiApp)
                 is PayEvent.Blocked -> snackbar.showSnackbar(blocked)
                 is PayEvent.Warning -> snackbar.showSnackbar(warning)
+                is PayEvent.ShareReceiptImage -> Unit
                 is PayEvent.ShareReceipt -> {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, event.text)
                     runCatching { context.startActivity(Intent.createChooser(send, shareTitle)) }

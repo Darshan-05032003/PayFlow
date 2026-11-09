@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.darshan.payflow.core.DispatcherProvider
-import com.darshan.payflow.core.Money
 import com.darshan.payflow.data.security.GuardDecision
 import com.darshan.payflow.data.security.GuardReason
 import com.darshan.payflow.data.security.PaymentGuard
@@ -33,12 +32,16 @@ import com.darshan.payflow.domain.usecase.RecordUpiAppResultUseCase
 import com.darshan.payflow.domain.usecase.UpiAppResult
 import com.darshan.payflow.domain.usecase.VerifyVpaUseCase
 import com.darshan.payflow.domain.usecase.VpaVerifyResult
+import com.darshan.payflow.ui.designsystem.effects.HapticEvent
+import com.darshan.payflow.ui.designsystem.effects.UiEffect
+import com.darshan.payflow.ui.designsystem.effects.UiEffectChannel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -70,8 +73,11 @@ data class PayFormErrors(val vpa: PayFieldError? = null, val name: PayFieldError
 sealed interface PayPhase {
     data object Idle : PayPhase
     data object Submitting : PayPhase
-    /** UPI-apps mode: PayFlow's own sheet lists the installed UPI apps; nothing is stored until one is picked. */
-    data class ChoosingApp(val apps: List<UpiApp>) : PayPhase
+    /**
+     * UPI-apps mode: PayFlow's own sheet lists the installed UPI apps; nothing is stored until one is picked. Once [picked] is
+     * set the payment is being created and the sheet can't be dismissed.
+     */
+    data class ChoosingApp(val apps: List<UpiApp>, val picked: String? = null) : PayPhase
     data class AwaitingApp(val paymentId: String) : PayPhase
     data class Confirming(val paymentId: String) : PayPhase
     /**
@@ -85,7 +91,8 @@ sealed interface PayPhase {
         val payment: Payment? = null,
         val handlerLabel: String? = null,
     ) : PayPhase
-    data class Unresolved(val paymentId: String) : PayPhase
+    /** No usable answer yet. [mismatch]: the provider did answer, for different details, and that answer was refused. */
+    data class Unresolved(val paymentId: String, val mismatch: Boolean = false) : PayPhase
 }
 
 data class PayUiState(
@@ -104,12 +111,16 @@ data class PayUiState(
     val polling: Boolean = false,
     /** Null until the persisted setting has been read. */
     val paymentMode: PaymentMode? = null,
+    /** Goes up each time an attempt ends without a payment (a failed check, the app sheet dismissed): the slider goes home. */
+    val attemptsRefused: Int = 0,
+    /** Goes up each time the keypad refuses a key: the amount nudges. */
+    val amountNudges: Int = 0,
 ) {
-    val isBusy: Boolean get() = phase is PayPhase.Submitting || phase is PayPhase.Confirming
+    val isBusy: Boolean get() = phase is PayPhase.Submitting || phase is PayPhase.Confirming || (phase as? PayPhase.ChoosingApp)?.picked != null
     /** The registered name replaces whatever was typed or scanned; it cannot be edited. */
     val nameLocked: Boolean get() = payeeLocked || verification is VpaVerificationState.Verified
     /** Paise for the typed amount, when it parses. */
-    val amountPaise: Long? get() = Money.parseInrToPaise(amountText)
+    val amountPaise: Long? get() = AmountInput.paiseOf(amountText)
 }
 
 sealed interface PayEvent {
@@ -121,6 +132,8 @@ sealed interface PayEvent {
     data class Warning(val reasons: List<GuardReason>) : PayEvent
     /** Plain-text receipt for the share sheet. */
     data class ShareReceipt(val text: String) : PayEvent
+    /** The same receipt as an image: the screen renders it, because that needs resources and a cache folder. */
+    data class ShareReceiptImage(val receipt: ReceiptContent) : PayEvent
 }
 
 @HiltViewModel
@@ -141,8 +154,8 @@ class PayViewModel @Inject constructor(
     // Declared before _uiState: Kotlin initialises properties in order and restore() reads these.
     private val source: String? = savedState.get<String>(ARG_SOURCE)
     private val fromExternal: Boolean = source == SOURCE_QR || source == SOURCE_LINK
-    /** A payee handed in by the route (QR, link, recent payee) is verified as soon as the mode is known. */
-    private val prefilledPayee: Boolean = source != null && !savedState.get<String>(KEY_VPA).isNullOrBlank()
+    /** A payee handed in by the route or restored after process death: checked as soon as the mode is known. */
+    private val startedWithPayee: Boolean = !savedState.get<String>(KEY_VPA).isNullOrBlank()
     private val method: PaymentMethod = when (source) {
         SOURCE_QR -> PaymentMethod.QR_SCAN
         SOURCE_LINK -> PaymentMethod.DEEP_LINK
@@ -155,7 +168,12 @@ class PayViewModel @Inject constructor(
     private val _events = MutableSharedFlow<PayEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<PayEvent> = _events.asSharedFlow()
 
+    private val effects = UiEffectChannel()
+    /** Haptics for this screen: a refused key, a blocked attempt, an outcome. Sent on the change, never replayed on rotation. */
+    val uiEffects: Flow<UiEffect> = effects.effects
+
     private var verifyJob: Job? = null
+    private var pollJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -166,8 +184,9 @@ class PayViewModel @Inject constructor(
                 state.phase != PayPhase.Idle -> Unit
                 // No directory in UPI-apps mode: the UPI app itself shows the registered payee before the user confirms.
                 mode == PaymentMode.UPI_APPS -> _uiState.update { it.copy(verification = VpaVerificationState.Skipped) }
-                // A prefilled payee (QR, link, recent payee) is verified immediately so the registered name replaces the given text.
-                prefilledPayee && VpaValidator.isValid(state.vpa) && state.verification == VpaVerificationState.Idle -> verifyJob = launch { runVerification() }
+                // A prefilled payee (QR, link, recent payee) or one restored after process death is verified immediately:
+                // the registered name replaces the given text, and the slider is waiting for this answer.
+                startedWithPayee && VpaValidator.isValid(state.vpa) && state.verification == VpaVerificationState.Idle -> verifyJob = launch { runVerification() }
             }
         }
     }
@@ -237,6 +256,28 @@ class PayViewModel @Inject constructor(
         savedState[KEY_AMOUNT] = value
     }
 
+    /** A keypad press. Reads the latest text rather than the screen's copy, so presses inside one frame can't lose a digit. */
+    fun onAmountKey(key: AmountKey) {
+        val state = _uiState.value
+        if (state.phase != PayPhase.Idle || state.amountLocked) return
+        when (val press = AmountInput.press(state.amountText, key)) {
+            is AmountPress.Accepted -> {
+                effects.send(UiEffect.Haptic(HapticEvent.Light))
+                _uiState.update { it.copy(amountText = press.text, errors = it.errors.copy(amount = null)) }
+                savedState[KEY_AMOUNT] = press.text
+            }
+            is AmountPress.Refused -> {
+                effects.send(UiEffect.Haptic(HapticEvent.Reject))
+                _uiState.update {
+                    it.copy(
+                        amountNudges = it.amountNudges + 1,
+                        errors = if (press.reason == AmountRefusal.TOO_LARGE) it.errors.copy(amount = PayFieldError.AMOUNT_TOO_LARGE) else it.errors,
+                    )
+                }
+            }
+        }
+    }
+
     private fun updateForm(transform: PayUiState.() -> PayUiState) {
         _uiState.update { if (it.phase == PayPhase.Idle) it.transform() else it }
     }
@@ -258,11 +299,13 @@ class PayViewModel @Inject constructor(
             }
             val errors = validate(_uiState.value, mode)
             if (errors.hasErrors) {
-                _uiState.update { it.copy(errors = errors, phase = PayPhase.Idle) }
+                // A text field plays its own reject when its error appears; the amount isn't a text field.
+                if (errors.vpa == null && errors.name == null) effects.send(UiEffect.Haptic(HapticEvent.Reject))
+                _uiState.update { it.copy(errors = errors, phase = PayPhase.Idle, attemptsRefused = it.attemptsRefused + 1) }
                 return@launch
             }
             if (!upiAppLauncher.isUpiAppInstalled()) {
-                _uiState.update { it.copy(phase = PayPhase.Idle) }
+                refuseAttempt()
                 _events.tryEmit(PayEvent.NoUpiApp)
                 return@launch
             }
@@ -279,13 +322,20 @@ class PayViewModel @Inject constructor(
     /** The user picked an app in PayFlow's sheet. */
     fun onAppChosen(packageName: String) {
         val phase = _uiState.value.phase as? PayPhase.ChoosingApp ?: return
-        if (phase.apps.none { it.packageName == packageName }) return
-        _uiState.update { it.copy(phase = PayPhase.Submitting) }
+        if (phase.picked != null || phase.apps.none { it.packageName == packageName }) return
+        _uiState.update { it.copy(phase = phase.copy(picked = packageName)) }
         viewModelScope.launch { startPayment(PaymentMode.UPI_APPS, packageName) }
     }
 
     fun dismissChooser() {
-        if (_uiState.value.phase is PayPhase.ChoosingApp) _uiState.update { it.copy(phase = PayPhase.Idle) }
+        if ((_uiState.value.phase as? PayPhase.ChoosingApp)?.picked == null && _uiState.value.phase is PayPhase.ChoosingApp) {
+            _uiState.update { it.copy(phase = PayPhase.Idle, attemptsRefused = it.attemptsRefused + 1) }
+        }
+    }
+
+    private fun refuseAttempt() {
+        effects.send(UiEffect.Haptic(HapticEvent.Reject))
+        _uiState.update { it.copy(phase = PayPhase.Idle, attemptsRefused = it.attemptsRefused + 1) }
     }
 
     private suspend fun startPayment(mode: PaymentMode, packageName: String?) {
@@ -295,7 +345,7 @@ class PayViewModel @Inject constructor(
             payeeVpa = vpa,
             // UPI apps show the registered name themselves; a blank name falls back to the handle so the link stays valid.
             payeeName = state.name.ifBlank { vpa.substringBefore('@') },
-            amountPaise = Money.parseInrToPaise(state.amountText)!!,
+            amountPaise = AmountInput.paiseOf(state.amountText)!!,
             note = state.note,
             txnRef = TxnRefGenerator.next(),
         )
@@ -305,7 +355,7 @@ class PayViewModel @Inject constructor(
         // Device checks before any money moves: a rooted / hooked / tampered device cannot pay; warnings are shown, not fatal.
         when (val guard = withContext(dispatchers.io) { paymentGuard.evaluate(idempotencyKey, request.amountPaise, request.payeeVpa) }) {
             is GuardDecision.Block -> {
-                _uiState.update { it.copy(phase = PayPhase.Idle) }
+                refuseAttempt()
                 _events.tryEmit(PayEvent.Blocked(guard.reasons))
                 return
             }
@@ -320,7 +370,7 @@ class PayViewModel @Inject constructor(
             _events.tryEmit(PayEvent.LaunchUpiApp(launch.upiUri, launch.packageName))
         }.onFailure { e ->
             savedState.remove<String>(KEY_IDEMPOTENCY) // this attempt is spent; the next one needs a fresh key
-            _uiState.update { it.copy(phase = PayPhase.Done("", PaymentStatus.FAILED, e.message)) }
+            showResult(PayPhase.Done("", PaymentStatus.FAILED, e.message))
         }
     }
 
@@ -332,7 +382,7 @@ class PayViewModel @Inject constructor(
             if (currentMode() == PaymentMode.UPI_APPS) {
                 val recorded = withContext(dispatchers.io) { recordUpiAppResult(paymentId, result, appLabelFor()) }
                 finishAttempt()
-                _uiState.update { it.copy(phase = recorded.toPhase(paymentId)) }
+                showResult(recorded.toPhase(paymentId))
             } else {
                 val appResponse = (result as? UpiLaunchResult.Responded)?.let { UpiResponseParser.parse(it.raw) }
                 confirmNow(paymentId, appResponse)
@@ -360,7 +410,7 @@ class PayViewModel @Inject constructor(
     private suspend fun confirmNow(paymentId: String, appResponse: UpiAppResponse?) {
         val result = withContext(dispatchers.io) { confirmPayment(paymentId, appResponse) }
         finishAttempt()
-        _uiState.update { it.copy(phase = result.toPhase(paymentId)) }
+        showResult(result.toPhase(paymentId))
         if (result is ConfirmResult.Pending || (result is ConfirmResult.Unresolved && result.error.retryable)) startPolling(paymentId)
     }
 
@@ -375,7 +425,7 @@ class PayViewModel @Inject constructor(
                 is ManualMarkResult.NotAllowed -> result.payment
                 ManualMarkResult.NotFound -> return@launch
             }
-            _uiState.update { it.copy(phase = PayPhase.Done(payment.id, payment.status, payment.failureReason, payment, done.handlerLabel)) }
+            showResult(PayPhase.Done(payment.id, payment.status, payment.failureReason, payment, done.handlerLabel))
         }
     }
 
@@ -385,10 +435,27 @@ class PayViewModel @Inject constructor(
         _events.tryEmit(PayEvent.ShareReceipt(receiptText(payment, done.handlerLabel)))
     }
 
+    fun shareReceiptImage() {
+        val done = _uiState.value.phase as? PayPhase.Done ?: return
+        val payment = done.payment ?: return
+        _events.tryEmit(PayEvent.ShareReceiptImage(ReceiptContent.from(payment, done.handlerLabel)))
+    }
+
+    /** Moves to [phase] and plays what that outcome has earned, once, on the change. */
+    private fun showResult(phase: PayPhase) {
+        val previous = _uiState.value.phase
+        _uiState.update { it.copy(phase = phase) }
+        if (phase is PayPhase.Done && (previous as? PayPhase.Done)?.status != phase.status) {
+            PayOutcomes.of(phase).haptic?.let { effects.send(UiEffect.Haptic(it)) }
+        }
+    }
+
     /** Keeps the payee and amount, drops the attempt: a new idempotency key and reference will be used. */
     fun payAgain() {
         if (_uiState.value.phase !is PayPhase.Done) return
         finishAttempt()
+        // The old payment's poller must not land on the new attempt. The reconciler still settles that payment.
+        pollJob?.cancel()
         val mode = _uiState.value.paymentMode
         _uiState.update {
             it.copy(
@@ -411,17 +478,20 @@ class PayViewModel @Inject constructor(
     private fun startPolling(paymentId: String) {
         if (_uiState.value.polling) return
         _uiState.update { it.copy(polling = true) }
-        viewModelScope.launch {
+        pollJob = viewModelScope.launch {
             val result = withContext(dispatchers.io) { pollPaymentStatus(paymentId) }
-            _uiState.update { it.copy(phase = result.toPhase(paymentId), polling = false) }
+            _uiState.update { it.copy(polling = false) }
+            showResult(result.toPhase(paymentId))
         }
     }
 
     private fun ConfirmResult.toPhase(paymentId: String): PayPhase = when (this) {
-        is ConfirmResult.Success -> PayPhase.Done(paymentId, PaymentStatus.SUCCESS, null, payment)
+        // The stored status, not the word "success": a captured-then-refunded order arrives here too.
+        is ConfirmResult.Success -> PayPhase.Done(paymentId, payment.status, null, payment)
         is ConfirmResult.Failed -> PayPhase.Done(paymentId, PaymentStatus.FAILED, payment.failureReason, payment)
         is ConfirmResult.Pending -> PayPhase.Done(paymentId, PaymentStatus.PENDING, null, payment)
-        is ConfirmResult.Unresolved, is ConfirmResult.Mismatch -> PayPhase.Unresolved(paymentId)
+        is ConfirmResult.Unresolved -> PayPhase.Unresolved(paymentId)
+        is ConfirmResult.Mismatch -> PayPhase.Unresolved(paymentId, mismatch = true)
         ConfirmResult.NotFound -> PayPhase.Done(paymentId, PaymentStatus.FAILED, null)
     }
 
@@ -438,6 +508,7 @@ class PayViewModel @Inject constructor(
 
     fun reset() {
         finishAttempt()
+        pollJob?.cancel()
         listOf(KEY_VPA, KEY_NAME, KEY_AMOUNT, KEY_NOTE, ARG_PREFILL_AMOUNT, ARG_SOURCE).forEach { savedState.remove<Any>(it) }
         val mode = _uiState.value.paymentMode
         _uiState.value = PayUiState(paymentMode = mode, verification = if (mode == PaymentMode.UPI_APPS) VpaVerificationState.Skipped else VpaVerificationState.Idle)
@@ -450,7 +521,7 @@ class PayViewModel @Inject constructor(
         }
         // The UPI app shows the bank-registered name; PayFlow's name field is optional there.
         val nameError = if (state.name.isBlank() && mode == PaymentMode.SANDBOX) PayFieldError.REQUIRED else null
-        val paise = Money.parseInrToPaise(state.amountText)
+        val paise = AmountInput.paiseOf(state.amountText)
         val amountError = when {
             state.amountText.isBlank() -> PayFieldError.REQUIRED
             paise == null || paise <= 0 -> PayFieldError.INVALID_AMOUNT
@@ -485,21 +556,6 @@ class PayViewModel @Inject constructor(
         private val AMOUNT_INPUT = Regex("""^\d{0,7}(\.\d{0,2})?$""")
 
         /** Plain-text receipt. Says who reported the status; never claims verification PayFlow cannot provide. */
-        fun receiptText(payment: Payment, handlerLabel: String?): String = buildString {
-            append("PayFlow receipt\n")
-            append("To: ").append(payment.payeeName).append(" (").append(payment.payeeVpa).append(")\n")
-            append("Amount: ").append(Money.formatInr(payment.amountPaise)).append('\n')
-            append("Status: ").append(payment.status.name.lowercase().replaceFirstChar(Char::uppercase))
-            when (payment.statusSource) {
-                com.darshan.payflow.domain.model.StatusSource.UPI_APP -> append(" (reported by ").append(handlerLabel ?: payment.knownHandlerPackage ?: "UPI app").append(")")
-                com.darshan.payflow.domain.model.StatusSource.USER -> append(" (marked by you)")
-                com.darshan.payflow.domain.model.StatusSource.PSP -> if (!payment.isUpiAppPayment && payment.status != PaymentStatus.PENDING) append(" (sandbox provider)")
-            }
-            append('\n')
-            append("Reference: ").append(payment.txnRef).append('\n')
-            payment.upiTxnId?.let { append("UPI transaction: ").append(it).append('\n') }
-            if (payment.note.isNotBlank()) append("Note: ").append(payment.note).append('\n')
-            append("Time: ").append(payment.createdAt)
-        }
+        fun receiptText(payment: Payment, handlerLabel: String?): String = ReceiptContent.from(payment, handlerLabel).text()
     }
 }
