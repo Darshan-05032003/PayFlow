@@ -446,3 +446,22 @@ To keep these benchmarks working as the UI changes:
   - Left alone on purpose: the CheckoutKit SDK object and `NavHostController` at the root (one instance for the app's life), `remember` keys typed `Any?`, and `VeiledAmount`'s `Random` (a stateful generator passed once). Converting the lists to `ImmutableList` would add a dependency and touch every ViewModel for no measured gain; revisit if the device benchmarks in row 7b show feed recomposition.
   - Recomposition counts per frame were already measured in earlier rows (Home 6 cycles over 600 scroll steps, History 0 over 300 flings).
 - Not measured: frame times on a device. Row 7b re-runs the Macrobenchmarks on the emulator.
+
+## UI Feature: Device session (before vs after on the emulator)
+- Scenario and scale:
+  - Planned: Macrobenchmark `StartupTimingMetric` (10 cold starts) and `FrameTimingMetric` (Home and History flings over 200 seeded payments) for the redesigned app and for `9c48cc2`, on the same emulator in one session, run with `adb shell am instrument` while no Gradle is running (`scripts/device_session.sh`).
+  - Emulator: `Pixel_7` AVD, API 37, 2 GB guest, 2 vCPUs, software rendering, inside a 6 GB kernel memory cap that protects the desktop it shares the laptop with.
+- Results (numbers, before vs after where possible):
+  - None yet. The first `startupNoCompilation` run on the redesigned build was stopped after 5 of its 10 cold starts (see below), so no Macrobenchmark result exists for either build.
+- What broke:
+  - Perfetto trace capture plus repeated cold starts pushed the emulator past its memory cap about 100 s after boot, and the kernel stopped it (`oom-kill` inside the emulator's own scope; the rest of the machine was unaffected). Without tracing, the same emulator settles near 5.4 GB.
+  - Before that, the results folder was the test app's own media folder, deleted from the shell before each test; the first trace move then failed (`mv: ... No such file or directory`). Results now go to a subfolder recreated per test, as Gradle's connected tasks do.
+- Failure flow (step by step):
+  1. The emulator boots inside the cap with about 1 GB of headroom.
+  2. Macrobenchmark starts a Perfetto session per iteration and kills and relaunches the app.
+  3. Trace buffers and the app's graphics memory under software rendering grow the emulator's memory with each iteration.
+  4. At the cap, the kernel stops the emulator; the benchmark never writes its JSON.
+- Fix applied / recommendation:
+  - The memory cap stays as it is: protecting the desktop comes first.
+  - Measurement moves to a lighter method with no tracing, `scripts/light_bench.sh`: cold start from `am start -W` (TotalTime over 10 force-stopped launches after a dex reset to `verify`, the same state as `CompilationMode.None`) and frame statistics from `dumpsys gfxinfo` (3 rounds of 3 flings down and 3 up on Home and on History). It runs on both builds in one session.
+  - Its numbers will be labelled "emulator, software rendering, 2 GB guest, `am start -W` and gfxinfo, not Macrobenchmark, not a mid-range phone". They are not comparable to the Macrobenchmark baseline table above; only before vs after from the same session is a fair comparison.

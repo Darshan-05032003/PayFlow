@@ -23,12 +23,20 @@ and motion that answers every touch. Every drawing and effect is made in code.
 
 ### In motion
 
-The recordings come from the emulator and will be added to `docs/media/`. Until then, this table lists what each one shows.
+Recorded on the emulator (software rendering, so motion is slower than on a phone) with sandbox data and invented names.
+
+<p align="center">
+  <img src="docs/media/unlock.webp" width="240" alt="Cold start: splash, lock screen, a wrong PIN, then the correct PIN and the reveal into Home">
+  <img src="docs/media/swipe-to-pay.webp" width="240" alt="Swipe to pay a sandbox payee, confirmation with the provider, checkmark burst and the printed receipt">
+</p>
+
+The rows marked "to record" are still pending.
 
 | Flow | What to watch | File |
 |---|---|---|
-| Scan to pay | Scan & Pay's breathing ring opens into the scanner; the payee card moves into Pay; swipe with detent ticks; checkmark draws, coin burst, receipt prints | `docs/media/scan-to-pay.webp` (to record) |
-| Unlock | PIN dots fill on springs; a wrong PIN shakes and pulses; the app opens with a circular reveal | `docs/media/unlock.webp` (to record) |
+| Swipe to pay | Swipe a sandbox payment; the provider confirms it; checkmark draws, coin burst, receipt prints | [`docs/media/swipe-to-pay.webp`](docs/media/swipe-to-pay.webp) |
+| Scan to pay | Scan & Pay's breathing ring opens into the scanner; the payee card moves into Pay | `docs/media/scan-to-pay.webp` (to record) |
+| Unlock | Splash, then PIN dots fill on springs; a wrong PIN shakes and pulses; the app opens with a circular reveal | [`docs/media/unlock.webp`](docs/media/unlock.webp) |
 | Home | Header docks into the top bar on scroll; hide amounts blurs and scrambles; pull to refresh flips the coin | `docs/media/home.webp` (to record) |
 | History | Search grows out of its button; swipe tray; a row grows into the payment sheet; the demo scratch card | `docs/media/history.webp` (to record) |
 | Collect request | Heads-up entrance, countdown ring, approve by swipe | `docs/media/collect.webp` (to record) |
@@ -311,11 +319,13 @@ numbers only compare before and after on the same setup. Method and raw tables: 
 | History scroll, jank | 97.3 % | pending |
 | Release APK | 25,265,073 bytes | 25,819,547 bytes (+2.2 %) |
 
-The "after" frame and startup numbers come from the next device session, which re-measures `9c48cc2` on the same emulator
-configuration (the emulator now runs with a 2 GB guest) so both columns share one setup. The Home scroll now measures a different,
-richer page, so its comparison is labelled as such. That session also generates the Baseline Profile and looks for leaks with
-LeakCanary. Measured on the JVM so far: a 600-step Home scroll in 6 recompositions, 300 History flings over 10,000 rows with no
-recomposition, and the release Compose compiler metrics in LOAD_TEST_REPORT ("Compose stability").
+The "after" column is still pending. Macrobenchmark with Perfetto tracing pushed the emulator past the memory cap that
+protects the rest of this laptop, so the after numbers will come from a lighter method (`scripts/light_bench.sh`:
+`am start -W` cold starts and `dumpsys gfxinfo` frame statistics, run on `9c48cc2` and on the redesign in one session).
+Those numbers will sit in their own table, because they are not comparable to the Macrobenchmark column above. The Home
+scroll now measures a different, richer page, so its comparison is labelled as such. Measured on the JVM so far: a
+600-step Home scroll in 6 recompositions, 300 History flings over 10,000 rows with no recomposition, and the release
+Compose compiler metrics in LOAD_TEST_REPORT ("Compose stability").
 
 ## Accessibility
 
