@@ -215,7 +215,7 @@ class PayScreenTest {
     fun lockedFieldsSayWhyTheyAreLocked() {
         show(PayUiState(vpa = "alice@okbank", name = "Alice Kumar", verification = VpaVerificationState.Verified("Alice Kumar"), paymentMode = PaymentMode.SANDBOX))
         rule.onNodeWithContentDescription("Registered name, verified with the payment provider").assertExists()
-        holder.value = PayUiState(vpa = "shop@okbank", name = "Chai Point", amountText = "45.00", payeeLocked = true, amountLocked = true)
+        holder.value = PayUiState(vpa = "shop@okbank", name = "Tulsi Tea Corner", amountText = "45.00", payeeLocked = true, amountLocked = true)
         rule.onAllNodesWithContentDescription("Filled from the payment QR or link").assertCountEquals(3)
         rule.onNodeWithTag(PayFlowTestTags.PAY_VPA).assertIsNotEnabled()
         rule.onNodeWithTag(PayFlowTestTags.PAY_AMOUNT).assertIsNotEnabled()

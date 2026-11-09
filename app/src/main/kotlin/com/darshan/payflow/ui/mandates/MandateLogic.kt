@@ -79,6 +79,25 @@ object MandateQuickAction {
 }
 
 /**
+ * Where a card sits in the AutoPay stack. A card [depth] steps back is scaled down by [SCALE_STEP] per step and moved down so
+ * its bottom edge lands exactly [depth] peeks below the front card's: the peek strip shows only the card's bottom padding,
+ * never its text. (The scale compensation was once multiplied by the depth a second time, which dropped the third card by
+ * `step x height` and showed its text at 1.3x.)
+ */
+object StackGeometry {
+    const val SCALE_STEP = 0.05f
+
+    fun scale(depth: Float): Float = 1f - depth * SCALE_STEP
+
+    /** Layer translation for a card scaled about its centre: the peek plus half of what scaling took off its height. */
+    fun translationY(depth: Float, heightPx: Float, peekPx: Float): Float = depth * peekPx + heightPx * (1f - scale(depth)) / 2f
+
+    /** The card's bottom edge relative to its unscaled, untranslated top. */
+    fun bottom(depth: Float, heightPx: Float, peekPx: Float): Float =
+        heightPx / 2f + scale(depth) * heightPx / 2f + translationY(depth, heightPx, peekPx)
+}
+
+/**
  * The AutoPay card stack, with no Compose in it. The front card follows the finger; past a third of its width, or on a
  * fling, the stack moves one card. Past either end the drag resists, and a release never moves more than one card.
  */

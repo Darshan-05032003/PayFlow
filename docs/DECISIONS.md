@@ -335,3 +335,32 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 
 ### Compromises
 - No device look for this row; JVM screenshots only. The real BiometricPrompt over the removal sheet and CheckoutKit's sheet over the receded store are unseen on a device.
+
+## Design QA (row 7a, 2026-11-10)
+A whole-app pass over all 202 Roborazzi baselines (light, dark, 1.3× text, reduced motion), judged as one product. Findings, then what was done.
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | The hero's text was champagne in light and ivory in dark on the same graphite. Things placed on a hero used the page's palette: in light, Me's "Set up your UPI ID" was a graphite button on a graphite card, the AutoPay card's status pill and avatars were pale light-theme tints, and the Security headline bar used light status colours. | `onHero` is ivory in both themes. `PayFlowSurface(Hero)` gives its content the dark palette (`HeroPalette`), so buttons, pills and avatars on a hero look the same in both themes. Champagne stays the accent. |
+| 2 | Title hierarchy wasn't a rule. History named itself in the serif display face, Me in the sans title. | Rule: a tab root (Home's wordmark, History, Me) uses serif `display`; pushed screens and sheets use sans `title`. `PayFlowTopBar(large = true)` for tab roots; Me now uses it. |
+| 3 | Payment detail: Method read "UPI app" under "Confirmed by the sandbox payment provider". The fixture is consistent: a sandbox payment started from a typed UPI ID is handed to a UPI app and then confirmed by the provider. The label was the problem. Method describes how a payment started, and "UPI app" is the status-source vocabulary ("Reported by the UPI app"), so the two lines read as two answers to "who said this was paid". | `PaymentMethod.UPI_INTENT` reads "UPI ID", next to "QR scan", "UPI link", "Collect request". Regression test `detailMethodNamesHowThePaymentStartedNotWhoConfirmedIt`. |
+| 4 | "Copy reference" was a borderless button whose inner padding pushed its icon and label in from the details' gutter. | Full-width outlined secondary on the gutters, like every other secondary action. Test `copyReferenceSitsOnTheDetailsGutter`. |
+| 5 | Scan's torch is a tonal button. Its visible circle sat 4dp from the screen edge while the title sat on the 20dp gutter. | The circle now sits on the gutter. |
+| 6 | Home's error state had a second primary button (Retry) under Scan & Pay, and a generic two-line title. | `ErrorState(primaryRetry = false)` on Home, so Scan & Pay stays the one primary action. Home and History say what failed: "Couldn't load your payments/history. Nothing was lost. Try again in a moment." |
+| 7 | AutoPay at 1.3× text: the cards behind the front one showed their text in the peek strip. Two causes: cards had different heights, and the layer translation multiplied the scale compensation by the depth twice, so the third card dropped by `step × height`. | All cards in the stack take the tallest card's height (`IntrinsicSize.Max`), and the geometry is a tested pure object (`StackGeometry`): each card's bottom lands exactly one peek lower at any height. Tests `cardsInTheStackShareTheTallestHeightAtLargeText`, `stackCardsSitOnePeekApartAtAnyHeight`. |
+| 8 | Security centre at 1.3×: the Play Integrity row's explanation was cut at three lines mid-sentence. | No line cap on check details; the row grows. Covered by the `security_large_font` baseline. |
+| 9 | Create AutoPay offered "1 months". | Plural resource. Asserted in `createFormInputsAndErrors`. |
+| 10 | Sample and seed data used real businesses: Blue Tokai Coffee (scan, Home), Chai Point (the in-app sandbox directory and a demo collect request, so it shipped in the app), Metro Recharge with `dmrc@upi`, Netflix, Spotify, Streambox, Indigo Laundry, Brightline Power, Zeta Pay. | Replaced with invented names: Monsoon Roast Coffee, Tulsi Tea Corner, Lotusline Transit, Reelwise, Tunewell, Lumora, Jasmine Laundry, Sunvale Power, Vela Pay. Kept: bank handles in UPI IDs (`@okicici`, `@ybl`) because they are address formats, not payees; UPI app names in payment-mode copy; the device brand in a binding-fingerprint unit test. |
+
+Checked and kept as they are:
+- **Grid and gutters.** Spacing tokens are all multiples of 4 (`TokensTest`). Screens use only tokens (now checked by `scripts/token_audit.sh` and `TokenAuditTest`). Content sits on the 20dp gutter; list rows, section headers and top-bar titles line up on it.
+- **Radii and depth.** 28 for hero and sheet tops, 20 for cards and buttons, 12 for small controls, pills for chips and status. No drop shadows anywhere: depth is the bg → surface → raised tone steps plus a 1dp hairline.
+- **Hero use.** Graphite heroes appear only where a screen has one subject: Home's total, Me's profile, Receive's card, Security's verdict, Checkout's store, the AutoPay card. Never as a list item style.
+- **Chips and pills.** One choice chip (filters, quick amounts, frequency, validity, theme) and one status pill everywhere. Horizontal chip rows run off the edge on purpose, as a scroll hint.
+- **Empty and error states.** Every one has a code-drawn illustration and plain words. After fix 6 every screen has at most one primary action.
+- **One exception, accepted.** Collect requests under reduced motion show "Review and pay" on each open request card. Each card is its own decision about someone else's request; in full motion each card has its own slider in the same role. Merging them into one action would make a payment ambiguous.
+- **Contrast.** Every text pair in both palettes passes WCAG AA, enforced by `TokensTest`; ivory on the graphite hero is above 12:1.
+- **Not default Material.** No stock spinner, text field, card, chip or snackbar remains. CheckoutKit's sheet is Material, themed from tokens (see "CheckoutKit boundary").
+- **1.3× and reduced motion.** After fixes 7 and 8 no clipping in the large-text baselines; long user-supplied names ellipsize by design. "Payment requests" ellipsizes in its top bar at 1.3× beside the Sandbox badge and refresh; TalkBack reads it whole, so it stays.
+
+Re-recorded baselines (intended changes only, one class at a time): Home, History, Money, Pay, Scan, Settings, Shell, and `ds_surfaces_light` from the catalog. Lock and Motion are unchanged. Roborazzi's default 1 % change threshold let the small "Hero" label in the catalog pass verification, so that class was recorded on purpose to keep the baseline truthful.

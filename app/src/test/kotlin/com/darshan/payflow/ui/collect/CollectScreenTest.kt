@@ -28,7 +28,7 @@ class CollectScreenTest {
     private val holder = mutableStateOf<CollectUiState>(CollectUiState.Loading)
 
     private fun request(id: String, status: CollectStatus = CollectStatus.PENDING) = CollectRequest(
-        id = id, payeeVpa = "shop@okbank", payeeName = "Chai Point", amountPaise = 4_500, note = "Table 4",
+        id = id, payeeVpa = "shop@okbank", payeeName = "Tulsi Tea Corner", amountPaise = 4_500, note = "Table 4",
         createdAt = FIXED_INSTANT, expiresAt = FIXED_INSTANT.plusSeconds(600), updatedAt = FIXED_INSTANT, status = status, paymentId = null,
     )
 
@@ -59,7 +59,7 @@ class CollectScreenTest {
             CollectUiState.Content(listOf(CollectItem(request("req-1"), busy = false)), refreshing = false),
             CollectCallbacks(onApprove = { approved = it }, onDecline = { declined = it }),
         )
-        rule.onNodeWithText("Chai Point").assertIsDisplayed()
+        rule.onNodeWithText("Tulsi Tea Corner").assertIsDisplayed()
         rule.onNodeWithText("₹45.00").assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.collectDecline("req-1")).performClick()
         // A tap on the slider pays nothing: paying is a full swipe, or the review sheet's button.

@@ -119,6 +119,7 @@ object PayFlowTestTags {
     const val DETAIL_RECEIPT = "payflow:detail:receipt"
     const val DETAIL_HIDE_AMOUNTS = "payflow:detail:hideAmounts"
     const val DETAIL_SCRATCH = "payflow:detail:scratch"
+    const val DETAIL_COPY_REFERENCE = "payflow:detail:copyReference"
     const val SECURITY_MODE_UPI = "payflow:security:mode:upi"
     const val SECURITY_MODE_SANDBOX = "payflow:security:mode:sandbox"
     const val RECEIVE_NAME = "payflow:receive:name"

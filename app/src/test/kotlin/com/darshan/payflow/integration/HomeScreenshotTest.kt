@@ -48,9 +48,9 @@ class HomeScreenshotTest {
 
     private val payments: List<Payment> = listOf(
         row("1", "Rahul Mehta", "rahul@okicici", 30_000, PaymentStatus.SUCCESS),
-        row("2", "Blue Tokai Coffee", "bluetokai@ybl", 42_000, PaymentStatus.PENDING),
+        row("2", "Monsoon Roast Coffee", "monsoonroast@ybl", 42_000, PaymentStatus.PENDING),
         row("3", "Asha Rao", "asha@okaxis", 1_25_000, PaymentStatus.SUCCESS, incoming = true),
-        row("4", "Metro Recharge", "dmrc@upi", 50_000, PaymentStatus.FAILED),
+        row("4", "Lotusline Transit", "lotusline@upi", 50_000, PaymentStatus.FAILED),
         row("5", "Karan Shah", "karan@oksbi", 2_00_000, PaymentStatus.REFUNDED),
     )
 
@@ -59,7 +59,7 @@ class HomeScreenshotTest {
         RecentPayee("asha@okaxis", "Asha Rao", at),
         RecentPayee("karan@oksbi", "Karan Shah", at),
         RecentPayee("priya@ybl", "Priya N", at),
-        RecentPayee("dmrc@upi", "Metro Recharge", at),
+        RecentPayee("lotusline@upi", "Lotusline Transit", at),
     )
 
     private fun row(id: String, name: String, vpa: String, paise: Long, status: PaymentStatus, incoming: Boolean = false) =

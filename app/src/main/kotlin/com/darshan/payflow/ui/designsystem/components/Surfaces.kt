@@ -41,10 +41,13 @@ import com.darshan.payflow.ui.designsystem.modifiers.filmGrain
 import com.darshan.payflow.ui.designsystem.modifiers.pressScale
 import com.darshan.payflow.ui.designsystem.modifiers.rememberPressFeedback
 import com.darshan.payflow.ui.designsystem.modifiers.trackPress
+import com.darshan.payflow.ui.designsystem.tokens.AurumDark
 import com.darshan.payflow.ui.designsystem.tokens.Hairline
+import com.darshan.payflow.ui.designsystem.tokens.PayFlowColors
 import com.darshan.payflow.ui.designsystem.tokens.Radii
 import com.darshan.payflow.ui.designsystem.tokens.Sizes
 import com.darshan.payflow.ui.designsystem.tokens.Spacing
+import com.darshan.payflow.ui.theme.LocalPayFlowColors
 import com.darshan.payflow.ui.theme.PayFlowTheme
 
 /** Depth layers: flat on the background, one card up, one more for things on cards, or the graphite hero with grain. */
@@ -53,6 +56,9 @@ enum class SurfaceLevel { Flat, Card, Raised, Hero }
 /**
  * The standard card: a tone step plus a 1dp hairline, no shadow. [SurfaceLevel.Hero] adds the graphite gradient and film
  * grain. Sets the content colour for its level.
+ *
+ * A hero is graphite in both themes, so whatever sits on it (buttons, pills, avatars) reads the dark palette: a light-theme
+ * graphite button on a graphite card would vanish, and a pale pill would glare. The content colour is [PayFlowColors.onHero].
  */
 @Composable
 fun PayFlowSurface(
@@ -79,9 +85,16 @@ fun PayFlowSurface(
             .then(if (level == SurfaceLevel.Hero) Modifier.filmGrain(colors.grainAlpha.coerceAtLeast(MIN_HERO_GRAIN)) else Modifier)
             .then(if (hairline) Modifier.border(Hairline.width, colors.hairline.takeUnless { level == SurfaceLevel.Hero } ?: colors.sheen.copy(alpha = 0.12f), shape) else Modifier),
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) { content() }
+        if (level == SurfaceLevel.Hero) {
+            CompositionLocalProvider(LocalPayFlowColors provides HeroPalette, LocalContentColor provides contentColor) { content() }
+        } else {
+            CompositionLocalProvider(LocalContentColor provides contentColor) { content() }
+        }
     }
 }
+
+/** What content on a hero reads: the dark palette, because the hero is graphite in both themes. */
+val HeroPalette: PayFlowColors = AurumDark
 
 /** The hero card is graphite in both themes, so it keeps a touch of grain in light too. */
 private const val MIN_HERO_GRAIN = 0.02f
@@ -115,12 +128,18 @@ fun SectionHeader(
     }
 }
 
-/** Plain top bar: back arrow, title, trailing actions. Stays out of the way so the content can lead. */
+/**
+ * Plain top bar: back arrow, title, trailing actions. Stays out of the way so the content can lead.
+ *
+ * Title rule for the whole app: a tab root (Home's wordmark, History, Me) names itself in the serif `display` face, set
+ * [large]; a screen pushed on top of it, or a sheet, uses the sans `title`, so depth reads from the type alone.
+ */
 @Composable
 fun PayFlowTopBar(
     title: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    large: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = PayFlowTheme.colors
@@ -140,7 +159,7 @@ fun PayFlowTopBar(
         }
         Text(
             title,
-            style = PayFlowTheme.type.title,
+            style = if (large) PayFlowTheme.type.display else PayFlowTheme.type.title,
             color = colors.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

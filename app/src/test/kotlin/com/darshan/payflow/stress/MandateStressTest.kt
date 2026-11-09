@@ -89,7 +89,7 @@ class MandateStressTest {
         val psp = FakePsp(fixedClock)
         val mandates = MandateRepositoryImpl(db.mandateDao())
         val create = CreateMandateUseCase(mandates, psp, fixedClock, ZoneOffset.UTC) { "race" }
-        create(CreateMandateRequest("netflix@okbank", "Netflix", 10_000, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
+        create(CreateMandateRequest("reelwise@okbank", "Reelwise", 10_000, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
         val update = UpdateMandateUseCase(mandates, psp, fixedClock)
         val actions = listOf(MandateAction.PAUSE, MandateAction.RESUME, MandateAction.PAUSE, MandateAction.RESUME, MandateAction.REVOKE)
         val ms = measureTimeMillis {

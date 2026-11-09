@@ -90,7 +90,7 @@ class AndroidUpiAppLauncherTest {
         disableSandboxUpi()
         assertThat(launcher.installedUpiApps()).isEmpty()
         installFakeUpiApp()
-        installFakeUpiApp(packageName = "com.example.zpay", label = "Zeta Pay")
+        installFakeUpiApp(packageName = "com.example.zpay", label = "Vela Pay")
         installFakeUpiApp(packageName = context.packageName, label = "PayFlow", activity = "${context.packageName}.MainActivity") // our own upi:// filter must not be offered
         val apps = launcher.installedUpiApps()
         assertThat(apps.map { it.packageName }).containsExactly("com.example.upiapp", "com.example.zpay").inOrder()

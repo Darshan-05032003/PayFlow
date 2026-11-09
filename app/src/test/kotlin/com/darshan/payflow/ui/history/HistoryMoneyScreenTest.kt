@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -227,6 +228,30 @@ class HistoryMoneyScreenTest {
         rule.setDs { PaymentDetailScreen(PaymentDetailUiState.Content(payment), PaymentDetailCallbacks()) }
         rule.onNodeWithTag(PayFlowTestTags.DETAIL_RECEIPT).assertIsDisplayed()
         rule.onNodeWithText("Confirmed by the sandbox payment provider.", substring = true).assertExists()
+    }
+
+    /**
+     * Design QA: Method says how the payment started, the receipt says who confirmed it. Method used to read "UPI app" under
+     * "Confirmed by the sandbox payment provider", which looked like two different answers to "who said this was paid".
+     */
+    @Test
+    fun detailMethodNamesHowThePaymentStartedNotWhoConfirmedIt() {
+        val payment = sample.first().copy(pspTxnId = "PSP1")
+        rule.setDs { PaymentDetailScreen(PaymentDetailUiState.Content(payment), PaymentDetailCallbacks()) }
+        rule.onNodeWithText("Confirmed by the sandbox payment provider.", substring = true).assertExists()
+        rule.onNodeWithText("UPI ID").performScrollTo().assertIsDisplayed()
+        rule.onAllNodesWithText("UPI app", substring = true).assertCountEquals(0)
+    }
+
+    /** Design QA: "Copy reference" starts on the same gutter as the details above it, not inset by a text button's padding. */
+    @Test
+    fun copyReferenceSitsOnTheDetailsGutter() {
+        val payment = sample.first().copy(pspTxnId = "PSP1")
+        rule.setDs { PaymentDetailScreen(PaymentDetailUiState.Content(payment), PaymentDetailCallbacks()) }
+        val copy = rule.onNodeWithTag(PayFlowTestTags.DETAIL_COPY_REFERENCE).performScrollTo().getBoundsInRoot()
+        val method = rule.onNodeWithText("Method").getBoundsInRoot()
+        assertThat(copy.left).isEqualTo(method.left)
+        assertThat((copy.right - copy.left).value).isGreaterThan((method.right - method.left).value * 4)
     }
 
     /** Clipboard exposure: keyboards and the clipboard preview must not show a copied payment reference. */

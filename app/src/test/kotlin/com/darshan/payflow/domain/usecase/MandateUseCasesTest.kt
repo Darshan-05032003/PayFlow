@@ -25,7 +25,7 @@ class MandateUseCasesTest {
     private val mandates = FakeMandateRepository()
     private val payments = FakePaymentRepository()
     private val today: LocalDate = FIXED_INSTANT.atZone(ZoneOffset.UTC).toLocalDate()
-    private val request = CreateMandateRequest("netflix@okbank", "Netflix", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), "Premium plan")
+    private val request = CreateMandateRequest("reelwise@okbank", "Reelwise", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), "Premium plan")
 
     private fun create(psp: FakePsp = FakePsp(fixedClock)) = CreateMandateUseCase(mandates, psp, fixedClock, ZoneOffset.UTC) { "m-1" }
     private fun update(psp: FakePsp) = UpdateMandateUseCase(mandates, psp, fixedClock)
@@ -39,7 +39,7 @@ class MandateUseCasesTest {
         assertThat(stored.status).isEqualTo(MandateStatus.ACTIVE)
         assertThat(stored.umn).isEqualTo(result.mandate.umn)
         assertThat(stored.umn).isNotEmpty()
-        assertThat(stored.payeeName).isEqualTo("Netflix")
+        assertThat(stored.payeeName).isEqualTo("Reelwise")
         assertThat(psp.mandates[stored.umn]!!.maxAmountPaise).isEqualTo(64_900)
     }
 

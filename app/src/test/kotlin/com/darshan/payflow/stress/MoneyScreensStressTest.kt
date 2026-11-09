@@ -151,7 +151,7 @@ class MoneyScreensStressTest {
         val psp = FakePsp(fixedClock)
         val mandates = MandateRepositoryImpl(db.mandateDao())
         CreateMandateUseCase(mandates, psp, fixedClock, zone) { "m-1" }
-            .invoke(CreateMandateRequest("streambox@okbank", "Streambox", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
+            .invoke(CreateMandateRequest("lumora@okbank", "Lumora", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
         val update = UpdateMandateUseCase(mandates, psp, fixedClock)
         val applied = AtomicInteger()
         val ms = measureTimeMillis {

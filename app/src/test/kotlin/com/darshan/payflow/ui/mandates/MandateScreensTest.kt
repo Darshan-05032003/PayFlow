@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -38,7 +39,7 @@ class MandateScreensTest {
     @get:Rule val rule = createComposeRule()
 
     private fun mandate(status: MandateStatus = MandateStatus.ACTIVE) = Mandate(
-        "m-1", "UMN123", "netflix@okbank", "Netflix", 64_900, MandateFrequency.MONTHLY, LocalDate.of(2026, 10, 29), LocalDate.of(2027, 10, 29),
+        "m-1", "UMN123", "reelwise@okbank", "Reelwise", 64_900, MandateFrequency.MONTHLY, LocalDate.of(2026, 10, 29), LocalDate.of(2027, 10, 29),
         status, "Premium plan", FIXED_INSTANT, FIXED_INSTANT, null, 0,
     )
 
@@ -52,14 +53,14 @@ class MandateScreensTest {
         rule.onNodeWithText("No AutoPay mandates").assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_CREATE).performClick()
         assertThat(create).isTrue()
-        holder.value = MandatesUiState.Content(listOf(mandate(), mandate(MandateStatus.PAUSED).copy(id = "m-2", payeeName = "Spotify", maxAmountPaise = 11_900)))
-        rule.onNodeWithText("Netflix").assertIsDisplayed()
+        holder.value = MandatesUiState.Content(listOf(mandate(), mandate(MandateStatus.PAUSED).copy(id = "m-2", payeeName = "Tunewell", maxAmountPaise = 11_900)))
+        rule.onNodeWithText("Reelwise").assertIsDisplayed()
         rule.onNodeWithText("Up to ₹649.00 · Monthly").assertIsDisplayed()
         // The second mandate is behind the first in the stack: swipe the front card away to reach it.
         rule.onNodeWithTag(PayFlowTestTags.mandateCard("m-1")).performTouchInput { swipeLeft(startX = right - 10f, endX = left + 10f) }
         rule.waitForIdle()
         rule.onNodeWithText("Paused").assertIsDisplayed()
-        rule.onNodeWithText("Spotify").performClick()
+        rule.onNodeWithText("Tunewell").performClick()
         assertThat(opened).isEqualTo("m-2")
     }
 
@@ -82,12 +83,15 @@ class MandateScreensTest {
                 )
             }
         }
-        rule.onNodeWithTag(PayFlowTestTags.MANDATE_VPA).performTextInput("netflix@okbank")
+        // Design QA: the shortest validity reads "1 month", not "1 months".
+        rule.onNodeWithText("1 month").assertExists()
+        rule.onAllNodesWithText("1 months").assertCountEquals(0)
+        rule.onNodeWithTag(PayFlowTestTags.MANDATE_VPA).performTextInput("reelwise@okbank")
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_AMOUNT).performTextInput("649")
         rule.onNodeWithTag(PayFlowTestTags.mandateFrequency(MandateFrequency.WEEKLY)).performClick()
         rule.onNodeWithTag(PayFlowTestTags.mandateValidity(6)).performClick()
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_SUBMIT).performClick() // docked under the form, always on screen
-        assertThat(holder.value.vpa).isEqualTo("netflix@okbank")
+        assertThat(holder.value.vpa).isEqualTo("reelwise@okbank")
         assertThat(holder.value.frequency).isEqualTo(MandateFrequency.WEEKLY)
         assertThat(holder.value.validityMonths).isEqualTo(6)
         assertThat(submitted).isTrue()
@@ -97,7 +101,7 @@ class MandateScreensTest {
 
     @Test
     fun detailActionsAndExecutions() {
-        val execution = testPayment("p1", status = PaymentStatus.SUCCESS, method = PaymentMethod.MANDATE, amountPaise = 64_900, payeeName = "Netflix")
+        val execution = testPayment("p1", status = PaymentStatus.SUCCESS, method = PaymentMethod.MANDATE, amountPaise = 64_900, payeeName = "Reelwise")
         val holder = mutableStateOf<MandateDetailUiState>(
             MandateDetailUiState.Content(mandate(), listOf(execution), availableActions = listOf(MandateAction.PAUSE, MandateAction.REVOKE), busy = false, debitAmountText = ""),
         )
@@ -107,7 +111,7 @@ class MandateScreensTest {
             PayFlowTheme { MandateDetailScreen(s, MandateDetailCallbacks(onAction = { action = it }, onSimulateDebit = { debit = true }, onDebitAmountChange = { holder.value = (holder.value as MandateDetailUiState.Content).copy(debitAmountText = it) })) }
         }
         rule.onNodeWithText("UMN123").assertIsDisplayed()
-        rule.onAllNodesWithText("Netflix").onFirst().assertIsDisplayed()
+        rule.onAllNodesWithText("Reelwise").onFirst().assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.mandateAction(MandateAction.PAUSE)).performClick()
         assertThat(action).isEqualTo(MandateAction.PAUSE)
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_DEBIT_AMOUNT).performScrollTo().performTextInput("100")

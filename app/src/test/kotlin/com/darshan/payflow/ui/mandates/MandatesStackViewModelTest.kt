@@ -35,7 +35,7 @@ class MandatesStackViewModelTest {
 
     private suspend fun seed(psp: FakePsp) =
         CreateMandateUseCase(mandates, psp, fixedClock, ZoneOffset.UTC) { "m-1" }
-            .invoke(CreateMandateRequest("streambox@okbank", "Streambox", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
+            .invoke(CreateMandateRequest("lumora@okbank", "Lumora", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
 
     private fun vm(psp: FakePsp) = MandatesViewModel(mandates, fixedClock, ZoneOffset.UTC, TestDispatcherProvider(dispatcher), UpdateMandateUseCase(mandates, psp, fixedClock))
 

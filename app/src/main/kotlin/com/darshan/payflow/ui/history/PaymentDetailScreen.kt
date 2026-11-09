@@ -301,7 +301,8 @@ private fun MoreDetails(payment: Payment, onCopied: (String) -> Unit) {
         InfoRow(stringResource(R.string.detail_method), payment.method.label())
         payment.pspTxnId?.let { CopyRow(stringResource(R.string.detail_psp_txn), it, onCopied) }
         payment.refundId?.let { CopyRow(stringResource(R.string.detail_refund_id), it, onCopied) }
-        // The receipt already shows the reference; this only copies it.
+        // The receipt already shows the reference; this only copies it. Full width on the gutters, like every other
+        // secondary action: a borderless button's inner padding pushed its label in from the details above it.
         val context = LocalContext.current
         val referenceLabel = stringResource(R.string.detail_txn_ref)
         val copied = stringResource(R.string.detail_copied, referenceLabel)
@@ -311,7 +312,7 @@ private fun MoreDetails(payment: Payment, onCopied: (String) -> Unit) {
                 context.copySensitive(referenceLabel, payment.txnRef)
                 onCopied(copied)
             },
-            outlined = false,
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs).testTag(PayFlowTestTags.DETAIL_COPY_REFERENCE),
             tone = GhostTone.Neutral,
             leadingIcon = Icons.Outlined.ContentCopy,
             debounceMs = 0L,

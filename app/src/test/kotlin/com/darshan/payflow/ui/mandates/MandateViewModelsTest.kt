@@ -41,7 +41,7 @@ class MandateViewModelsTest {
     private val dispatchers = TestDispatcherProvider(dispatcher)
 
     private fun createUseCase(psp: FakePsp = this.psp) = CreateMandateUseCase(mandates, psp, fixedClock, ZoneOffset.UTC) { "m-1" }
-    private suspend fun seedMandate() = createUseCase().invoke(CreateMandateRequest("netflix@okbank", "Netflix", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
+    private suspend fun seedMandate() = createUseCase().invoke(CreateMandateRequest("reelwise@okbank", "Reelwise", 64_900, MandateFrequency.MONTHLY, today, today.plusYears(1), ""))
 
     // ---------- list ----------
 
@@ -82,7 +82,7 @@ class MandateViewModelsTest {
         vm.submit(); advanceUntilIdle()
         assertThat(vm.uiState.value.errors.vpa).isNotNull()
         assertThat(vm.uiState.value.errors.amount).isNotNull()
-        vm.onVpaChange("netflix@okbank"); vm.onNameChange("Netflix"); vm.onAmountChange("649"); vm.onFrequencyChange(MandateFrequency.MONTHLY); vm.onValidityMonthsChange(12)
+        vm.onVpaChange("reelwise@okbank"); vm.onNameChange("Reelwise"); vm.onAmountChange("649"); vm.onFrequencyChange(MandateFrequency.MONTHLY); vm.onValidityMonthsChange(12)
         vm.events.test {
             vm.submit()
             val created = awaitItem() as CreateMandateEvent.Created
@@ -108,7 +108,7 @@ class MandateViewModelsTest {
     fun `create double tap submits once and psp outage is reported`() = runTest(dispatcher) {
         val down = FakePsp(fixedClock, FakePspConfig(serverErrorRate = 1.0))
         val vm = createVm(down)
-        vm.onVpaChange("netflix@okbank"); vm.onNameChange("Netflix"); vm.onAmountChange("649")
+        vm.onVpaChange("reelwise@okbank"); vm.onNameChange("Reelwise"); vm.onAmountChange("649")
         vm.events.test {
             vm.submit(); vm.submit()
             assertThat(awaitItem()).isEqualTo(CreateMandateEvent.Unavailable)

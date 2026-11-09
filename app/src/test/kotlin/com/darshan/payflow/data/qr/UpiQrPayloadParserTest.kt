@@ -10,9 +10,9 @@ class UpiQrPayloadParserTest {
 
     @Test
     fun `parses a merchant qr with amount`() {
-        val p = valid("upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00&cu=INR&tn=Table%204&tr=ORD123&mc=5812")
+        val p = valid("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00&cu=INR&tn=Table%204&tr=ORD123&mc=5812")
         assertThat(p.payeeVpa).isEqualTo("shop@okbank")
-        assertThat(p.payeeName).isEqualTo("Chai Point")
+        assertThat(p.payeeName).isEqualTo("Tulsi Tea Corner")
         assertThat(p.amountPaise).isEqualTo(4_500)
         assertThat(p.note).isEqualTo("Table 4")
         assertThat(p.txnRef).isEqualTo("ORD123")
@@ -37,7 +37,7 @@ class UpiQrPayloadParserTest {
 
     @Test
     fun `plus signs are not spaces in rfc3986 but many generators use them`() {
-        assertThat(valid("upi://pay?pa=ab@ab&pn=Chai+Point").payeeName).isEqualTo("Chai Point")
+        assertThat(valid("upi://pay?pa=ab@ab&pn=Tulsi+Tea+Corner").payeeName).isEqualTo("Tulsi Tea Corner")
     }
 
     @Test

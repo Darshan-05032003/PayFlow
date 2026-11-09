@@ -139,7 +139,7 @@ class HttpPspClientTest {
     fun `collect requests are listed and answered`() = runBlocking {
         server.enqueue(
             MockResponse.Builder().code(200).body(
-                """[{"id":"req-1","payeeVpa":"shop@okbank","payeeName":"Chai Point","amountPaise":4500,"note":"Table 4",
+                """[{"id":"req-1","payeeVpa":"shop@okbank","payeeName":"Tulsi Tea Corner","amountPaise":4500,"note":"Table 4",
                    "createdAt":1793268930000,"expiresAt":1793269530000,"status":"PENDING"},
                    {"id":"bad","payeeVpa":"not a vpa","payeeName":"x","amountPaise":-5,"note":"","createdAt":1,"expiresAt":2,"status":"PENDING"}]""",
             ).build(),
@@ -175,7 +175,7 @@ class HttpPspClientTest {
         server.enqueue(MockResponse.Builder().code(201).body("""{"pspTxnId":"psp-5","txnRef":"MND1","status":"PENDING"}""").build())
         server.enqueue(MockResponse.Builder().code(422).body("""{"error":"max amount"}""").build())
 
-        val created = client.createMandate(PspMandateRequest("netflix@okbank", "Netflix", 64_900, "MONTHLY", "2026-10-29", "2027-10-29", "plan"))
+        val created = client.createMandate(PspMandateRequest("reelwise@okbank", "Reelwise", 64_900, "MONTHLY", "2026-10-29", "2027-10-29", "plan"))
         assertThat(created).isEqualTo(PspMandate("UMN-1", com.darshan.payflow.domain.model.MandateStatus.ACTIVE))
         assertThat(client.updateMandate("UMN-1", "PAUSE")).isEqualTo(PspMandate("UMN-1", com.darshan.payflow.domain.model.MandateStatus.PAUSED))
         assertThat(runCatching { client.updateMandate("UMN-1", "RESUME") }.exceptionOrNull()).isInstanceOf(PspException.Malformed::class.java)

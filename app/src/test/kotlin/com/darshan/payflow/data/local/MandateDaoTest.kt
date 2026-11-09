@@ -28,7 +28,7 @@ class MandateDaoTest {
     private lateinit var repo: MandateRepositoryImpl
 
     private fun mandate(id: String, end: LocalDate = LocalDate.of(2027, 1, 1)) = Mandate(
-        id, "UMN$id", "netflix@okbank", "Netflix", 64_900, MandateFrequency.MONTHLY, LocalDate.of(2026, 10, 29), end,
+        id, "UMN$id", "reelwise@okbank", "Reelwise", 64_900, MandateFrequency.MONTHLY, LocalDate.of(2026, 10, 29), end,
         MandateStatus.ACTIVE, "", FIXED_INSTANT, FIXED_INSTANT, null, 0,
     )
 

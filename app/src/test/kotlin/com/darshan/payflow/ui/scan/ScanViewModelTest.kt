@@ -42,7 +42,7 @@ class ScanViewModelTest {
         val handle = SavedStateHandle()
         val vm = vm(handle)
         vm.onPermissionResult(granted = true, canAskAgain = true)
-        decoder.result = ImageQrResult.Found(payload("upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00"))
+        decoder.result = ImageQrResult.Found(payload("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00"))
         decoder.gate = kotlinx.coroutines.CompletableDeferred()
         vm.events.test {
             vm.onImagePicked("content://media/picker/0/42")
@@ -58,7 +58,7 @@ class ScanViewModelTest {
         assertThat(decoder.decoded).containsExactly("content://media/picker/0/42")
         // The URI is never persisted; the decoded payload is, exactly like a camera scan, so rotation restores the result.
         assertThat(handle.keys().map { handle.get<Any>(it) }).doesNotContain("content://media/picker/0/42")
-        assertThat(handle.get<String>(ScanViewModel.KEY_FOUND_RAW)).isEqualTo("upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00")
+        assertThat(handle.get<String>(ScanViewModel.KEY_FOUND_RAW)).isEqualTo("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00")
     }
 
     @Test
@@ -129,7 +129,7 @@ class ScanViewModelTest {
         val vm = vm()
         vm.onPermissionResult(granted = true, canAskAgain = true)
         vm.events.test {
-            vm.onBarcode("upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00&cu=INR")
+            vm.onBarcode("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00&cu=INR")
             val event = awaitItem() as ScanEvent.PayloadReady
             assertThat(event.payload.payeeVpa).isEqualTo("shop@okbank")
         }

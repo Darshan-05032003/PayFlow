@@ -253,7 +253,7 @@ class FakePsp(
         val UNKNOWN_USERS = setOf("unknown", "nobody", "invalid")
         val DIRECTORY = mapOf(
             "alice@okbank" to "Alice Kumar",
-            "shop@okbank" to "Chai Point",
+            "shop@okbank" to "Tulsi Tea Corner",
             "bob@upi" to "Bob Mathew",
             "landlord@ybl" to "Mr Rao",
             "9876543210@upi" to "Ravi Sharma",

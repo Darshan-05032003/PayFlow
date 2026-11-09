@@ -29,7 +29,10 @@ fun EmptyState(
     }
 }
 
-/** A deliberate error state with a primary retry. TalkBack announces it when it appears. */
+/**
+ * A deliberate error state with a retry. TalkBack announces it when it appears. The retry is the primary action unless the
+ * screen already has one ([primaryRetry] = false), as Home does with Scan & Pay: one primary action per screen.
+ */
 @Composable
 fun ErrorState(
     title: String,
@@ -38,9 +41,10 @@ fun ErrorState(
     modifier: Modifier = Modifier,
     message: String? = null,
     illustration: IllustrationKind = IllustrationKind.ErrorReceipt,
+    primaryRetry: Boolean = true,
 ) {
     StateColumn(modifier, illustration, title, message, liveRegion = true) {
-        PrimaryButton(retryLabel, onRetry)
+        if (primaryRetry) PrimaryButton(retryLabel, onRetry) else GhostButton(retryLabel, onRetry)
     }
 }
 

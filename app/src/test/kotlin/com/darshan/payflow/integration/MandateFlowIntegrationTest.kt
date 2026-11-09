@@ -97,8 +97,8 @@ class MandateFlowIntegrationTest {
                 }
             }
         }
-        rule.onNodeWithTag(PayFlowTestTags.MANDATE_VPA).performTextInput("netflix@okbank")
-        rule.onNodeWithTag(PayFlowTestTags.MANDATE_NAME).performTextInput("Netflix")
+        rule.onNodeWithTag(PayFlowTestTags.MANDATE_VPA).performTextInput("reelwise@okbank")
+        rule.onNodeWithTag(PayFlowTestTags.MANDATE_NAME).performTextInput("Reelwise")
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_AMOUNT).performTextInput("649")
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_SUBMIT).performClick() // docked under the form, always on screen
         rule.waitUntilWithMainLooper { created.any { it is CreateMandateEvent.Created } }
@@ -112,7 +112,7 @@ class MandateFlowIntegrationTest {
         )
         val detail = detailVm.value!!
         rule.waitUntilWithMainLooper { detail.uiState.value is MandateDetailUiState.Content }
-        rule.onNodeWithText("Netflix").assertIsDisplayed()
+        rule.onNodeWithText("Reelwise").assertIsDisplayed()
 
         rule.onNodeWithTag(PayFlowTestTags.mandateAction(MandateAction.PAUSE)).performClick()
         rule.waitUntilWithMainLooper { (detail.uiState.value as? MandateDetailUiState.Content)?.mandate?.status == MandateStatus.PAUSED }

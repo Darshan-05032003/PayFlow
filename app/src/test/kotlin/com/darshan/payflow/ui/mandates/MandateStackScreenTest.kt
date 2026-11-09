@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -60,27 +61,27 @@ class MandateStackScreenTest {
 
     @Test
     fun theCardsPauseControlAsksTheDataLayerAndTheCardFollowsTheStoredState() {
-        show(listOf(mandate("m1", "Streambox")))
-        rule.onNodeWithContentDescription("Pause AutoPay for Streambox").performClick()
+        show(listOf(mandate("m1", "Lumora")))
+        rule.onNodeWithContentDescription("Pause AutoPay for Lumora").performClick()
         assertThat(actions).containsExactly("m1" to MandateAction.PAUSE)
         // Nothing changes until the stored status does.
-        rule.onNodeWithContentDescription("Pause AutoPay for Streambox").assertIsDisplayed()
-        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Streambox", MandateStatus.PAUSED)), emptySet(), today) }
+        rule.onNodeWithContentDescription("Pause AutoPay for Lumora").assertIsDisplayed()
+        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Lumora", MandateStatus.PAUSED)), emptySet(), today) }
         rule.waitForIdle()
-        rule.onNodeWithContentDescription("Resume AutoPay for Streambox").performClick()
+        rule.onNodeWithContentDescription("Resume AutoPay for Lumora").performClick()
         assertThat(actions.last()).isEqualTo("m1" to MandateAction.RESUME)
     }
 
     @Test
     fun theIconMorphsBetweenPauseAndPlay() {
         rule.mainClock.autoAdvance = false
-        show(listOf(mandate("m1", "Streambox")))
+        show(listOf(mandate("m1", "Lumora")))
         rule.mainClock.advanceTimeBy(1_000)
         val quick = rule.onNodeWithTag(PayFlowTestTags.mandateQuick("m1")).fetchSemanticsNode().boundsInRoot
         val x = quick.center.x.toInt()
         val y = quick.center.y.toInt()
         val pause = rule.onRoot().captureToImage().toPixelMap()[x, y]
-        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Streambox", MandateStatus.PAUSED)), emptySet(), today) }
+        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Lumora", MandateStatus.PAUSED)), emptySet(), today) }
         rule.mainClock.advanceTimeBy(1_000)
         // The centre of the glyph is the gap between the bars when paused-able, and inside the triangle when resumable.
         val play = rule.onRoot().captureToImage().toPixelMap()[x, y]
@@ -90,13 +91,28 @@ class MandateStackScreenTest {
 
     @Test
     fun aBusyCardHoldsItsControl() {
-        show(listOf(mandate("m1", "Streambox")), busy = setOf("m1"))
+        show(listOf(mandate("m1", "Lumora")), busy = setOf("m1"))
         rule.onNodeWithTag(PayFlowTestTags.mandateQuick("m1")).assertIsNotEnabled()
+    }
+
+    /**
+     * Design QA: at 1.3x a card behind the front one could be taller, and its text showed in the peek under the front card.
+     * Every card in the stack now takes the tallest card's height.
+     */
+    @Test
+    fun cardsInTheStackShareTheTallestHeightAtLargeText() {
+        val tall = mandate("m2", "Gym Pass", frequency = MandateFrequency.AS_PRESENTED).copy(maxAmountPaise = 1_00_000_00)
+        show(listOf(tall), fontScale = 1.3f)
+        val alone = rule.onNodeWithTag(PayFlowTestTags.mandateCard("m2")).getBoundsInRoot()
+        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Lumora"), tall), emptySet(), today) }
+        rule.waitForIdle()
+        val front = rule.onNodeWithTag(PayFlowTestTags.mandateCard("m1")).getBoundsInRoot()
+        assertThat((front.bottom - front.top).value).isAtLeast((alone.bottom - alone.top).value)
     }
 
     @Test
     fun talkBackMovesThroughTheStackWithActions() {
-        show(listOf(mandate("m1", "Streambox"), mandate("m2", "Gym Pass", MandateStatus.PAUSED)))
+        show(listOf(mandate("m1", "Lumora"), mandate("m2", "Gym Pass", MandateStatus.PAUSED)))
         val stack = rule.onNodeWithTag(PayFlowTestTags.MANDATE_STACK)
         val next = stack.fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions).orEmpty().single { it.label == "Next mandate" }
         rule.runOnIdle { next.action() }
@@ -107,7 +123,7 @@ class MandateStackScreenTest {
 
     @Test
     fun theTimelineSaysExpectedAndSandbox() {
-        show(listOf(mandate("m1", "Streambox")))
+        show(listOf(mandate("m1", "Lumora")))
         rule.onNodeWithText("Expected debits").assertIsDisplayed()
         rule.onNodeWithText("Today", substring = true).assertExists()
         rule.onNodeWithText("In the sandbox no merchant presents debits", substring = true).performScrollTo().assertIsDisplayed()
@@ -115,9 +131,9 @@ class MandateStackScreenTest {
 
     @Test
     fun pausedAndBilledWhenPresentedExplainWhyNoDatesShow() {
-        show(listOf(mandate("m1", "Streambox", MandateStatus.PAUSED)))
+        show(listOf(mandate("m1", "Lumora", MandateStatus.PAUSED)))
         rule.onNodeWithText("Paused. Nothing can be debited until you resume it.").assertIsDisplayed()
-        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Streambox", frequency = MandateFrequency.AS_PRESENTED)), emptySet(), today) }
+        commitState { holder.value = MandatesUiState.Content(listOf(mandate("m1", "Lumora", frequency = MandateFrequency.AS_PRESENTED)), emptySet(), today) }
         rule.waitForIdle()
         rule.onNodeWithText("Debited when the merchant presents a bill", substring = true).assertIsDisplayed()
     }
@@ -134,7 +150,7 @@ class MandateStackScreenTest {
     @Test
     fun revokingAsksFirst() {
         var revoked = 0
-        val m = mandate("m1", "Streambox")
+        val m = mandate("m1", "Lumora")
         rule.setDs {
             MandateDetailScreen(
                 MandateDetailUiState.Content(m, emptyList(), listOf(MandateAction.PAUSE, MandateAction.REVOKE), busy = false, debitAmountText = ""),

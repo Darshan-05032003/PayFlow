@@ -4,6 +4,9 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -170,5 +173,26 @@ class LegacyGraphicsCompatibilityTest {
             }
         }
         rule.waitForIdle()
+    }
+
+    /** Design QA: the hero is graphite in both themes, so its text and whatever sits on it look the same in both. */
+    @Test
+    fun hero_content_reads_the_same_palette_in_both_themes() {
+        assertThat(AurumLight.onHero).isEqualTo(AurumDark.onHero)
+        val seen = mutableMapOf<Boolean, Pair<Color, Color>>()
+        var dark by mutableStateOf(false)
+        rule.setContent {
+            PayFlowTheme(darkTheme = dark) {
+                PayFlowSurface(level = SurfaceLevel.Hero) {
+                    seen[dark] = PayFlowTheme.colors.primary to LocalContentColor.current
+                }
+            }
+        }
+        rule.waitForIdle()
+        dark = true
+        rule.waitForIdle()
+        assertThat(seen[false]).isEqualTo(seen[true])
+        assertThat(seen.getValue(false).first).isEqualTo(AurumDark.primary)
+        assertThat(seen.getValue(false).second).isEqualTo(AurumDark.onHero)
     }
 }

@@ -55,7 +55,7 @@ class CollectFlowIntegrationTest {
 
     @Test
     fun approveAnIncomingRequestEndToEnd() {
-        val psp = FakePsp(fixedClock).also { it.simulateIncomingCollect("req-1", "shop@okbank", "Chai Point", 4_500, "Table 4", 600_000) }
+        val psp = FakePsp(fixedClock).also { it.simulateIncomingCollect("req-1", "shop@okbank", "Tulsi Tea Corner", 4_500, "Table 4", 600_000) }
         val payments = PaymentRepositoryImpl(db.paymentDao(), fixedClock)
         val collects = CollectRepositoryImpl(db.collectDao())
         val vm = CollectViewModel(
@@ -70,7 +70,7 @@ class CollectFlowIntegrationTest {
             }
         }
         rule.waitUntilWithMainLooper { vm.uiState.value is CollectUiState.Content }
-        rule.onNodeWithText("Chai Point").assertIsDisplayed()
+        rule.onNodeWithText("Tulsi Tea Corner").assertIsDisplayed()
         // Approving goes through the review sheet, which names the payee and the amount before anything is paid.
         rule.onNodeWithTag(PayFlowTestTags.collectPlain("req-1")).performClick()
         rule.onNodeWithTag(PayFlowTestTags.COLLECT_CONFIRM_SHEET).assertIsDisplayed()

@@ -591,11 +591,14 @@ private fun Feed(state: HomeUiState, callbacks: HomeCallbacks, amountsHidden: Bo
             illustration = IllustrationKind.EmptyLedger,
             modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.EMPTY),
         )
+        // Scan & Pay stays the one primary action, so the retry here is secondary.
         is HomeUiState.Error -> ErrorState(
-            title = stringResource(R.string.error_generic),
+            title = stringResource(R.string.home_error_title),
+            message = stringResource(R.string.error_try_again_hint),
             retryLabel = stringResource(R.string.retry),
             onRetry = callbacks.onRetry,
             modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.ERROR),
+            primaryRetry = false,
         )
         is HomeUiState.Content -> Column(Modifier.fillMaxWidth()) {
             state.recent.forEachIndexed { index, payment ->

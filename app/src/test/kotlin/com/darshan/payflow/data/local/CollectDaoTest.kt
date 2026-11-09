@@ -26,7 +26,7 @@ class CollectDaoTest {
     private lateinit var repo: CollectRepositoryImpl
 
     private fun request(id: String, status: CollectStatus = CollectStatus.PENDING, expiresIn: Long = 600) = CollectRequest(
-        id, "shop@okbank", "Chai Point", 4_500, "Table 4", FIXED_INSTANT, FIXED_INSTANT.plusSeconds(expiresIn), FIXED_INSTANT, status, null,
+        id, "shop@okbank", "Tulsi Tea Corner", 4_500, "Table 4", FIXED_INSTANT, FIXED_INSTANT.plusSeconds(expiresIn), FIXED_INSTANT, status, null,
     )
 
     @Before

@@ -197,14 +197,14 @@ class PayViewModelTest {
     fun `qr route arguments prefill the form, lock the payee and record the QR method`() = runTest(dispatcher) {
         val handle = SavedStateHandle(
             mapOf(
-                PayViewModel.ARG_PREFILL_VPA to "shop@okbank", PayViewModel.ARG_PREFILL_NAME to "Chai Point",
+                PayViewModel.ARG_PREFILL_VPA to "shop@okbank", PayViewModel.ARG_PREFILL_NAME to "Tulsi Tea Corner",
                 PayViewModel.ARG_PREFILL_AMOUNT to 4_500L, PayViewModel.ARG_PREFILL_NOTE to "Table 4", PayViewModel.ARG_SOURCE to "qr",
             ),
         )
         val vm = vm(handle = handle)
         val s = vm.uiState.value
         assertThat(s.vpa).isEqualTo("shop@okbank")
-        assertThat(s.name).isEqualTo("Chai Point")
+        assertThat(s.name).isEqualTo("Tulsi Tea Corner")
         assertThat(s.amountText).isEqualTo("45.00")
         assertThat(s.note).isEqualTo("Table 4")
         assertThat(s.payeeLocked).isTrue()
@@ -275,8 +275,8 @@ class PayViewModelTest {
         val handle = SavedStateHandle(mapOf(PayViewModel.ARG_PREFILL_VPA to "shop@okbank", PayViewModel.ARG_PREFILL_NAME to "Government Refund Desk", PayViewModel.ARG_SOURCE to "qr"))
         val vm = vm(handle = handle)
         advanceUntilIdle()
-        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Verified("Chai Point"))
-        assertThat(vm.uiState.value.name).isEqualTo("Chai Point")
+        assertThat(vm.uiState.value.verification).isEqualTo(VpaVerificationState.Verified("Tulsi Tea Corner"))
+        assertThat(vm.uiState.value.name).isEqualTo("Tulsi Tea Corner")
     }
 
     // --- feature 6: idempotency key + auto polling ---

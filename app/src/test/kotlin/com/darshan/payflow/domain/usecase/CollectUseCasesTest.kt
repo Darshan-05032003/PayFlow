@@ -21,7 +21,7 @@ class CollectUseCasesTest {
     private val collects = FakeCollectRepository()
 
     private fun psp(config: FakePspConfig = FakePspConfig()) = FakePsp(fixedClock, config).also {
-        it.simulateIncomingCollect("req-1", "shop@okbank", "Chai Point", 4_500, "Table 4", ttlMillis = 10 * 60_000)
+        it.simulateIncomingCollect("req-1", "shop@okbank", "Tulsi Tea Corner", 4_500, "Table 4", ttlMillis = 10 * 60_000)
         it.simulateIncomingCollect("req-2", "landlord@ybl", "Mr Rao", 1_500_000, "Rent", ttlMillis = 60_000)
     }
 

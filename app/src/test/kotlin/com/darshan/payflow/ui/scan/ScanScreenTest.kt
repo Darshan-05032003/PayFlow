@@ -88,10 +88,10 @@ class ScanScreenTest {
     @Test
     fun foundShowsPayeeAndOffersPayAndRescan() {
         var paid = false; var rescan = false
-        val payload = (UpiQrPayloadParser.parse("upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00") as QrParseResult.Valid).payload
+        val payload = (UpiQrPayloadParser.parse("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00") as QrParseResult.Valid).payload
         show(ScanUiState.Found(payload), ScanCallbacks(onPay = { paid = true }, onRescan = { rescan = true }))
         assertThat(camera.started).isFalse()
-        rule.onNodeWithText("Chai Point").assertIsDisplayed()
+        rule.onNodeWithText("Tulsi Tea Corner").assertIsDisplayed()
         rule.onNodeWithText("shop@okbank").assertIsDisplayed()
         rule.onNodeWithText("₹45.00").assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.SCAN_PAY).performClick()
@@ -102,7 +102,7 @@ class ScanScreenTest {
 
     @Test
     fun severalCodesInOneImageAreSaidPlainly() {
-        val payload = (UpiQrPayloadParser.parse("upi://pay?pa=shop@okbank&pn=Chai%20Point") as QrParseResult.Valid).payload
+        val payload = (UpiQrPayloadParser.parse("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner") as QrParseResult.Valid).payload
         show(ScanUiState.Found(payload, codesInImage = 3))
         rule.onNodeWithText("This image has 3 payment QR codes. This is the first one. Check it's who you meant to pay.").assertIsDisplayed()
     }

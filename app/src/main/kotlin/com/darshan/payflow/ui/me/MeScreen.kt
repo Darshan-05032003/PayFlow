@@ -103,7 +103,7 @@ fun MeScreen(state: MeUiState, callbacks: MeCallbacks, version: String = BuildCo
 
     Box(Modifier.fillMaxSize().background(colors.bg).testTag(PayFlowTestTags.ME_SCREEN)) {
         Column(Modifier.fillMaxSize().then(if (aboutOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
-            PayFlowTopBar(title = stringResource(R.string.me_title))
+            PayFlowTopBar(title = stringResource(R.string.me_title), large = true)
             Column(
                 Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = Spacing.screen),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),

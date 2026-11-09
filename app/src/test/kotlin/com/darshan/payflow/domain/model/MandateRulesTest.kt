@@ -18,7 +18,7 @@ class MandateRulesTest {
         end: LocalDate = today.plusYears(1),
         lastExecutedAt: java.time.Instant? = null,
     ) = Mandate(
-        id = "m1", umn = "UMN1", payeeVpa = "netflix@okbank", payeeName = "Netflix", maxAmountPaise = maxAmountPaise, frequency = frequency,
+        id = "m1", umn = "UMN1", payeeVpa = "reelwise@okbank", payeeName = "Reelwise", maxAmountPaise = maxAmountPaise, frequency = frequency,
         startDate = start, endDate = end, status = status, note = "Subscription", createdAt = FIXED_INSTANT, updatedAt = FIXED_INSTANT,
         lastExecutedAt = lastExecutedAt, executionCount = if (lastExecutedAt == null) 0 else 1,
     )

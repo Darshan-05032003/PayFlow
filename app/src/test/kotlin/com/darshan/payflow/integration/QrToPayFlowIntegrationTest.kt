@@ -104,13 +104,13 @@ class QrToPayFlowIntegrationTest {
         }
         scanVm.onPermissionResult(granted = true, canAskAgain = true)
         rule.waitUntilWithMainLooper { camera.started }
-        camera.emit("upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00&cu=INR&tn=Table%204")
+        camera.emit("upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00&cu=INR&tn=Table%204")
         rule.waitUntilWithMainLooper { scanVm.uiState.value is ScanUiState.Found }
         assertThat(events.single()).isInstanceOf(ScanEvent.PayloadReady::class.java)
-        rule.onNodeWithText("Chai Point").assertIsDisplayed()
+        rule.onNodeWithText("Tulsi Tea Corner").assertIsDisplayed()
         rule.onNodeWithTag(PayFlowTestTags.SCAN_PAY).performClick()
         val dest = destination!!
-        assertThat(dest).isEqualTo(PayDestination(vpa = "shop@okbank", name = "Chai Point", amountPaise = 4_500, note = "Table 4", source = "qr"))
+        assertThat(dest).isEqualTo(PayDestination(vpa = "shop@okbank", name = "Tulsi Tea Corner", amountPaise = 4_500, note = "Table 4", source = "qr"))
 
         // Navigation would create the Pay screen with these args in its SavedStateHandle:
         val payVm = PayViewModel(

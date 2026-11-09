@@ -39,8 +39,8 @@ class PayScreenshotTest {
         verification = VpaVerificationState.Verified("Asha Rao"), paymentMode = PaymentMode.SANDBOX,
     )
     private val locked = PayUiState(
-        vpa = "shop@okbank", name = "Chai Point", amountText = "45.00", note = "Table 4",
-        payeeLocked = true, amountLocked = true, verification = VpaVerificationState.Verified("Chai Point"), paymentMode = PaymentMode.SANDBOX,
+        vpa = "shop@okbank", name = "Tulsi Tea Corner", amountText = "45.00", note = "Table 4",
+        payeeLocked = true, amountLocked = true, verification = VpaVerificationState.Verified("Tulsi Tea Corner"), paymentMode = PaymentMode.SANDBOX,
     )
     private val apps = listOf(UpiApp("com.example.gpay", "GPay"), UpiApp("com.example.phonepe", "PhonePe"), UpiApp("com.example.bhim", "BHIM"))
 

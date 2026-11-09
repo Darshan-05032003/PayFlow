@@ -75,6 +75,7 @@ import com.darshan.payflow.ui.designsystem.components.GhostButton
 import com.darshan.payflow.ui.designsystem.components.GhostTone
 import com.darshan.payflow.ui.designsystem.components.HairlineDivider
 import com.darshan.payflow.ui.designsystem.components.PayFlowBottomSheet
+import com.darshan.payflow.ui.designsystem.components.HeroPalette
 import com.darshan.payflow.ui.designsystem.components.PayFlowSurface
 import com.darshan.payflow.ui.designsystem.components.PayFlowTextField
 import com.darshan.payflow.ui.designsystem.components.PayFlowTopBar
@@ -244,12 +245,14 @@ private fun SummaryHero(summary: SecuritySummary) {
         is SecuritySummary.NeedsYou -> pluralStringResource(R.plurals.security_summary_needs_you, summary.count, summary.count)
         SecuritySummary.PaymentsOff -> stringResource(R.string.security_summary_payments_off)
     }
+    // The bar sits on the graphite hero, so it takes the hero's (dark) tones in both themes.
+    val hero = HeroPalette
     val accent = when (summary) {
-        SecuritySummary.Checking -> colors.accent
-        SecuritySummary.AllClear -> colors.success.strong
-        is SecuritySummary.ClearWithNotes -> colors.accent
-        is SecuritySummary.NeedsYou -> colors.pending.strong
-        SecuritySummary.PaymentsOff -> colors.failed.strong
+        SecuritySummary.Checking -> hero.accent
+        SecuritySummary.AllClear -> hero.success.strong
+        is SecuritySummary.ClearWithNotes -> hero.accent
+        is SecuritySummary.NeedsYou -> hero.pending.strong
+        SecuritySummary.PaymentsOff -> hero.failed.strong
     }
     PayFlowSurface(Modifier.fillMaxWidth().testTag(PayFlowTestTags.SECURITY_SUMMARY), level = SurfaceLevel.Hero, shape = Radii.largeShape) {
         Column(
@@ -339,7 +342,8 @@ private fun CheckRow(check: SecurityCheck, state: SecurityUiState, onClick: () -
         CheckGlyph(check.verdict)
         Column(Modifier.weight(1f)) {
             Text(title, style = type.bodyStrong, color = colors.text)
-            Text(detail, style = type.label, color = colors.textSecondary, maxLines = 3)
+            // No line cap: at 1.3x text the integrity note needs four lines, and a cut sentence says less than a taller row.
+            Text(detail, style = type.label, color = colors.textSecondary)
         }
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(Sizes.icon))
     }

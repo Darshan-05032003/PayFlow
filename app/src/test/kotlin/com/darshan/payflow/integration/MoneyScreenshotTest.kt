@@ -83,9 +83,9 @@ class MoneyScreenshotTest {
     )
 
     private val mandates = listOf(
-        mandate("m1", "Streambox", "streambox@okbank", 64_900, MandateFrequency.MONTHLY),
+        mandate("m1", "Lumora", "lumora@okbank", 64_900, MandateFrequency.MONTHLY),
         mandate("m2", "Gym Pass", "gympass@okicici", 1_50_000, MandateFrequency.QUARTERLY, MandateStatus.PAUSED),
-        mandate("m3", "Brightline Power", "brightline@oksbi", 3_00_000, MandateFrequency.AS_PRESENTED),
+        mandate("m3", "Sunvale Power", "sunvale@oksbi", 3_00_000, MandateFrequency.AS_PRESENTED),
     )
 
     private fun stack(name: String, state: MandatesUiState, dark: Boolean = false, fontScale: Float = 1f) {
@@ -102,7 +102,7 @@ class MoneyScreenshotTest {
 
     private fun detail(name: String, dark: Boolean = false, revoke: Boolean = false) {
         val executions = listOf(
-            testPayment("d1", status = PaymentStatus.SUCCESS, method = PaymentMethod.MANDATE, payeeName = "Streambox", payeeVpa = "streambox@okbank", amountPaise = 64_900, createdAt = FIXED_INSTANT.minusSeconds(86_400 * 3)),
+            testPayment("d1", status = PaymentStatus.SUCCESS, method = PaymentMethod.MANDATE, payeeName = "Lumora", payeeVpa = "lumora@okbank", amountPaise = 64_900, createdAt = FIXED_INSTANT.minusSeconds(86_400 * 3)),
         )
         rule.setDs(dark = dark, reduceMotion = true) {
             MandateDetailScreen(
@@ -125,7 +125,7 @@ class MoneyScreenshotTest {
 
     @Test fun createMandateLight() {
         rule.setDs(reduceMotion = true) {
-            CreateMandateScreen(CreateMandateUiState(vpa = "streambox@okbank", name = "Streambox", amountText = "649"), CreateMandateCallbacks())
+            CreateMandateScreen(CreateMandateUiState(vpa = "lumora@okbank", name = "Lumora", amountText = "649"), CreateMandateCallbacks())
         }
         rule.waitForIdle()
         rule.captureScreenshot("money/create_mandate_light")

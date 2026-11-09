@@ -26,7 +26,7 @@ class CollectViewModelTest {
     private val collects = FakeCollectRepository()
     private val payments = FakePaymentRepository()
     private val psp = FakePsp(fixedClock).also {
-        it.simulateIncomingCollect("req-1", "shop@okbank", "Chai Point", 4_500, "Table 4", ttlMillis = 600_000)
+        it.simulateIncomingCollect("req-1", "shop@okbank", "Tulsi Tea Corner", 4_500, "Table 4", ttlMillis = 600_000)
     }
 
     private fun vm(psp: FakePsp = this.psp) = CollectViewModel(

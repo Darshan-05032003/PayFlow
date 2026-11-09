@@ -49,7 +49,7 @@ class HistoryScreenshotTest {
         testPayment("p5", status = PaymentStatus.REFUNDED, payeeName = "Copper Kettle Cafe", payeeVpa = "copperkettle@okbank", amountPaise = 32_000, createdAt = at(30)),
         testPayment("p6", status = PaymentStatus.SUCCESS, payeeName = "Meera Iyer", payeeVpa = "meera@okicici", amountPaise = 5_000, createdAt = at(24 * 9)),
         testPayment("p7", status = PaymentStatus.SUCCESS, payeeName = "Rohan Das", payeeVpa = "rohan@ybl", amountPaise = 1_80_000, createdAt = at(24 * 9 + 2)),
-        testPayment("p8", status = PaymentStatus.SUCCESS, payeeName = "Indigo Laundry", payeeVpa = "indigolaundry@okbank", amountPaise = 21_000, createdAt = at(24 * 12)),
+        testPayment("p8", status = PaymentStatus.SUCCESS, payeeName = "Jasmine Laundry", payeeVpa = "jasminelaundry@okbank", amountPaise = 21_000, createdAt = at(24 * 12)),
     )
 
     private val content = HistoryUiState.Content(payments, HistoryFilter.ALL, "", HistorySections.build(payments, today, zone))

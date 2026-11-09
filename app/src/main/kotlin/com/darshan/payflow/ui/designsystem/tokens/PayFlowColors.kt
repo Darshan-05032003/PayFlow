@@ -55,6 +55,7 @@ data class PayFlowColors(
     val onToast: Color,
     val heroStart: Color,
     val heroEnd: Color,
+    /** Text on the graphite hero. Identical in both themes, because the hero is graphite in both. */
     val onHero: Color,
     val success: StatusTone,
     val pending: StatusTone,
@@ -100,7 +101,8 @@ val AurumLight = PayFlowColors(
     onToast = Color(0xFFF3F0E9),
     heroStart = Color(0xFF2C2D33),
     heroEnd = Color(0xFF17181C),
-    onHero = Color(0xFFEFD9AE),
+    // The hero is graphite in both themes, so its text is the same ivory in both. Champagne stays the accent.
+    onHero = Color(0xFFF3F0E9),
     success = StatusTone(strong = Color(0xFF1B7A4C), content = Color(0xFF176B42), container = Color(0xFFDCEFE4)),
     pending = StatusTone(strong = Color(0xFF855B00), content = Color(0xFF755000), container = Color(0xFFF5E7C6)),
     failed = StatusTone(strong = Color(0xFFB3362C), content = Color(0xFFA02F26), container = Color(0xFFF8E1DD)),

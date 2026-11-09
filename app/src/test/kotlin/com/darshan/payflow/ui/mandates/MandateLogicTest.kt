@@ -21,7 +21,7 @@ class MandateLogicTest {
         status: MandateStatus = MandateStatus.ACTIVE,
         lastExecutedAt: java.time.Instant? = null,
     ) = Mandate(
-        id = "m", umn = "UMN1", payeeVpa = "streambox@okbank", payeeName = "Streambox", maxAmountPaise = 64_900, frequency = frequency,
+        id = "m", umn = "UMN1", payeeVpa = "lumora@okbank", payeeName = "Lumora", maxAmountPaise = 64_900, frequency = frequency,
         startDate = start, endDate = end, status = status, note = "", createdAt = FIXED_INSTANT, updatedAt = FIXED_INSTANT,
         lastExecutedAt = lastExecutedAt, executionCount = if (lastExecutedAt == null) 0 else 1,
     )
@@ -123,5 +123,18 @@ class MandateLogicTest {
         assertThat(stack.index).isEqualTo(1)
         stack.resize(0)
         assertThat(stack.index).isEqualTo(0)
+    }
+
+    /** Design QA: each card behind sits exactly one peek lower, whatever the card height (1.3x text makes cards taller). */
+    @Test
+    fun stackCardsSitOnePeekApartAtAnyHeight() {
+        val peek = 24f
+        for (height in listOf(300f, 420f, 640f)) {
+            for (depth in 0..2) {
+                assertThat(StackGeometry.bottom(depth.toFloat(), height, peek)).isWithin(0.01f).of(height + depth * peek)
+            }
+        }
+        assertThat(StackGeometry.scale(0f)).isEqualTo(1f)
+        assertThat(StackGeometry.translationY(0f, 500f, peek)).isEqualTo(0f)
     }
 }

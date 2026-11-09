@@ -82,7 +82,7 @@ class FakePspTest {
     @Test
     fun `mandate lifecycle in the sandbox`() = runTest {
         val psp = FakePsp(fixedClock)
-        val created = psp.createMandate(PspMandateRequest("netflix@okbank", "Netflix", 64_900, "MONTHLY", "2026-10-29", "2027-10-29", ""))
+        val created = psp.createMandate(PspMandateRequest("reelwise@okbank", "Reelwise", 64_900, "MONTHLY", "2026-10-29", "2027-10-29", ""))
         assertThat(created.status).isEqualTo(com.darshan.payflow.domain.model.MandateStatus.ACTIVE)
         assertThat(psp.updateMandate(created.umn, "PAUSE").status).isEqualTo(com.darshan.payflow.domain.model.MandateStatus.PAUSED)
         val paused = runCatching { psp.executeMandate(created.umn, "MND1", 100) }.exceptionOrNull() as PspException.ClientError

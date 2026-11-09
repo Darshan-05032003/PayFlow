@@ -45,7 +45,7 @@ object PspModule {
         } else {
             FakePsp(clock, FakePspConfig(latencyMillis = 400, pendingPolls = 1, demoPayees = true)).also { psp ->
                 // Sandbox demo data: a few incoming collect requests, one of them about to expire.
-                psp.simulateIncomingCollect("demo-chai", "shop@okbank", "Chai Point", 4_500, "Table 4", ttlMillis = 30 * 60_000)
+                psp.simulateIncomingCollect("demo-chai", "shop@okbank", "Tulsi Tea Corner", 4_500, "Table 4", ttlMillis = 30 * 60_000)
                 psp.simulateIncomingCollect("demo-rent", "landlord@ybl", "Mr Rao", 1_500_000, "October rent", ttlMillis = 24 * 60 * 60_000)
                 psp.simulateIncomingCollect("demo-expiring", "bob@upi", "Bob Mathew", 25_000, "Movie tickets", ttlMillis = 2 * 60_000)
             }

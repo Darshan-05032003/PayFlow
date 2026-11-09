@@ -409,7 +409,8 @@ private fun HistoryBody(state: HistoryUiState, callbacks: HistoryCallbacks, amou
         when (state) {
             HistoryUiState.Loading -> SkeletonList(Modifier.fillMaxWidth().padding(top = Spacing.xs).testTag(PayFlowTestTags.LOADING), count = SKELETON_ROWS)
             is HistoryUiState.Error -> ErrorState(
-                title = stringResource(R.string.error_generic),
+                title = stringResource(R.string.history_error_title),
+                message = stringResource(R.string.error_try_again_hint),
                 retryLabel = stringResource(R.string.retry),
                 onRetry = callbacks.onRetry,
                 modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.ERROR),

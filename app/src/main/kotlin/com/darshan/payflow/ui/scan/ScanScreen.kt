@@ -348,7 +348,15 @@ private fun CameraView(state: ScanUiState.Scanning, callbacks: ScanCallbacks, co
         Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
             PayFlowTopBar(stringResource(R.string.scan_title), onBack = callbacks.onBack) {
                 val label = stringResource(if (state.torchOn) R.string.scan_torch_off else R.string.scan_torch_on)
-                PayFlowIconButton(if (state.torchOn) Icons.Outlined.FlashlightOff else Icons.Outlined.FlashlightOn, label, callbacks.onToggleTorch, tonal = true, tint = colors.text)
+                // A tonal button shows its circle, so the circle (not the 48dp target) sits on the screen gutter like the title.
+                PayFlowIconButton(
+                    if (state.torchOn) Icons.Outlined.FlashlightOff else Icons.Outlined.FlashlightOn,
+                    label,
+                    callbacks.onToggleTorch,
+                    Modifier.padding(end = Spacing.md),
+                    tonal = true,
+                    tint = colors.text,
+                )
             }
         }
         Column(

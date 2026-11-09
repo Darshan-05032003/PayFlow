@@ -45,9 +45,9 @@ class AndroidImageQrDecoderTest {
     @Test
     fun `a real qr png is read through the resolver and decoded to the upi payload`() = runBlocking {
         // Regression: the bounds-only decode returns null by design; treating that as "unreadable" rejected every real image on a device.
-        val link = "upi://pay?pa=chaipoint@okaxis&pn=Chai%20Point&am=45.00&cu=INR&tn=Table%204"
+        val link = "upi://pay?pa=tulsitea@okaxis&pn=Tulsi%20Tea%20Corner&am=45.00&cu=INR&tn=Table%204"
         val result = decoder.decode(qrPng("upi.png", link)) as ImageQrResult.Found
-        assertThat(result.payload.payeeVpa).isEqualTo("chaipoint@okaxis")
+        assertThat(result.payload.payeeVpa).isEqualTo("tulsitea@okaxis")
         assertThat(result.payload.amountPaise).isEqualTo(4_500)
         // A rotated screenshot still decodes (zxing tries rotations of the binary image), a URL QR is "not UPI".
         assertThat(decoder.decode(qrPng("rotated.png", link, rotate = 90f))).isInstanceOf(ImageQrResult.Found::class.java)

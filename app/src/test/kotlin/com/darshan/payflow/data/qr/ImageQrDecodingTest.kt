@@ -27,7 +27,7 @@ class ImageQrDecodingTest {
 
     @Test
     fun `a rendered upi qr decodes back and maps to the same payload a camera scan would give`() {
-        val link = "upi://pay?pa=shop@okbank&pn=Chai%20Point&am=45.00&cu=INR&tn=Table%204"
+        val link = "upi://pay?pa=shop@okbank&pn=Tulsi%20Tea%20Corner&am=45.00&cu=INR&tn=Table%204"
         val texts = decode(render(link))
         assertThat(texts).containsExactly(link)
         val found = ImageQrResults.fromTexts(texts) as ImageQrResult.Found

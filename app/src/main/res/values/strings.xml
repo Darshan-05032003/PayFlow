@@ -8,6 +8,9 @@
     <string name="ds_off">Off</string>
     <string name="back">Back</string>
     <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="error_try_again_hint">Nothing was lost. Try again in a moment.</string>
+    <string name="home_error_title">Couldn\'t load your payments</string>
+    <string name="history_error_title">Couldn\'t load your history</string>
 
     <!-- Relative time -->
     <string name="time_just_now">Just now</string>
@@ -113,7 +116,7 @@
     <string name="detail_section_references">References</string>
     <string name="detail_copied">%1$s copied</string>
     <string name="detail_copy">Copy %1$s</string>
-    <string name="method_upi_intent">UPI app</string>
+    <string name="method_upi_intent">UPI ID</string>
     <string name="method_qr_scan">QR scan</string>
     <string name="method_collect">Collect request</string>
     <string name="method_mandate">AutoPay mandate</string>
@@ -373,7 +376,10 @@
     <string name="mandate_max_amount">Maximum per debit</string>
     <string name="mandate_frequency">Frequency</string>
     <string name="mandate_validity">Valid for</string>
-    <string name="mandate_months">%1$d months</string>
+    <plurals name="mandate_months">
+        <item quantity="one">%1$d month</item>
+        <item quantity="other">%1$d months</item>
+    </plurals>
     <string name="mandate_umn">Mandate number</string>
     <string name="mandate_executions">Debits so far</string>
     <string name="mandate_history">Debit history</string>

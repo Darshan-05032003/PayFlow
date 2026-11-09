@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -56,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -373,6 +375,9 @@ private fun MandateStack(
             .fillMaxWidth()
             .padding(horizontal = Spacing.screen)
             .padding(bottom = Sizes.mandateStackPeek * 2)
+            // Every card takes the tallest card's height, so a taller card behind never shows its text in the peek
+            // (found at 1.3x text). Cards are plain rows and columns, so intrinsic measurement is cheap here.
+            .height(IntrinsicSize.Max)
             .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f); holder.setWidth(widthPx) }
             .testTag(PayFlowTestTags.MANDATE_STACK)
             .semantics {
@@ -397,15 +402,16 @@ private fun MandateStack(
                     onQuick = { action -> callbacks.onAction(mandate.id, action) },
                     quickTag = PayFlowTestTags.mandateQuick(mandate.id),
                     modifier = Modifier
+                        .fillMaxHeight()
                         .zIndex((STACK_DEPTH - depth).toFloat())
                         .graphicsLayer {
                             val leaving = (abs(offset) / widthPx).coerceIn(0f, 1f)
                             // How far back this card sits: the front card rises from 1 to 0, the ones behind move up as it leaves.
                             val d = if (isFront) 1f - rise.value else (depth - leaving).coerceAtLeast(0f)
-                            val scale = 1f - d * STACK_SCALE_STEP
+                            val scale = StackGeometry.scale(d)
                             scaleX = scale
                             scaleY = scale
-                            translationY = d * peekPx + d * size.height * (1f - scale) / 2f
+                            translationY = StackGeometry.translationY(d, size.height, peekPx)
                             alpha = if (isFront) 1f else lerp(1f, STACK_BACK_ALPHA, d / STACK_DEPTH)
                             if (isFront) {
                                 translationX = offset * direction
@@ -433,7 +439,6 @@ private fun MandateStack(
 }
 
 private const val STACK_DEPTH = 2
-private const val STACK_SCALE_STEP = 0.05f
 private const val STACK_BACK_ALPHA = 0.55f
 private const val STACK_TILT = 6f
 private const val FLY_OUT = 1.2f
@@ -705,7 +710,7 @@ fun CreateMandateScreen(state: CreateMandateUiState, callbacks: CreateMandateCal
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), fieldTag = PayFlowTestTags.MANDATE_AMOUNT,
                 )
                 ChipGroup(stringResource(R.string.mandate_frequency), MandateFrequency.entries, state.frequency, { it.label() }, { PayFlowTestTags.mandateFrequency(it) }, callbacks.onFrequencyChange, enabled)
-                ChipGroup(stringResource(R.string.mandate_validity), VALIDITY_MONTHS, state.validityMonths, { stringResource(R.string.mandate_months, it) }, { PayFlowTestTags.mandateValidity(it) }, callbacks.onValidityMonthsChange, enabled)
+                ChipGroup(stringResource(R.string.mandate_validity), VALIDITY_MONTHS, state.validityMonths, { pluralStringResource(R.plurals.mandate_months, it, it) }, { PayFlowTestTags.mandateValidity(it) }, callbacks.onValidityMonthsChange, enabled)
                 PayFlowTextField(state.note, callbacks.onNoteChange, stringResource(R.string.pay_note), enabled = enabled)
                 state.ruleError?.let { Text(it.message(), style = type.body, color = colors.failed.strong) }
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {

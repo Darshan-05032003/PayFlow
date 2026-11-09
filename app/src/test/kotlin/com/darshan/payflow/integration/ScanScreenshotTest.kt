@@ -24,7 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-xhdpi")
 class ScanScreenshotTest {
     @get:Rule val rule = createComposeRule()
-    private val payload = (UpiQrPayloadParser.parse("upi://pay?pa=bluetokai@ybl&pn=Blue%20Tokai%20Coffee&am=420.00&tn=Table%206") as QrParseResult.Valid).payload
+    private val payload = (UpiQrPayloadParser.parse("upi://pay?pa=monsoonroast@ybl&pn=Monsoon%20Roast%20Coffee&am=420.00&tn=Table%206") as QrParseResult.Valid).payload
     private val staticPayload = (UpiQrPayloadParser.parse("upi://pay?pa=asha@okicici&pn=Asha%20Rao") as QrParseResult.Valid).payload
 
     private fun show(name: String, state: ScanUiState, dark: Boolean = false, fontScale: Float = 1f) {
