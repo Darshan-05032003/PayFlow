@@ -309,14 +309,14 @@ To keep these benchmarks working as the UI changes:
 | Scenario | Result |
 |---|---|
 | First content from 10,000 stored payments (4 queries, 5 rows returned) | 23 ms |
-| First composition of Home, 10,000 stored payments, reduced motion | 874 ms, includes Robolectric and class loading on a cold JVM |
-| 600 scroll steps, up and down past the dock, composition and layout | 454 ms, 756 µs per step, no drawing |
+| First composition of Home, 10,000 stored payments, reduced motion | 773 ms, includes Robolectric and class loading on a cold JVM |
+| 600 scroll steps, up and down past the dock, composition and layout | 307 ms, 511 µs per step, no drawing |
 | Recomposition cycles in those 600 steps | 6, one per dock crossing |
 | 60 scroll steps past the dock (`HomeScreenBehaviourTest`) | At most 3 cycles |
 | New payment among 10,000, to the screen's state | 15 ms each over 50 inserts |
-| 1,000 taps on Scan & Pay | 1,266 ms, 59 accepted by the 500 ms debounce on the injected clock; `launchSingleTop` keeps one scanner on the stack |
+| 1,000 taps on Scan & Pay | 1,225 ms, 59 accepted by the 500 ms debounce on the injected clock. These are screen callbacks. On the stack, `launchSingleTop` is the guard: `aDoubleTapOnATilePushesOneScreen` covers a double tap on a tile, not 1,000 taps through the real NavHost |
 | 1,000 refresh requests while one runs | 1 reconcile |
-| 1,001 hide and show toggles, one per 16 ms | 2,020 ms, heap change -967 KB, ends on the last choice |
+| 1,001 hide and show toggles, one per 16 ms | 2,085 ms, heap change -1,139 KB, ends on the last choice |
 | ₹99,99,99,999.99 at 1.0× and 1.3× | Fits the hero (shrinks to fit), docks inside the bar |
 | 100,000 payments through the entrance memory | Holds at most 64 ids |
 
