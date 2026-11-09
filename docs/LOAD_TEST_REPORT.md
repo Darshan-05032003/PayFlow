@@ -240,3 +240,36 @@ To keep these benchmarks working as the UI changes:
 - No new first-launch screen may block a fresh install. If one is added, `SeedDataReceiver` must mark it done.
 - `SeedDataReceiver` keeps writing through `PaymentRepository`; update it if the `Payment` model changes.
 
+
+## UI Feature: Design system and catalog
+- Scenario and scale (all from `DesignSystemStressTest`, JVM timings, useful for comparison but not phone frame times):
+  - 1,000 clicks in one tick, 1,000 injected taps with and without a loading state.
+  - 10,000 list rows with avatar, amount and title, with long scroll jumps.
+  - 1,000 interrupting odometer updates at the maximum amount, with and without reduced motion.
+  - 120 frames of an odometer, 5 status pills and a nav pill all animating.
+  - 1,000,000 calls to the pure debounce, nav and roll rules; 100,000 toasts and effects.
+- Results:
+
+| Scenario | Result |
+|---|---|
+| 1,000 clicks inside the debounce window | 1 action, 1 haptic, under 1 ms |
+| 1,000 injected taps, loading on accept | 1 action, 249 ms |
+| 1,000 injected taps, no loading state, 30 simulated seconds | 59 actions (limit 61) |
+| 10,000 rows | 13 composed at first, 91 after 6 long jumps, 391 ms for the jumps |
+| 10,000 avatar initials and tones | 2 ms |
+| 1,000 interrupting updates at ₹99,99,99,999.99 | 2,135 ms in total, ends on the exact value |
+| Same load, reduced motion | 149 ms |
+| 120 busy animation frames | 0 recomposition cycles |
+| 1,000,000 pure rule calls | 20 ms |
+| 100,000 toasts | 13 ms, 4 kept |
+| 100,000 effects into a 16-slot channel | 24 ms |
+
+- Release APK: 25,265,073 → 25,523,345 bytes, +258,272 bytes (+1.0 %). The two fonts take 239,440 bytes compressed. Subsetting saved about 117 KB compressed.
+- What broke: the first version of the 1,000-tap test expected 1 action from injected taps. Those taps move the simulated clock about 30ms each, so they pass the 500ms window 59 times. That is correct for a debounce: over 30 seconds of tapping, the loading state is what guarantees one action, so the test now covers each case separately.
+- Failure flow:
+  1. A screen relies on the debounce alone for a payment.
+  2. A user keeps tapping past 500ms.
+  3. A second click is accepted.
+  4. Only the ViewModel's idempotency stops a duplicate.
+- Fix applied / recommendation: money actions must set `loading = true` on the first accepted click. The debounce is a second layer, not the guard. The no-per-frame-recomposition checks have a control test showing the counter does move when a value is read in composition.
+- Not measured: real frame times and jank. Macrobenchmark needs the device run in the QA step, and these components aren't on a screen yet. 3× animator speed isn't a separate case: Compose scales durations itself and `ThemeTest` confirms motion stays full; scale 0 resolves to reduced motion.

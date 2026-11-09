@@ -334,3 +334,35 @@ Severity scale: Critical / High / Medium / Low.
   `MainActivity` (`AndroidUpiAppLauncherTest`), verified on the emulator (Android then opens the only real handler directly).
 - **Test-harness note**: `adb shell am start -d "upi://pay?pa=…&pn=…&am=…"` loses everything after the first `&` because the device
   shell splits the command; the app correctly showed a payee-only link. Quote for the remote shell when testing.
+
+## UI Feature: Design system and catalog
+- Attacks tried:
+  - 1,000 clicks in one main-thread tick on a debounced button: 1 action, 1 haptic (`DesignSystemStressTest`).
+  - 1,000 injected taps with the screen going to loading on accept: 1 action. The same taps with no loading state: 59 actions over 30 simulated seconds, bounded at one per 500ms window.
+  - Two-finger tap on one button: at most 1 action (`ButtonsTest.a_two_finger_tap_is_one_action`).
+  - Repeated accessibility clicks: the same debounce applies (`ButtonsTest.the_accessibility_click_goes_through_the_same_debounce`).
+  - Touches aimed at a button behind a sheet, including a locked sheet: never reach it (`BottomSheetUiTest.touches_cannot_reach_a_button_behind_a_sheet_even_a_locked_one`).
+  - Back, scrim tap, swipe and the accessibility dismiss action on a locked sheet: all refused, and back is swallowed so a payment in flight can't be left from the sheet.
+  - Sheet leaving the window that holds `FLAG_SECURE`: it opens no dialog or popup (`BottomSheetUiTest.it_opens_no_new_window_so_flag_secure_still_covers_it`).
+  - Payee names with direction-override and zero-width characters, used to make one name read like another.
+  - Hidden amount: value or length leaking through semantics or the drawing (`OdometerUiTest.hidden_reveals_nothing_to_talkback_or_tests`, `OdometerLogicTest.hidden_amount_reveals_no_digits_and_no_length`).
+  - Amounts beyond the limit, including `Long.MIN_VALUE`: clamp to ₹99,99,99,999.99 with the right sign, with no overflow.
+  - Tampered and unreadable UI settings: an unknown theme string, read failures and write failures fall back to defaults with no crash (`UiPreferencesTest`).
+  - Floods: 100,000 toasts keep 4, and 100,000 effects stay in a 16-slot channel; oversized toast text is capped without splitting an emoji.
+  - Catalog in a release build: checked in the merged manifest, in the dex and in the R8 mapping.
+  - Secrets in screenshots and the catalog: sample values only (`CatalogReleaseIsolationTest.catalog_samples_hold_no_real_looking_secrets`).
+  - Reduced motion skipping a step: sheets, errors and clicks behave the same; only the animation changes.
+- What broke:
+  - Medium: `PayFlowListRow` rendered direction-override characters from a payee name, so a crafted name could read like a different payee.
+  - Medium: dragging a sheet could lose its settle animation. Each drag delta launched a suspending snap, and a late one cancelled the release animation, leaving the sheet stranded where the finger let go (found by `BottomSheetUiTest.a_swipe_down_dismisses`).
+- Fixed now:
+  - `DisplayText.safe` strips those characters, and `PayFlowListRow` applies it. Regressions: `DisplayTextTest`, `SmallComponentsUiTest.a_list_row_never_shows_direction_override_characters`.
+  - The drag now writes a plain state directly, and animations take turns with it through a `MutatorMutex`.
+- Held from the start: `resolveMotionLevel` treats a corrupt animator scale (NaN, negative) as reduced motion (`MotionSchemeTest.a_corrupt_animator_scale_never_enables_decoration`).
+- Release check: the merged release manifest has no catalog entry, no class dex in the release APK mentions it, and the R8 mapping has 0 `DesignCatalog` lines. `CatalogReleaseIsolationTest` also fails if anything in `src/main` starts to reference it.
+- Permissions: haptics use the view channel, so `VIBRATE` isn't needed (`EffectsTest.haptics_add_no_vibrate_permission_to_the_app`).
+- Scope for improvement:
+  - The in-window sheet doesn't hide the screen behind it from TalkBack. Screens must clear those semantics while it's open.
+  - Screens rendering payee names outside `PayFlowListRow` must call `DisplayText.safe` themselves (pay, scan, receipt).
+  - The debug catalog activity is exported so `adb` can open it. That's fine for a debug build, and it isn't in release.
+  - Not checked on a device: this review used JVM tests and images only.

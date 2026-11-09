@@ -221,3 +221,14 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Aurum Noir** (see `DESIGN_DIRECTION.md`), no tweaks. No Lottie: all motion is code-drawn.
 - Features are built one at a time on `main`, because this machine runs one Gradle build safely at a time; no parallel worktrees are needed.
 - Performance numbers come from the Pixel 7 emulator with software rendering and are labelled as such. They show before/after differences, not what a real mid-range phone would measure.
+
+## UI overhaul: design system decisions (2026-11-09)
+- **Screenshot tests:** Roborazzi 1.78.0 works with AGP 9.5 and Robolectric 4.17 with no workaround, so Paparazzi was not needed. Baselines are in `app/src/test/screenshots/`. Tests that need the debug-only catalog are in `src/testDebug`, so release unit-test compilation is unaffected.
+- **Theme name:** `ui.theme.PayFlowTheme` stays the single entry point and delegates to the design system, so existing screens change with no import churn.
+- **Haze: skipped.** Aurum Noir gets its depth from layered tones and a hairline. No component needs real blur, and skipping it avoids a dependency and a blur cost on mid-range phones. Revisit only if a later screen truly needs glass.
+- **Haptics use the view channel only.** `View.performHapticFeedback` needs no `VIBRATE` permission and respects the phone's touch-feedback setting. A payments app shouldn't ask for a permission it can avoid. `CONFIRM` and `REJECT` exist from API 30; older phones fall back to `VIRTUAL_KEY` and `LONG_PRESS`.
+- **Bottom sheet is in-window, not a dialog.** A dialog or popup is a separate window that doesn't inherit `FLAG_SECURE`, so payment details in it could reach screenshots and the recents thumbnail. Trade-off: the caller places it last in a full-screen `Box`, and content behind it must be hidden from TalkBack by the screen.
+- **Film grain is on hero surfaces only.** The direction asks for 3% grain on dark surfaces. Per-pixel noise across a scrolling screen is a poor trade on weaker GPUs for an effect few would notice, so `SurfaceLevel.Hero` carries it. The hero stays graphite in light theme, so it keeps 2% there.
+- **Fonts are subset** to Latin, Latin-1, Latin Extended-A, punctuation, ₹ and −, with variation axes and OpenType features kept. Other scripts such as Devanagari fall back to the system font.
+- **Sheen strength differs by theme:** 35% on champagne, 14% on graphite. The same strength looked scratchy on the dark button.
+- **Additions beyond the brief's component list**, because later screens would otherwise improvise them: `PayFlowTopBar`, `PayFlowListRow`, `PayFlowChoiceChip`, `PayFlowSwitch`, `PayFlowSurface`, `AmountText`, `DrawnCheckmark`, `DrawnCross`, `StaggeredEntrance`.

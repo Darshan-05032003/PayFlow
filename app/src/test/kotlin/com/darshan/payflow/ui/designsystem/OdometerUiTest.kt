@@ -1,9 +1,13 @@
 package com.darshan.payflow.ui.designsystem
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -106,6 +110,23 @@ class OdometerUiTest {
         assertThat(recompositionCycles() - before).isAtMost(ALLOWED_CYCLES)
         // Proves the frames above really animated, so the flat recomposition count means something.
         assertThat(rule.onRoot().captureToImage().asAndroidBitmap().sameAs(moving)).isFalse()
+    }
+
+    /** Control: shows the counter behind the "no recomposition" checks really moves when something recomposes per frame. */
+    @Test
+    fun the_recomposition_counter_catches_a_value_read_in_composition() {
+        var target by mutableStateOf(0f)
+        rule.mainClock.autoAdvance = false
+        rule.setDs {
+            val value by animateFloatAsState(target, tween(1_000), label = "control")
+            Text(value.toString())
+        }
+        rule.mainClock.advanceTimeBy(100)
+        commitState { target = 1f }
+        rule.mainClock.advanceTimeBy(48)
+        val before = recompositionCycles()
+        repeat(FRAMES) { rule.mainClock.advanceTimeByFrame() }
+        assertThat(recompositionCycles() - before).isAtLeast(FRAMES.toLong() / 2)
     }
 
     @Test
