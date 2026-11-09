@@ -26,7 +26,9 @@ ScrollBenchmark#homeScrollNoCompilation ScrollBenchmark#homeScrollPartial
 ScrollBenchmark#historyScrollNoCompilation ScrollBenchmark#historyScrollPartial}"
 
 die() { echo "device_session: $*" >&2; exit 1; }
-no_gradle() { ! pgrep -f '[G]radleWrapperMain|[G]radleDaemon' >/dev/null || die "a Gradle build is running; wait for it to exit"; }
+# Only our builds count: safe_gradle.sh runs the wrapper without a daemon. An editor's own Gradle daemon (VS Code keeps
+# one up all day) never shares the emulator's memory budget with us, so it must not block the session.
+no_gradle() { ! pgrep -f '^[^ ]*java .*GradleWrapperMain' >/dev/null || die "a Gradle build is running; wait for it to exit"; }
 need_emulator() { [ "$("${adb[@]}" get-state 2>/dev/null)" = device ] || die "$serial is not up (../tools/safe_emulator.sh start)"; }
 
 # A variant built from release can come out unsigned; adb only installs signed APKs, so sign it with the debug key.
