@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.darshan.payflow.ui.components.AmountVisibility
+import com.darshan.payflow.ui.designsystem.effects.InMemoryUiPreferences
+import com.darshan.payflow.ui.designsystem.effects.UiPreferences
 
 sealed interface PaymentDetailUiState {
     data object Loading : PaymentDetailUiState
@@ -37,8 +40,15 @@ class PaymentDetailViewModel @Inject constructor(
     private val upiAppLauncher: UpiAppLauncher,
     private val dispatchers: DispatcherProvider,
     savedState: SavedStateHandle,
+    preferences: UiPreferences = InMemoryUiPreferences(),
 ) : ViewModel() {
     private val id: String = savedState.get<String>(ARG_ID).orEmpty()
+    private val visibility = AmountVisibility(preferences, viewModelScope)
+
+    /** Home's hide-amounts choice, so the detail never shows what Home hides. */
+    val amountsHidden: StateFlow<Boolean> = visibility.hidden
+
+    fun toggleAmountsHidden() = visibility.toggle()
     private val marking = MutableStateFlow(false)
 
     val uiState: StateFlow<PaymentDetailUiState> = combine(repository.observeById(id), marking) { payment, busy ->
