@@ -300,3 +300,4 @@ To keep these benchmarks working as the UI changes:
 - Not measured:
   - Real frame times, jank and cold start with the splash hold. Holding the first frame for DataStore and the lock can add to time to initial display, so compare `startupNoCompilation` against the 876 ms baseline in the QA step.
   - 3x animator speed isn't a separate case: Compose scales durations, and the logic doesn't depend on them.
+- Device run: not run. The emulator booted in 19 s under its 4 GB memory cap, and the cap stopped it about 4 s later (4.16 GB resident, software rendering), before the app could install. The rest of the machine was not affected.

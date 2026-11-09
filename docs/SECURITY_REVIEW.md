@@ -406,3 +406,4 @@ Severity scale: Critical / High / Medium / Low.
   - Biometric unlock still works during a PIN lockout. BiometricPrompt has its own lockout, so this was left as it was.
   - Keypad digits are read aloud by TalkBack, as on any PIN pad.
   - `AndroidBiometricAuthenticator` is device-only and did not run in these tests: biometric paths use the fake.
+  - Not checked on a device: all of this ran on the JVM under Robolectric. The one emulator attempt ended before the app could install (see `LOAD_TEST_REPORT.md`). FLAG_SECURE in the recents thumbnail, the real back gesture and overlay touch filtering still need a device.
