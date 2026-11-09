@@ -65,6 +65,8 @@ data class PayFlowColors(
     val shimmerHighlight: Color,
     /** Light band of the metallic sheen sweep. */
     val sheen: Color,
+    /** Strength of the metal band on the primary button. Graphite needs less than champagne. */
+    val sheenStrength: Float,
     /** Strength of the film grain on this theme (0..1). */
     val grainAlpha: Float,
     val avatarTones: List<AvatarTone>,
@@ -107,6 +109,7 @@ val AurumLight = PayFlowColors(
     shimmerBase = Color(0xFFEEEAE0),
     shimmerHighlight = Color(0xFFFBF9F4),
     sheen = Color(0xFFEFD9AE),
+    sheenStrength = 0.14f,
     grainAlpha = 0f,
     avatarTones = listOf(
         AvatarTone(Color(0xFF5C4314), Color(0xFFEBDFC6)),
@@ -155,6 +158,7 @@ val AurumDark = PayFlowColors(
     shimmerBase = Color(0xFF1F2228),
     shimmerHighlight = Color(0xFF2E3138),
     sheen = Color(0xFFFFF6E3),
+    sheenStrength = 0.35f,
     grainAlpha = 0.03f,
     avatarTones = listOf(
         AvatarTone(Color(0xFFE2C48D), Color(0xFF2E2717)),

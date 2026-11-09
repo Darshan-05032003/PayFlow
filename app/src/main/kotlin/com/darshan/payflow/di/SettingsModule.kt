@@ -8,6 +8,8 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import com.darshan.payflow.data.settings.DataStorePaymentModeRepository
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.domain.repository.PaymentModeRepository
+import com.darshan.payflow.ui.designsystem.effects.DataStoreUiPreferences
+import com.darshan.payflow.ui.designsystem.effects.UiPreferences
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,13 +25,17 @@ import kotlinx.coroutines.SupervisorJob
 @Retention(AnnotationRetention.BINARY)
 annotation class SettingsPrefs
 
-/** Non-secret app settings (payment mode). Secrets go through `SecureStore`, never here. */
+/** Non-secret app settings (payment mode, look and feel). Secrets go through `SecureStore`, never here. */
 @Module
 @InstallIn(SingletonComponent::class)
 object SettingsModule {
     @Provides @Singleton @SettingsPrefs
     fun settingsPrefs(@ApplicationContext context: Context): DataStore<Preferences> =
         PreferenceDataStoreFactory.create(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)) { context.preferencesDataStoreFile("payflow_settings") }
+
+    @Provides @Singleton
+    fun uiPreferences(@SettingsPrefs prefs: DataStore<Preferences>): UiPreferences =
+        DataStoreUiPreferences(prefs, CoroutineScope(SupervisorJob() + Dispatchers.Default))
 
     @Provides @Singleton
     fun upiProfileRepository(store: com.darshan.payflow.data.security.SecureStore): com.darshan.payflow.domain.model.UpiProfileRepository =

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Launcher icon background: the brand teal (Brand.Teal40 in ui/theme/Color.kt). -->
-    <color name="ic_launcher_background">#00675B</color>
+    <!-- Launcher icon background: Aurum Noir graphite. -->
+    <color name="ic_launcher_background">#17181C</color>
+    <!-- Window colour before the first Compose frame: Aurum Noir bg in each theme (values-night overrides it). -->
+    <color name="window_background">#F6F3EC</color>
 </resources>

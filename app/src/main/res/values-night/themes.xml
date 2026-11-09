@@ -1,3 +1,5 @@
 <resources>
-    <style name="Theme.PayFlow" parent="android:Theme.Material.NoActionBar" />
+    <style name="Theme.PayFlow" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>
