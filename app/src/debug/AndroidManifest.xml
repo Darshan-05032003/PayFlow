@@ -17,5 +17,11 @@
                 <data android:scheme="upi" android:host="pay" />
             </intent-filter>
         </activity>
+        <!-- Design catalog: every design-system component in every state. Sample values only. -->
+        <activity
+            android:name=".ui.designsystem.catalog.DesignCatalogActivity"
+            android:exported="true"
+            android:label="Design catalog"
+            android:theme="@style/Theme.PayFlow" />
     </application>
 </manifest>
