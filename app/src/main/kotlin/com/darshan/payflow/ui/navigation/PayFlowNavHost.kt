@@ -159,7 +159,7 @@ fun NavDestination.shellRoute(): ShellRoute? = when {
 private fun NavController.push(destination: Any) = navigate(destination) { launchSingleTop = true }
 
 /** Switches tab: one copy of each tab, each keeping its own state, and back from any tab goes to Home. */
-private fun NavController.openTab(destination: Any) = navigate(destination) {
+internal fun NavController.openTab(destination: Any) = navigate(destination) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true
     restoreState = true

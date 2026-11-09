@@ -2,4 +2,11 @@
     <style name="Theme.PayFlow" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
+    <!-- Graphite in both themes, like the launcher icon, so a stored theme that differs from the system's can't flash the wrong one.
+         Below API 31 the library draws a static icon, so the animated one is only set in values-v31. -->
+    <style name="Theme.PayFlow.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.PayFlow</item>
+    </style>
 </resources>

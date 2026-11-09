@@ -6,12 +6,14 @@ import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -23,7 +25,10 @@ import com.darshan.payflow.data.upi.IncomingIntentPolicy
 import com.darshan.payflow.data.upi.IncomingUpiLinkStore
 import com.darshan.payflow.data.upi.UpiAppLauncher
 import com.darshan.payflow.ui.designsystem.effects.UiPreferences
+import com.darshan.payflow.ui.lock.AppLockViewModel
+import com.darshan.payflow.ui.lock.LockUiState
 import com.darshan.payflow.ui.navigation.AppRoot
+import com.darshan.payflow.ui.splash.holdUntilReadyThenHandOff
 import com.darshan.payflow.ui.theme.PayFlowTheme
 import com.darshan.payflow.ui.theme.isDark
 import dagger.hilt.android.AndroidEntryPoint
@@ -45,8 +50,18 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var incomingLinks: IncomingUpiLinkStore
     @Inject lateinit var uiPreferences: UiPreferences
 
+    private val lockViewModel: AppLockViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Injected fields exist from here on. The first frame waits for the stored theme and the lock's answer, so neither a
+        // wrong theme nor a moment of the app can show first.
+        splash.holdUntilReadyThenHandOff(
+            themeLoaded = { uiPreferences.loaded.value },
+            lockResolved = { lockViewModel.uiState.value !is LockUiState.Checking },
+            reduceMotion = { uiPreferences.settings.value.reduceMotion },
+        )
         enableEdgeToEdge()
         // Tapjacking: taps delivered through another app's overlay are dropped everywhere, not only on secure screens.
         window.decorView.filterTouchesWhenObscured = true
@@ -66,7 +81,7 @@ class MainActivity : FragmentActivity() {
             PayFlowTheme(settings) {
                 // No visual effect. Off in release; the benchmark build uses it to find screens by test tag.
                 Box(if (BuildConfig.EXPOSE_TEST_TAGS) Modifier.semantics { testTagsAsResourceId = true } else Modifier) {
-                    AppRoot(upiAppLauncher, cameraController, cameraPermission, checkoutKit, incomingLinks)
+                    AppRoot(upiAppLauncher, cameraController, cameraPermission, checkoutKit, incomingLinks, lockViewModel = lockViewModel)
                 }
             }
         }

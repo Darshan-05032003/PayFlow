@@ -2,6 +2,8 @@
 <resources>
     <!-- Launcher icon background: Aurum Noir graphite. -->
     <color name="ic_launcher_background">#17181C</color>
+    <!-- The champagne mark on that graphite. -->
+    <color name="ic_launcher_mark">#E2C48D</color>
     <!-- Window colour before the first Compose frame: Aurum Noir bg in each theme (values-night overrides it). -->
     <color name="window_background">#F6F3EC</color>
 </resources>
