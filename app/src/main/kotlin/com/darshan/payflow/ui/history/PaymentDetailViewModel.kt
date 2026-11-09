@@ -41,8 +41,18 @@ class PaymentDetailViewModel @Inject constructor(
     private val dispatchers: DispatcherProvider,
     savedState: SavedStateHandle,
     preferences: UiPreferences = InMemoryUiPreferences(),
+    private val rewards: DemoRewardLedger = DemoRewardLedger(),
 ) : ViewModel() {
     private val id: String = savedState.get<String>(ARG_ID).orEmpty()
+    private val _rewardRevealed = MutableStateFlow(rewards.isScratched(id))
+
+    /** Whether this payment's demo scratch card has been scratched in this run. Nothing else changes when it is. */
+    val rewardRevealed: StateFlow<Boolean> = _rewardRevealed
+
+    fun revealReward() {
+        rewards.markScratched(id)
+        _rewardRevealed.value = true
+    }
     private val visibility = AmountVisibility(preferences, viewModelScope)
 
     /** Home's hide-amounts choice, so the detail never shows what Home hides. */

@@ -66,12 +66,16 @@ class CollectFlowIntegrationTest {
         rule.setContent {
             PayFlowTheme {
                 val state by vm.uiState.collectAsStateWithLifecycle()
-                CollectScreen(state, CollectCallbacks(onApprove = vm::approve, onDecline = vm::decline, onRefresh = vm::refresh))
+                CollectScreen(state, CollectCallbacks(onApprove = vm::approve, onDecline = vm::decline, onRefresh = vm::refresh), clock = fixedClock)
             }
         }
         rule.waitUntilWithMainLooper { vm.uiState.value is CollectUiState.Content }
         rule.onNodeWithText("Chai Point").assertIsDisplayed()
-        rule.onNodeWithTag(PayFlowTestTags.collectApprove("req-1")).performClick()
+        // Approving goes through the review sheet, which names the payee and the amount before anything is paid.
+        rule.onNodeWithTag(PayFlowTestTags.collectPlain("req-1")).performClick()
+        rule.onNodeWithTag(PayFlowTestTags.COLLECT_CONFIRM_SHEET).assertIsDisplayed()
+        assertThat(runOffMain { payments.observeRecent(1).first() }).isEmpty()
+        rule.onNodeWithTag(PayFlowTestTags.COLLECT_CONFIRM_PAY).performClick()
         rule.waitUntilWithMainLooper {
             (vm.uiState.value as? CollectUiState.Content)?.requests?.single()?.request?.status == CollectStatus.APPROVED
         }

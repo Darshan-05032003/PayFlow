@@ -74,6 +74,8 @@ import kotlinx.coroutines.launch
  *   drag or that confirmation.
  *
  * [refusals] goes up when an attempt ends without a payment, which sends a committed handle home.
+ *
+ * Also approves collect requests, with the same rules and the same confirmation route.
  */
 @Composable
 fun SwipeToPay(
@@ -85,6 +87,7 @@ fun SwipeToPay(
     onCommit: () -> Unit,
     onPlainAction: () -> Unit,
     modifier: Modifier = Modifier,
+    testTag: String = PayFlowTestTags.PAY_SWIPE,
 ) {
     val colors = PayFlowTheme.colors
     val motion = LocalMotion.current
@@ -193,7 +196,7 @@ fun SwipeToPay(
                     }
                 }
             }
-            .testTag(PayFlowTestTags.PAY_SWIPE)
+            .testTag(testTag)
             .clearAndSetSemantics {
                 contentDescription = description
                 text = AnnotatedString(label)

@@ -36,7 +36,7 @@ class CollectScreenTest {
         holder.value = state
         rule.setContent {
             val current by holder
-            PayFlowTheme { CollectScreen(current, callbacks) }
+            PayFlowTheme { CollectScreen(current, callbacks, clock = com.darshan.payflow.testutil.fixedClock) }
         }
     }
 
@@ -61,8 +61,12 @@ class CollectScreenTest {
         )
         rule.onNodeWithText("Chai Point").assertIsDisplayed()
         rule.onNodeWithText("₹45.00").assertIsDisplayed()
-        rule.onNodeWithTag(PayFlowTestTags.collectApprove("req-1")).performClick()
         rule.onNodeWithTag(PayFlowTestTags.collectDecline("req-1")).performClick()
+        // A tap on the slider pays nothing: paying is a full swipe, or the review sheet's button.
+        rule.onNodeWithTag(PayFlowTestTags.collectApprove("req-1")).performClick()
+        assertThat(approved).isNull()
+        rule.onNodeWithTag(PayFlowTestTags.collectPlain("req-1")).performClick()
+        rule.onNodeWithTag(PayFlowTestTags.COLLECT_CONFIRM_PAY).performClick()
         assertThat(approved).isEqualTo("req-1")
         assertThat(declined).isEqualTo("req-1")
     }

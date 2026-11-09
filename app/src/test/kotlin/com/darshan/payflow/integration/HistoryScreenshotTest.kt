@@ -75,9 +75,9 @@ class HistoryScreenshotTest {
         rule.onNodeWithTag(PayFlowTestTags.paymentRow("p2")).performTouchInput { swipeLeft(startX = right - 10f, endX = left + 10f) }
     }
 
-    private fun detail(name: String, payment: Payment, dark: Boolean = false, hidden: Boolean = false, handler: String? = null, fontScale: Float = 1f) {
+    private fun detail(name: String, payment: Payment, dark: Boolean = false, hidden: Boolean = false, handler: String? = null, fontScale: Float = 1f, rewardRevealed: Boolean = false) {
         rule.setDs(dark = dark, fontScale = fontScale, reduceMotion = true) {
-            PaymentDetailScreen(PaymentDetailUiState.Content(payment, handlerLabel = handler), PaymentDetailCallbacks(), amountsHidden = hidden)
+            PaymentDetailScreen(PaymentDetailUiState.Content(payment, handlerLabel = handler), PaymentDetailCallbacks(), amountsHidden = hidden, rewardRevealed = rewardRevealed)
         }
         rule.waitForIdle()
         rule.captureScreenshot("history/$name")
@@ -95,5 +95,6 @@ class HistoryScreenshotTest {
         dark = true,
         handler = "Wallet",
     )
+    @Test fun detailRewardRevealedDark() = detail("detail_reward_revealed_dark", paid, dark = true, rewardRevealed = true)
     @Test fun detailFailedLight() = detail("detail_failed_light", payments[3].copy(failureReason = "Declined by the bank"))
 }

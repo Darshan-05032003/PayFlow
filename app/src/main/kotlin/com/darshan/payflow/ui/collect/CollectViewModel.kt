@@ -52,7 +52,8 @@ class CollectViewModel @Inject constructor(
     private val collects: CollectRepository,
     private val refreshRequests: RefreshCollectRequestsUseCase,
     private val respond: RespondToCollectUseCase,
-    private val clock: Clock,
+    /** The screen counts down against the same clock the answers are checked with. */
+    val clock: Clock,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -78,6 +79,9 @@ class CollectViewModel @Inject constructor(
         }
         .flowOn(dispatchers.io)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CollectUiState.Loading)
+
+    /** Which requests have slid in on this visit. Lives here so a return from a payment doesn't replay the entrance. */
+    val headsUp = HeadsUpMemory()
 
     init {
         refresh(initial = true)

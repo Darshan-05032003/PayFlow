@@ -47,7 +47,7 @@ class MandateViewModelsTest {
 
     @Test
     fun `list goes loading, empty, then content and derives expiry`() = runTest(dispatcher) {
-        val vm = MandatesViewModel(mandates, fixedClock, ZoneOffset.UTC, dispatchers)
+        val vm = MandatesViewModel(mandates, fixedClock, ZoneOffset.UTC, dispatchers, UpdateMandateUseCase(mandates, psp, fixedClock))
         vm.uiState.test {
             assertThat(awaitItem()).isEqualTo(MandatesUiState.Loading)
             assertThat(awaitItem()).isEqualTo(MandatesUiState.Empty)
@@ -60,7 +60,7 @@ class MandateViewModelsTest {
     @Test
     fun `list error and retry`() = runTest(dispatcher) {
         mandates.failure = IOException("db")
-        val vm = MandatesViewModel(mandates, fixedClock, ZoneOffset.UTC, dispatchers)
+        val vm = MandatesViewModel(mandates, fixedClock, ZoneOffset.UTC, dispatchers, UpdateMandateUseCase(mandates, psp, fixedClock))
         vm.uiState.test {
             awaitItem()
             assertThat(awaitItem()).isInstanceOf(MandatesUiState.Error::class.java)

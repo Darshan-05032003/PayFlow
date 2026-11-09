@@ -100,7 +100,7 @@ class MandateFlowIntegrationTest {
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_VPA).performTextInput("netflix@okbank")
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_NAME).performTextInput("Netflix")
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_AMOUNT).performTextInput("649")
-        rule.onNodeWithTag(PayFlowTestTags.MANDATE_SUBMIT).performScrollTo().performClick()
+        rule.onNodeWithTag(PayFlowTestTags.MANDATE_SUBMIT).performClick() // docked under the form, always on screen
         rule.waitUntilWithMainLooper { created.any { it is CreateMandateEvent.Created } }
         val id = (created.single() as CreateMandateEvent.Created).mandateId
         assertThat(runOffMain { mandates.getById(id) }!!.status).isEqualTo(MandateStatus.ACTIVE)
@@ -121,13 +121,15 @@ class MandateFlowIntegrationTest {
 
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_DEBIT_AMOUNT).performScrollTo().performTextInput("649")
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_DEBIT).performScrollTo().performClick()
-        rule.waitUntilWithMainLooper { (detail.uiState.value as? MandateDetailUiState.Content)?.executions?.size == 1 }
+        rule.waitUntilWithMainLooper { (detail.uiState.value as? MandateDetailUiState.Content)?.executions?.singleOrNull()?.status == PaymentStatus.SUCCESS }
         val payment = runOffMain { payments.observeRecent(1).first() }.single()
         assertThat(payment.status).isEqualTo(PaymentStatus.SUCCESS)
         assertThat(payment.method).isEqualTo(PaymentMethod.MANDATE)
         assertThat(payment.mandateId).isEqualTo(id)
 
         rule.onNodeWithTag(PayFlowTestTags.mandateAction(MandateAction.REVOKE)).performScrollTo().performClick()
+        // Revoking can't be undone, so it asks first.
+        rule.onNodeWithTag(PayFlowTestTags.MANDATE_REVOKE_CONFIRM).performClick()
         rule.waitUntilWithMainLooper { (detail.uiState.value as? MandateDetailUiState.Content)?.mandate?.status == MandateStatus.REVOKED }
         assertThat(psp.mandates.values.single().status).isEqualTo(MandateStatus.REVOKED)
     }

@@ -92,12 +92,14 @@ data class PaymentDetailCallbacks(
     val onMarkPaid: () -> Unit = {},
     val onMarkNotPaid: () -> Unit = {},
     val onToggleAmounts: () -> Unit = {},
+    val onRewardRevealed: () -> Unit = {},
 )
 
 @Composable
 fun PaymentDetailRoute(onBack: () -> Unit, containerKey: String? = null, viewModel: PaymentDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val hidden by viewModel.amountsHidden.collectAsStateWithLifecycle()
+    val rewardRevealed by viewModel.rewardRevealed.collectAsStateWithLifecycle()
     PaymentDetailScreen(
         state,
         PaymentDetailCallbacks(
@@ -105,9 +107,11 @@ fun PaymentDetailRoute(onBack: () -> Unit, containerKey: String? = null, viewMod
             onMarkPaid = { viewModel.markManually(paid = true) },
             onMarkNotPaid = { viewModel.markManually(paid = false) },
             onToggleAmounts = viewModel::toggleAmountsHidden,
+            onRewardRevealed = viewModel::revealReward,
         ),
         amountsHidden = hidden,
         containerKey = containerKey,
+        rewardRevealed = rewardRevealed,
     )
 }
 
@@ -139,6 +143,7 @@ fun PaymentDetailScreen(
     callbacks: PaymentDetailCallbacks,
     amountsHidden: Boolean = false,
     containerKey: String? = null,
+    rewardRevealed: Boolean = false,
 ) {
     val colors = PayFlowTheme.colors
     val motion = LocalMotion.current
@@ -215,7 +220,7 @@ fun PaymentDetailScreen(
                     onRetry = callbacks.onBack,
                     modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.ERROR),
                 )
-                is PaymentDetailUiState.Content -> DetailContent(state, callbacks, amountsHidden) { message -> toasts.show(message, ToastTone.Info) }
+                is PaymentDetailUiState.Content -> DetailContent(state, callbacks, amountsHidden, rewardRevealed) { message -> toasts.show(message, ToastTone.Info) }
             }
         }
         PayFlowToastHost(toasts, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
@@ -223,7 +228,7 @@ fun PaymentDetailScreen(
 }
 
 @Composable
-private fun DetailContent(state: PaymentDetailUiState.Content, callbacks: PaymentDetailCallbacks, amountsHidden: Boolean, onCopied: (String) -> Unit) {
+private fun DetailContent(state: PaymentDetailUiState.Content, callbacks: PaymentDetailCallbacks, amountsHidden: Boolean, rewardRevealed: Boolean, onCopied: (String) -> Unit) {
     val colors = PayFlowTheme.colors
     val type = PayFlowTheme.type
     val payment = state.payment
@@ -258,6 +263,9 @@ private fun DetailContent(state: PaymentDetailUiState.Content, callbacks: Paymen
             }
         }
         if (payment.canBeMarkedManually) MarkCard(state, callbacks)
+        // Delight is kept for a payment the provider confirmed; it's a demo and says so, and it changes nothing.
+        val reward = remember(payment) { DemoReward.forPayment(payment) }
+        if (reward != null) ScratchCard(reward, rewardRevealed, callbacks.onRewardRevealed)
         // The sheet is the surface colour in light, so the receipt is printed on the page colour there to stay a slip of paper.
         ReceiptCard(receipt, payment, state.handlerLabel, tag = PayFlowTestTags.DETAIL_RECEIPT, paper = if (colors.isDark) colors.surface else colors.bg)
         MoreDetails(payment, onCopied)

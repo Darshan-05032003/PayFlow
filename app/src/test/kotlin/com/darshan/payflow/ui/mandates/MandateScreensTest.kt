@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.darshan.payflow.domain.model.Mandate
 import com.darshan.payflow.domain.model.MandateAction
@@ -53,6 +55,9 @@ class MandateScreensTest {
         holder.value = MandatesUiState.Content(listOf(mandate(), mandate(MandateStatus.PAUSED).copy(id = "m-2", payeeName = "Spotify", maxAmountPaise = 11_900)))
         rule.onNodeWithText("Netflix").assertIsDisplayed()
         rule.onNodeWithText("Up to ₹649.00 · Monthly").assertIsDisplayed()
+        // The second mandate is behind the first in the stack: swipe the front card away to reach it.
+        rule.onNodeWithTag(PayFlowTestTags.mandateCard("m-1")).performTouchInput { swipeLeft(startX = right - 10f, endX = left + 10f) }
+        rule.waitForIdle()
         rule.onNodeWithText("Paused").assertIsDisplayed()
         rule.onNodeWithText("Spotify").performClick()
         assertThat(opened).isEqualTo("m-2")
@@ -81,13 +86,13 @@ class MandateScreensTest {
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_AMOUNT).performTextInput("649")
         rule.onNodeWithTag(PayFlowTestTags.mandateFrequency(MandateFrequency.WEEKLY)).performClick()
         rule.onNodeWithTag(PayFlowTestTags.mandateValidity(6)).performClick()
-        rule.onNodeWithTag(PayFlowTestTags.MANDATE_SUBMIT).performScrollTo().performClick()
+        rule.onNodeWithTag(PayFlowTestTags.MANDATE_SUBMIT).performClick() // docked under the form, always on screen
         assertThat(holder.value.vpa).isEqualTo("netflix@okbank")
         assertThat(holder.value.frequency).isEqualTo(MandateFrequency.WEEKLY)
         assertThat(holder.value.validityMonths).isEqualTo(6)
         assertThat(submitted).isTrue()
         holder.value = holder.value.copy(ruleError = MandateValidation.InvalidPayee)
-        rule.onNodeWithText("This UPI ID cannot receive AutoPay mandates").assertIsDisplayed()
+        rule.onNodeWithText("This UPI ID cannot receive AutoPay mandates").performScrollTo().assertIsDisplayed()
     }
 
     @Test

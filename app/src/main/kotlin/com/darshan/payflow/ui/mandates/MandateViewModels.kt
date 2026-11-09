@@ -53,7 +53,9 @@ sealed interface MandatesUiState {
     data object Loading : MandatesUiState
     data object Empty : MandatesUiState
     data class Error(val detail: String?) : MandatesUiState
-    data class Content(val mandates: List<Mandate>) : MandatesUiState
+
+    /** [busy] holds the mandates with a pause or resume in flight; [today] is the day expected debits count from. */
+    data class Content(val mandates: List<Mandate>, val busy: Set<String> = emptySet(), val today: java.time.LocalDate? = null) : MandatesUiState
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -61,19 +63,26 @@ sealed interface MandatesUiState {
 class MandatesViewModel @Inject constructor(
     repository: MandateRepository,
     private val clock: Clock,
-    private val zone: ZoneId,
-    dispatchers: DispatcherProvider,
+    /** The zone expected debit dates are counted in. */
+    val zone: ZoneId,
+    private val dispatchers: DispatcherProvider,
+    private val updateMandate: UpdateMandateUseCase,
 ) : ViewModel() {
     private val reload = MutableStateFlow(0)
+    private val busyIds = MutableStateFlow<Set<String>>(emptySet())
+
+    private val _events = MutableSharedFlow<MandateDetailEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** Results of a card's pause or resume, in the same shape as the detail screen's. */
+    val events: SharedFlow<MandateDetailEvent> = _events.asSharedFlow()
 
     val uiState: StateFlow<MandatesUiState> = reload
         .flatMapLatest {
-            repository.observeAll()
-                .map<List<Mandate>, MandatesUiState> { list ->
-                    val today = clock.instant().atZone(zone).toLocalDate()
-                    if (list.isEmpty()) MandatesUiState.Empty else MandatesUiState.Content(list.map { it.copy(status = it.effectiveStatus(today)) })
-                }
-                .onStart { emit(MandatesUiState.Loading) }
+            combine(repository.observeAll(), busyIds) { list, busy ->
+                val today = clock.instant().atZone(zone).toLocalDate()
+                if (list.isEmpty()) MandatesUiState.Empty else MandatesUiState.Content(list.map { it.copy(status = it.effectiveStatus(today)) }, busy, today)
+            }
+                .onStart<MandatesUiState> { emit(MandatesUiState.Loading) }
                 .catch { emit(MandatesUiState.Error(it.message)) }
         }
         .flowOn(dispatchers.io)
@@ -81,6 +90,25 @@ class MandatesViewModel @Inject constructor(
 
     fun retry() {
         reload.value++
+    }
+
+    /**
+     * Pause or resume from a card. Goes through the same use case as the detail screen, so the sandbox provider and the stored
+     * mandate agree; the card shows the state the data layer reports, never an optimistic guess. One action per mandate at a
+     * time; taps while one runs are dropped.
+     */
+    fun act(id: String, action: MandateAction) {
+        if (action != MandateAction.PAUSE && action != MandateAction.RESUME) return
+        if (id in busyIds.value) return
+        busyIds.update { it + id }
+        viewModelScope.launch {
+            val result = try {
+                withContext(dispatchers.io) { updateMandate(id, action) }
+            } finally {
+                busyIds.update { it - id }
+            }
+            _events.tryEmit(MandateDetailEvent.ActionResult(result))
+        }
     }
 }
 
@@ -203,6 +231,8 @@ sealed interface MandateDetailUiState {
         val availableActions: List<MandateAction>,
         val busy: Boolean,
         val debitAmountText: String,
+        /** The day expected debits count from, on the injected clock. */
+        val today: java.time.LocalDate? = null,
     ) : MandateDetailUiState
 }
 
@@ -218,11 +248,16 @@ class MandateDetailViewModel @Inject constructor(
     private val updateMandate: UpdateMandateUseCase,
     private val executeMandate: ExecuteMandateUseCase,
     private val clock: Clock,
-    private val zone: ZoneId,
+    /** The zone expected debit dates are counted in. */
+    val zone: ZoneId,
     private val dispatchers: DispatcherProvider,
     private val savedState: SavedStateHandle,
+    preferences: com.darshan.payflow.ui.designsystem.effects.UiPreferences = com.darshan.payflow.ui.designsystem.effects.InMemoryUiPreferences(),
 ) : ViewModel() {
     private val id: String = savedState.get<String>(ARG_ID).orEmpty()
+
+    /** Home's hide-amounts choice, for the debits listed here. */
+    val amountsHidden: StateFlow<Boolean> = com.darshan.payflow.ui.components.AmountVisibility(preferences, viewModelScope).hidden
     private val busy = MutableStateFlow(false)
     private val debitAmount = savedState.getStateFlow(KEY_DEBIT_AMOUNT, "")
 
@@ -235,7 +270,7 @@ class MandateDetailViewModel @Inject constructor(
                 MandateDetailUiState.NotFound
             } else {
                 val effective = mandate.copy(status = mandate.effectiveStatus(clock.instant().atZone(zone).toLocalDate()))
-                MandateDetailUiState.Content(effective, executions, MandateStateMachine.userActions(effective.status), isBusy, amountText)
+                MandateDetailUiState.Content(effective, executions, MandateStateMachine.userActions(effective.status), isBusy, amountText, clock.instant().atZone(zone).toLocalDate())
             }
         }
             .onStart<MandateDetailUiState> { emit(MandateDetailUiState.Loading) }

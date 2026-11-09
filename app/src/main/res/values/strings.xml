@@ -100,6 +100,12 @@
     <string name="history_action_check">Check status</string>
     <string name="detail_sheet_close">Close payment</string>
     <string name="detail_amount_label">Amount</string>
+    <string name="reward_demo_tag">Demo</string>
+    <string name="reward_title">Demo cashback</string>
+    <string name="reward_scratch">Scratch to reveal</string>
+    <string name="reward_scratch_action">Reveal the demo reward</string>
+    <string name="reward_disclaimer">A demo of a reward, not real money. Nothing is credited and no balance or total changes.</string>
+    <string name="reward_revealed_description">Demo cashback of %1$s. Not real money; nothing is credited.</string>
     <string name="detail_status_heading">Status</string>
 
     <!-- Payment detail -->
@@ -327,12 +333,31 @@
     <string name="collect_msg_already">This request was already answered</string>
     <string name="collect_msg_unavailable">Could not reach the payment provider. Try again.</string>
     <string name="collect_msg_refresh_failed">Could not refresh requests</string>
+    <string name="collect_msg_waiting">Approved. Waiting for the provider to confirm the payment.</string>
+    <string name="collect_msg_payment_failed">The payment failed. Nothing was paid.</string>
+    <string name="collect_intro">Approving a request pays money from your account. PayFlow never approves one for you.</string>
+    <string name="collect_open_header">Waiting for your answer</string>
+    <string name="collect_earlier">Earlier</string>
+    <string name="collect_asks">asks you to pay</string>
+    <string name="collect_swipe">Swipe to pay %1$s</string>
+    <string name="collect_swipe_description">Pay %1$s to %2$s, %3$s. Double-tap to review before paying.</string>
+    <string name="collect_swipe_paying">Paying…</string>
+    <string name="collect_swipe_expired">Expired. It can\'t be paid.</string>
+    <string name="collect_review">Review and pay</string>
+    <string name="collect_use_button">Pay with a button</string>
+    <string name="collect_countdown">Expires in %1$s</string>
+    <string name="collect_confirm_title">Pay this request?</string>
+    <string name="collect_confirm_to">To %1$s</string>
+    <string name="collect_confirm_warning">Paying sends money from your account. You don\'t receive anything by approving.</string>
+    <string name="collect_confirm_pay">Pay %1$s</string>
+    <string name="collect_confirm_cancel">Not now</string>
+    <string name="collect_decline_description">Decline the request from %1$s</string>
 
     <!-- AutoPay mandates -->
     <string name="mandates_title">AutoPay</string>
     <string name="mandates_empty">No AutoPay mandates</string>
     <string name="mandates_empty_hint">Set up a mandate to let a merchant debit you automatically within limits you choose.</string>
-    <string name="mandate_create">New mandate</string>
+    <string name="mandate_create">New AutoPay</string>
     <string name="mandates_intro">Standing instructions that let a merchant debit you automatically, within the limits you set.</string>
     <string name="mandate_section_merchant">Merchant</string>
     <string name="mandate_section_rules">Rules</string>
@@ -384,6 +409,26 @@
     <string name="mandate_msg_illegal">That action is not possible in the current state</string>
     <string name="mandate_msg_executed">Debit completed</string>
     <string name="mandate_msg_rejected">Debit rejected by the mandate rules</string>
+    <string name="mandate_stack_next">Next mandate</string>
+    <string name="mandate_stack_previous">Previous mandate</string>
+    <string name="mandate_stack_position">Mandate %1$d of %2$d</string>
+    <string name="mandate_next_label">Next debit</string>
+    <string name="mandate_next_on">Expected %1$s</string>
+    <string name="mandate_next_paused">None while paused</string>
+    <string name="mandate_next_presented">When the merchant bills</string>
+    <string name="mandate_next_ended">None. This mandate has ended</string>
+    <string name="mandate_pause_for">Pause AutoPay for %1$s</string>
+    <string name="mandate_resume_for">Resume AutoPay for %1$s</string>
+    <string name="mandate_up_to">Up to %1$s</string>
+    <string name="mandate_timeline_title">Expected debits</string>
+    <string name="mandate_timeline_paused">Paused. Nothing can be debited until you resume it.</string>
+    <string name="mandate_timeline_presented">Debited when the merchant presents a bill, %1$s each time.</string>
+    <string name="mandate_timeline_ended">This mandate has ended. Nothing more can be debited.</string>
+    <string name="mandate_timeline_caption">Expected from the start date and frequency; the merchant decides the day, within the limit. In the sandbox no merchant presents debits: use Simulate a debit on the mandate.</string>
+    <string name="mandate_revoke_title">Revoke this AutoPay?</string>
+    <string name="mandate_revoke_body">%1$s will not be able to debit you again. This can\'t be undone; you would need a new mandate.</string>
+    <string name="mandate_revoke_confirm">Revoke mandate</string>
+    <string name="mandate_revoke_keep">Keep it</string>
 
     <!-- App lock -->
     <string name="nav_home">Home</string>
