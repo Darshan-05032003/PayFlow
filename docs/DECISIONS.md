@@ -375,3 +375,8 @@ Re-recorded baselines (intended changes only, one class at a time): Home, Histor
 - **Reports are a Gradle property, off by default:** `-PcomposeReports=true` writes the compiler's reports and metrics to `app/build/compose_compiler/`. They slow compilation, so the normal build doesn't produce them.
 - **`java.time.*` is declared stable** in `app/compose_stability.conf`. The JDK documents these types as immutable, but the compiler infers any Java library class as unstable, which made `Payment` unstable because of its `Instant`. `HomeUiState.Content` is `@Immutable`. Numbers in LOAD_TEST_REPORT ("Compose stability").
 - **No `kotlinx.collections.immutable`.** Strong skipping already makes every named composable skippable; the lists are read-only and rebuilt per emission. A new dependency and a change to every ViewModel isn't justified without a device measurement asking for it.
+
+## LeakCanary (row 7a)
+- **2.14, `debugImplementation` only.** 2.14 is the latest stable on Maven Central (3.0 is still alpha). It installs itself through a provider in the debug manifest, so no code change is needed.
+- **Verified absent from release:** the merged release and benchmark manifests contain no LeakCanary entry, and `dexdump` finds 0 `leakcanary`/`shark` classes in the release APK (1,165 in the debug APK). The benchmark build type starts from release, so the Macrobenchmarks measure an app without it.
+- **Findings need a device.** It watches activities, fragments, view models and views on a running app and dumps the heap when something is retained; that happens in row 7b on the emulator. Robolectric tests run with it on the classpath unchanged (it turns heap dumps off under JUnit).

@@ -148,6 +148,8 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
+    // Leak detection in debug builds only: it installs itself through a debug-manifest provider and never reaches release.
+    debugImplementation(libs.leakcanary)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)
