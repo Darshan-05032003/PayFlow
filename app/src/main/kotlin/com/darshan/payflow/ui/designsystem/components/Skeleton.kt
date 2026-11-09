@@ -76,13 +76,18 @@ fun SkeletonGroup(modifier: Modifier = Modifier, label: String = stringResource(
 
 /**
  * A shimmering placeholder block. The sweep translates one retained gradient in the draw phase, with no per-frame allocation
- * or recomposition. Reduced motion holds a flat tone.
+ * or recomposition. Reduced motion holds a flat tone. Pass [base] and [highlight] on a surface the shimmer tones don't suit,
+ * such as the graphite hero in the light theme.
  */
 @Composable
-fun SkeletonBlock(modifier: Modifier = Modifier, shape: Shape = Radii.smallShape) {
-    val colors = PayFlowTheme.colors
+fun SkeletonBlock(
+    modifier: Modifier = Modifier,
+    shape: Shape = Radii.smallShape,
+    base: Color = PayFlowTheme.colors.shimmerBase,
+    highlight: Color = PayFlowTheme.colors.shimmerHighlight,
+) {
     val state = LocalShimmer.current ?: shimmerState()
-    SkeletonSurface(modifier, shape, colors.shimmerBase, colors.shimmerHighlight, state)
+    SkeletonSurface(modifier, shape, base, highlight, state)
 }
 
 @Composable

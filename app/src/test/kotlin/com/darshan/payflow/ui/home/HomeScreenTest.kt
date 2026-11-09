@@ -40,6 +40,8 @@ class HomeScreenTest {
     fun loadingState() {
         show(HomeUiState.Loading)
         rule.onNodeWithTag(PayFlowTestTags.LOADING).performScrollTo().assertIsDisplayed()
+        // An amount that isn't known yet is never shown as zero.
+        rule.onAllNodesWithText("₹0").assertCountEquals(0)
     }
 
     @Test
@@ -57,6 +59,7 @@ class HomeScreenTest {
         rule.onNodeWithTag(PayFlowTestTags.ERROR).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Retry").performClick()
         assertThat(retried).isTrue()
+        rule.onAllNodesWithText("₹0").assertCountEquals(0)
     }
 
     @Test
@@ -80,8 +83,9 @@ class HomeScreenTest {
         rule.onNodeWithText("View all").performScrollTo().performClick()
         assertThat(viewAll).isTrue()
         rule.onNodeWithContentDescription("Payment to Alice, ₹123.45, Success").assertExists()
-        // Every quick action is labelled and reachable.
-        listOf("Scan QR", "Requests", "AutoPay", "Checkout", "Security", "Receive", "History").forEach { rule.onNodeWithContentDescription(it).assertExists() }
+        // Every action is labelled and reachable. History and Security moved to the bar: see ShellNavigationTest.
+        listOf("Scan & Pay", "Pay", "Receive").forEach { rule.onNodeWithContentDescription(it).assertExists() }
+        listOf("Requests, sandbox", "AutoPay, sandbox", "Demo store").forEach { rule.onNodeWithContentDescription(it, substring = true).assertExists() }
     }
 
     @Test

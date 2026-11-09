@@ -12,6 +12,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -70,7 +72,8 @@ private const val SCROLL_ANIMATION_LIMIT = 30
 
 /**
  * The app's bar. History carries [PayFlowTestTags.HOME_HISTORY], the tag the benchmarks use to open History from the first
- * screen. Content scrolling under the dock fades into the background behind it, so the dock never sits on busy rows.
+ * screen. Content fades out just above the dock, and everything from the dock's top edge down is solid background, so no half
+ * readable text shows beside or below it.
  */
 @Composable
 fun ShellBottomBar(state: BottomNavState, onChange: (BottomNavChange) -> Unit, modifier: Modifier = Modifier) {
@@ -92,8 +95,13 @@ fun ShellBottomBar(state: BottomNavState, onChange: (BottomNavChange) -> Unit, m
         state = state,
         onChange = onChange,
         modifier = modifier.drawWithCache {
-            val fade = Brush.verticalGradient(listOf(background.copy(alpha = 0f), background))
-            onDrawBehind { drawRect(fade) }
+            val rise = Spacing.xl.toPx()
+            val solidFrom = Spacing.xs.toPx()
+            val fade = Brush.verticalGradient(listOf(background.copy(alpha = 0f), background), startY = -rise, endY = solidFrom)
+            onDrawBehind {
+                drawRect(fade, topLeft = Offset(0f, -rise), size = Size(size.width, rise + solidFrom))
+                drawRect(background, topLeft = Offset(0f, solidFrom), size = Size(size.width, size.height - solidFrom))
+            }
         },
     )
 }

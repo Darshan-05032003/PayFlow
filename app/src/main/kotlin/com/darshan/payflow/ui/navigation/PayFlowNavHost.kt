@@ -221,7 +221,6 @@ fun PayFlowNavHost(
                                     onScan = { navController.push(ScanDestination) },
                                     onCollect = { navController.push(CollectDestination) },
                                     onMandates = { navController.push(MandatesDestination) },
-                                    onSecurity = { navController.openTab(SecurityDestination) },
                                     onCheckout = { navController.push(CheckoutDestination) },
                                     onReceive = { navController.push(ReceiveDestination) },
                                     onPayee = { navController.push(it.toPayDestination()) },
@@ -272,12 +271,14 @@ fun PayFlowNavHost(
                             CollectRoute(onBack = { navController.popBackStack() }, onOpenPayment = { navController.push(PaymentDetailDestination(it)) })
                         }
                         screen<ScanDestination> {
-                            ScanRoute(
-                                cameraController = cameraController,
-                                cameraPermission = cameraPermission,
-                                onBack = { navController.popBackStack() },
-                                onPay = { payload -> navController.navigate(payload.toPayDestination()) { popUpTo<ScanDestination> { inclusive = true } } },
-                            )
+                            Box(Modifier.fillMaxSize().containerTransform(SCAN_CONTAINER_KEY)) {
+                                ScanRoute(
+                                    cameraController = cameraController,
+                                    cameraPermission = cameraPermission,
+                                    onBack = { navController.popBackStack() },
+                                    onPay = { payload -> navController.navigate(payload.toPayDestination()) { popUpTo<ScanDestination> { inclusive = true } } },
+                                )
+                            }
                         }
                         screen<PaymentDetailDestination> { backStackEntry ->
                             val id = backStackEntry.toRoute<PaymentDetailDestination>().id

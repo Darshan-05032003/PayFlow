@@ -84,7 +84,7 @@ class HomeHistoryFlowIntegrationTest {
         rule.waitUntilWithMainLooper(5_000) { vm.uiState.value is HomeUiState.Content }
         rule.onNodeWithTag(PayFlowTestTags.paymentRow("a")).performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Pay Alice again (alice@okbank)").assertExists() // the recent-payee row
-        rule.onAllNodesWithText("₹99.00").onFirst().performScrollTo().assertIsDisplayed()
+        rule.onAllNodesWithText("₹99").onFirst().performScrollTo().assertIsDisplayed()
     }
 
     @Test

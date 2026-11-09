@@ -135,7 +135,7 @@ fun PaymentStatus.feedPill(): StatusKind? = when (this) {
  * What Home has already shown during this visit, so coming back from another screen doesn't replay the entrance, and a new
  * amount can roll from the one the user last saw. Held by the ViewModel rather than saved state: amounts don't leave the process.
  */
-class HomeEntranceMemory {
+class HomeEntranceMemory(val scrambleRandom: Random = Random.Default) {
     var sectionsPlayed: Boolean = false
     var lastShownSentPaise: Long? = null
     private val seen = LinkedHashSet<String>()

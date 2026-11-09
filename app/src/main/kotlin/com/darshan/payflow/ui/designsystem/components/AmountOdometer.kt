@@ -199,6 +199,7 @@ private fun DigitCell(
 
 /**
  * A static amount for rows and cards: same grouping and Geist sign as [AmountOdometer], no animation, cheap in long lists.
+ * [hidden] shows the same mask as the odometer and says "Amount hidden" to TalkBack.
  */
 @Composable
 fun AmountText(
@@ -208,10 +209,11 @@ fun AmountText(
     color: Color = Color.Unspecified,
     decimals: AmountDecimals = AmountDecimals.WhenNonZero,
     sign: AmountSign = AmountSign.NegativeOnly,
+    hidden: Boolean = false,
 ) {
-    val text = remember(paise, decimals, sign) {
+    val text = remember(paise, decimals, sign, hidden) {
         buildAnnotatedString {
-            for (slot in OdometerLogic.slots(paise, decimals, sign)) {
+            for (slot in if (hidden) OdometerLogic.hiddenSlots() else OdometerLogic.slots(paise, decimals, sign)) {
                 if (slot is OdometerSlot.Sign) {
                     withStyle(SpanStyle(fontFamily = Geist, fontWeight = FontWeight.Normal)) { append(slot.char) }
                 } else {
@@ -220,7 +222,8 @@ fun AmountText(
             }
         }
     }
-    val spoken = remember(paise, decimals) { OdometerLogic.spoken(paise, decimals) }
+    val hiddenLabel = stringResource(R.string.ds_amount_hidden)
+    val spoken = if (hidden) hiddenLabel else remember(paise, decimals) { OdometerLogic.spoken(paise, decimals) }
     Text(
         text,
         modifier = modifier.clearAndSetSemantics {

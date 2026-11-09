@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
@@ -112,7 +113,6 @@ class ShellNavigationTest {
             PayFlowTestTags.HOME_RECEIVE,
             PayFlowTestTags.HOME_COLLECT,
             PayFlowTestTags.HOME_MANDATES,
-            PayFlowTestTags.HOME_CHECKOUT,
             "${PayFlowTestTags.HOME_PAY}:tile",
         )
         for (tag in tiles) {
@@ -121,16 +121,49 @@ class ShellNavigationTest {
             compose.waitUntilWithMainLooper(5_000) { !barVisible() }
             assertBackGoesHome()
         }
+        // The demo store sits at the end of the page, clear of the bar only once scrolled there.
+        val scroller = hasScrollAction() and hasTestTag(PayFlowTestTags.HOME_PAYEES).not()
+        repeat(3) { compose.onAllNodes(scroller)[0].performTouchInput { swipeUp() } }
+        compose.waitForIdle()
+        compose.onNodeWithTag(PayFlowTestTags.HOME_CHECKOUT).performClick()
+        awaitGone(PayFlowTestTags.HOME_SCAN)
+        compose.waitUntilWithMainLooper(5_000) { !barVisible() }
+        assertBackGoesHome()
     }
 
+    /** The graphite header runs under the status bar, so its icons must be light on Home whatever the theme, and only on Home. */
     @Test
-    fun theHistoryAndSecurityTilesSwitchTabs() {
-        tile(PayFlowTestTags.HOME_HISTORY_TILE)
+    fun theStatusBarIconsAreLightOnTheGraphiteHeaderAndFollowTheThemeElsewhere() {
+        fun lightIcons() = compose.runOnUiThread<Boolean> {
+            androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView).isAppearanceLightStatusBars
+        }
+        compose.waitForIdle()
+        assertThat(lightIcons()).isFalse()
+        tile(PayFlowTestTags.HOME_RECEIVE)
         awaitGone(PayFlowTestTags.HOME_SCAN)
+        compose.waitForIdle()
+        assertThat(lightIcons()).isTrue()
+        assertBackGoesHome()
+        compose.waitForIdle()
+        assertThat(lightIcons()).isFalse()
+    }
+
+    /** History and Security have no tile of their own any more: "View all" and the bar still reach them, as tab switches. */
+    @Test
+    fun viewAllAndTheBarSwitchTabs() {
+        runOffMain { payments.create(testPayment(id = "p1", status = PaymentStatus.SUCCESS)) }
+        await(PayFlowTestTags.paymentRow("p1"))
+        // After scrolling, not just performScrollTo: that can leave it under the floating bar, where a real tap would hit the bar.
+        val scroller = hasScrollAction() and hasTestTag(PayFlowTestTags.HOME_PAYEES).not()
+        repeat(3) { compose.onAllNodes(scroller)[0].performTouchInput { swipeUp() } }
+        compose.waitForIdle()
+        compose.onNodeWithText("View all").performClick()
+        await(PayFlowTestTags.PAYMENT_LIST)
+        compose.waitForIdle()
         compose.onNodeWithTag(PayFlowTestTags.HOME_HISTORY).assertIsSelected()
         back()
         await(PayFlowTestTags.HOME_SCAN)
-        tile(PayFlowTestTags.HOME_SECURITY)
+        compose.onNodeWithTag(PayFlowTestTags.NAV_ME).performClick()
         await(PayFlowTestTags.SECURITY_SETUP_PIN)
         compose.onNodeWithTag(PayFlowTestTags.NAV_ME).assertIsSelected()
     }

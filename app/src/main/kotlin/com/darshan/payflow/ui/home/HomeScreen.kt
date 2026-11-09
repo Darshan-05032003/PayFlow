@@ -1,90 +1,132 @@
 package com.darshan.payflow.ui.home
 
-import androidx.compose.foundation.background
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.QrCode2
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
-import com.darshan.payflow.domain.model.PaymentMode
-import com.darshan.payflow.domain.model.RecentPayee
-import com.darshan.payflow.ui.components.InitialAvatar
-import com.darshan.payflow.ui.components.LocalPaymentMode
-import com.darshan.payflow.ui.components.SandboxBadgeIfActive
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.outlined.CurrencyRupee
 import androidx.compose.material.icons.outlined.EventRepeat
-import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.QrCodeScanner
-import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.RequestQuote
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.VerifiedUser
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.darshan.payflow.R
 import com.darshan.payflow.core.Money
-import com.darshan.payflow.domain.model.HistorySummary
+import com.darshan.payflow.domain.model.Payment
+import com.darshan.payflow.domain.model.PaymentDirection
+import com.darshan.payflow.domain.model.PaymentMode
+import com.darshan.payflow.domain.model.PaymentStatus
+import com.darshan.payflow.domain.model.RecentPayee
 import com.darshan.payflow.ui.PayFlowTestTags
-import com.darshan.payflow.ui.components.BannerTone
-import com.darshan.payflow.ui.components.EmptyView
-import com.darshan.payflow.ui.components.ErrorView
-import com.darshan.payflow.ui.components.InfoBanner
-import com.darshan.payflow.ui.components.LoadingView
-import com.darshan.payflow.ui.components.PaymentRow
-import com.darshan.payflow.ui.components.SectionHeader
+import com.darshan.payflow.ui.components.LocalPaymentMode
+import com.darshan.payflow.ui.components.label
+import com.darshan.payflow.ui.components.relativeLabel
+import com.darshan.payflow.ui.designsystem.components.AmountDecimals
+import com.darshan.payflow.ui.designsystem.components.AmountSign
+import com.darshan.payflow.ui.designsystem.components.AmountText
+import com.darshan.payflow.ui.designsystem.components.ClickDebouncer
+import com.darshan.payflow.ui.designsystem.components.DisplayText
+import com.darshan.payflow.ui.designsystem.components.EmptyState
+import com.darshan.payflow.ui.designsystem.components.ErrorState
+import com.darshan.payflow.ui.designsystem.components.GhostButton
+import com.darshan.payflow.ui.designsystem.components.HairlineDivider
+import com.darshan.payflow.ui.designsystem.components.IllustrationKind
+import com.darshan.payflow.ui.designsystem.components.OdometerLogic
+import com.darshan.payflow.ui.designsystem.components.PayFlowAvatar
+import com.darshan.payflow.ui.designsystem.components.PayFlowListRow
+import com.darshan.payflow.ui.designsystem.components.PayFlowToastHost
+import com.darshan.payflow.ui.designsystem.components.SectionHeader
+import com.darshan.payflow.ui.designsystem.components.SkeletonList
+import com.darshan.payflow.ui.designsystem.components.StatusKind
+import com.darshan.payflow.ui.designsystem.components.StatusPill
+import com.darshan.payflow.ui.designsystem.components.ToastHostState
+import com.darshan.payflow.ui.designsystem.components.rememberToastHostState
+import com.darshan.payflow.ui.designsystem.effects.CollectUiEffects
+import com.darshan.payflow.ui.designsystem.effects.LocalHaptics
+import com.darshan.payflow.ui.designsystem.effects.ToastTone
+import com.darshan.payflow.ui.designsystem.modifiers.StaggeredEntrance
+import com.darshan.payflow.ui.designsystem.modifiers.metallicSheen
+import com.darshan.payflow.ui.designsystem.modifiers.pressScale
+import com.darshan.payflow.ui.designsystem.modifiers.rememberPressFeedback
+import com.darshan.payflow.ui.designsystem.modifiers.trackPress
+import com.darshan.payflow.ui.designsystem.tokens.Hairline
+import com.darshan.payflow.ui.designsystem.tokens.Radii
+import com.darshan.payflow.ui.designsystem.tokens.Sizes
+import com.darshan.payflow.ui.designsystem.tokens.Spacing
 import com.darshan.payflow.ui.navigation.LocalBottomBarInset
+import com.darshan.payflow.ui.navigation.SCAN_CONTAINER_KEY
 import com.darshan.payflow.ui.navigation.ScrollToTopOnReselect
 import com.darshan.payflow.ui.navigation.ShellRoute
+import com.darshan.payflow.ui.navigation.containerTransform
+import com.darshan.payflow.ui.navigation.paymentContainerKey
 import com.darshan.payflow.ui.theme.PayFlowTheme
-import com.darshan.payflow.ui.theme.ScreenPadding
 
 data class HomeCallbacks(
     val onPaymentClick: (String) -> Unit = {},
@@ -93,244 +135,556 @@ data class HomeCallbacks(
     val onScan: () -> Unit = {},
     val onCollect: () -> Unit = {},
     val onMandates: () -> Unit = {},
-    val onSecurity: () -> Unit = {},
     val onCheckout: () -> Unit = {},
     val onReceive: () -> Unit = {},
     val onPayee: (RecentPayee) -> Unit = {},
     val onSetupPin: () -> Unit = {},
     val onRetry: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
+    val onToggleAmounts: () -> Unit = {},
 )
 
 @Composable
 fun HomeRoute(callbacks: HomeCallbacks, pinConfigured: Boolean = true, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    HomeScreen(state = state, callbacks = callbacks.copy(onRetry = viewModel::retry), pinConfigured = pinConfigured)
+    val hidden by viewModel.amountsHidden.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val toasts = rememberToastHostState()
+    val resources = LocalResources.current
+    CollectUiEffects(
+        viewModel.effects,
+        onOther = { effect ->
+            if (effect is HomeEffect) {
+                val failed = effect is HomeEffect.RefreshFailed
+                toasts.show(refreshMessage(effect, resources), if (failed) ToastTone.Failed else ToastTone.Info)
+            }
+        },
+    )
+    LightStatusBarIconsOnHero()
+    HomeScreen(
+        state = state,
+        callbacks = callbacks.copy(onRetry = viewModel::retry, onRefresh = viewModel::refresh, onToggleAmounts = viewModel::toggleAmountsHidden),
+        pinConfigured = pinConfigured,
+        amountsHidden = hidden,
+        refreshing = refreshing,
+        memory = viewModel.entranceMemory,
+        toasts = toasts,
+    )
+}
+
+internal fun refreshMessage(effect: HomeEffect, resources: android.content.res.Resources): String = when (effect) {
+    HomeEffect.RefreshFailed -> resources.getString(R.string.home_refresh_failed)
+    is HomeEffect.Refreshed -> when {
+        effect.settled > 0 -> resources.getQuantityString(R.plurals.home_refresh_settled, effect.settled, effect.settled)
+        effect.checked > 0 -> resources.getQuantityString(R.plurals.home_refresh_waiting, effect.checked, effect.checked)
+        else -> resources.getString(R.string.home_refresh_nothing)
+    }
+}
+
+/** The header is graphite in both themes and runs under the status bar, so the icons must be light here whatever the theme. */
+@Composable
+private fun LightStatusBarIconsOnHero() {
+    val window = LocalActivity.current?.window ?: return
+    val darkTheme = PayFlowTheme.colors.isDark
+    DisposableEffect(window, darkTheme) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = false
+        onDispose { controller.isAppearanceLightStatusBars = !darkTheme }
+    }
 }
 
 /**
- * Dashboard: brand bar, app-lock prompt, "this month" summary card, labelled quick actions, the last five payments
- * and the Pay FAB. Loading / error replace the list area only, so the actions stay reachable.
+ * Home: a graphite header that docks into the top bar, Scan & Pay across its edge as the one primary action, four quick actions,
+ * people to pay again, and the latest payments. The states replace the feed only, so every action stays reachable.
+ *
+ * A scrolling column on purpose: its children are bounded (5 payments, 8 payees), so a scroll frame moves layers and composes
+ * nothing, and every node stays in the tree for TalkBack.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(state: HomeUiState, callbacks: HomeCallbacks, pinConfigured: Boolean = true) {
+fun HomeScreen(
+    state: HomeUiState,
+    callbacks: HomeCallbacks,
+    pinConfigured: Boolean = true,
+    amountsHidden: Boolean = false,
+    refreshing: Boolean = false,
+    memory: HomeEntranceMemory = remember { HomeEntranceMemory() },
+    toasts: ToastHostState = rememberToastHostState(),
+    scroll: ScrollState = rememberScrollState(),
+) {
+    val colors = PayFlowTheme.colors
+    val haptics = LocalHaptics.current
+    val density = LocalDensity.current
     val barInset = LocalBottomBarInset.current
-    val scroll = rememberScrollState()
+    val sandbox = LocalPaymentMode.current == PaymentMode.SANDBOX
     ScrollToTopOnReselect(ShellRoute.Home, scroll)
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { BrandTitle() },
-                actions = { SandboxBadgeIfActive(Modifier.padding(end = 12.dp)) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = callbacks.onPay,
-                icon = { Icon(Icons.Default.Send, contentDescription = null) },
-                text = { Text(stringResource(R.string.home_pay)) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(bottom = barInset).testTag(PayFlowTestTags.HOME_PAY),
-            )
-        },
-    ) { padding ->
-        // A plain scrolling column: at most ~12 children, and every node stays in the tree for accessibility and tests.
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .padding(start = ScreenPadding, end = ScreenPadding, top = 4.dp, bottom = 96.dp + barInset),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (!pinConfigured) {
-                InfoBanner(
-                    text = stringResource(R.string.home_lock_banner),
-                    icon = Icons.Outlined.Shield,
-                    tone = BannerTone.Warning,
-                    modifier = Modifier.testTag(PayFlowTestTags.HOME_LOCK_BANNER),
-                    action = { TextButton(onClick = callbacks.onSetupPin) { Text(stringResource(R.string.home_lock_setup)) } },
-                )
-            }
-            SummaryCard(
-                month = (state as? HomeUiState.Content)?.month ?: HistorySummary.EMPTY,
-                allTime = (state as? HomeUiState.Content)?.summary ?: HistorySummary.EMPTY,
-            )
-            SectionHeader(stringResource(R.string.home_quick_actions))
-            QuickActions(callbacks)
-            val payees = (state as? HomeUiState.Content)?.recentPayees.orEmpty()
-            if (payees.isNotEmpty()) {
-                SectionHeader(stringResource(R.string.home_recent_payees))
-                RecentPayeesRow(payees, callbacks.onPayee)
-            }
-            SectionHeader(
-                stringResource(R.string.home_recent),
-                actionLabel = if (state is HomeUiState.Content) stringResource(R.string.home_view_all) else null,
-                onAction = callbacks.onViewAll,
-            )
-            RecentSection(state, callbacks)
-            val sandbox = LocalPaymentMode.current == PaymentMode.SANDBOX
-            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(top = 4.dp)) {
-                Icon(if (sandbox) Icons.Outlined.Science else Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                Text(
-                    stringResource(if (sandbox) R.string.home_sandbox_footer else R.string.home_real_footer),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
+
+    val header = remember(scroll) { HomeHeaderState(scroll) }
+    val play = remember { !memory.sectionsPlayed }
+    SideEffect { memory.sectionsPlayed = true }
+
+    val pull = rememberPullToRefreshState()
+    val thresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
+    val fraction = { pull.distanceFraction }
+    val isRefreshing by rememberUpdatedState(refreshing)
+    LaunchedEffect(pull) {
+        var previous = 0f
+        snapshotFlow { pull.distanceFraction }.collect { current ->
+            if (!isRefreshing && PullLogic.crossedThreshold(previous, current)) haptics.tick()
+            previous = current
         }
     }
-}
 
-@Composable
-private fun BrandTitle() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Surface(color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary, shape = CircleShape, modifier = Modifier.size(34.dp)) {
-            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.CurrencyRupee, contentDescription = null, modifier = Modifier.size(20.dp)) }
-        }
-        Column(Modifier.padding(start = 10.dp)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-            Text(stringResource(R.string.home_tagline), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    val refreshLabel = stringResource(R.string.home_refresh_action)
+    val onRefresh by rememberUpdatedState(callbacks.onRefresh)
+    val hero = when (state) {
+        HomeUiState.Loading -> HeroContent.Loading
+        is HomeUiState.Error -> HeroContent.Unavailable
+        HomeUiState.Empty -> HeroContent.Known(com.darshan.payflow.domain.model.HistorySummary.EMPTY)
+        is HomeUiState.Content -> HeroContent.Known(state.month)
     }
-}
 
-@Composable
-private fun SummaryCard(month: HistorySummary, allTime: HistorySummary) {
-    val hero = PayFlowTheme.status.hero
-    val summaryLine = stringResource(R.string.home_summary_line, month.success, month.pending, month.failed)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent, contentColor = hero.content),
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pullToRefresh(isRefreshing = refreshing, state = pull, onRefresh = callbacks.onRefresh)
+            .semantics { customActions = listOf(CustomAccessibilityAction(refreshLabel) { onRefresh(); true }) }
+            .drawBehind {
+                drawRect(colors.bg)
+                // The well the page is pulled away from: the header's own graphite, so the header reads as stretching.
+                val stretch = PullLogic.stretchPx(fraction(), thresholdPx)
+                if (stretch > 0f) drawRect(colors.heroStart, size = Size(size.width, stretch + Spacing.xl.toPx()))
+            },
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.linearGradient(listOf(hero.start, hero.end)))
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.VerifiedUser, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text(stringResource(R.string.home_sent_this_month), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 8.dp))
+        PullCoin(
+            fraction = fraction,
+            thresholdPx = thresholdPx,
+            topInsetPx = WindowInsets.statusBars.getTop(density).toFloat(),
+            refreshing = refreshing,
+            refreshingLabel = stringResource(R.string.home_refreshing),
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+        Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+            // The pull moves this inner layer, not the scroller: moving the scroller would shift the pointer it measures from.
+            Column(Modifier.fillMaxWidth().graphicsLayer { translationY = PullLogic.stretchPx(fraction(), thresholdPx) }) {
+                HomeHero(
+                    header = header,
+                    content = hero,
+                    caption = stringResource(if (sandbox) R.string.home_hero_caption_sandbox else R.string.home_hero_caption_upi),
+                    amountsHidden = amountsHidden,
+                    memory = memory,
+                    onToggleAmounts = callbacks.onToggleAmounts,
+                    modifier = Modifier.zIndex(1f),
+                )
+                ScanAndPay(header, play, callbacks.onScan)
+                QuickActions(callbacks, sandbox, play)
+                if (!pinConfigured) StaggeredEntrance(5, play = play) { LockBanner(callbacks.onSetupPin) }
+                val payees = (state as? HomeUiState.Content)?.recentPayees.orEmpty()
+                if (payees.isNotEmpty()) StaggeredEntrance(6, play = play) { RecentPayeesRow(payees, callbacks.onPayee) }
+                Feed(state, callbacks, amountsHidden, memory, play)
+                DemoStoreRow(callbacks.onCheckout, play)
+                Footer(sandbox)
+                // Keeps the end of the page clear of the floating bar and the system navigation.
+                Spacer(Modifier.navigationBarsPadding().height(barInset + Spacing.xl))
             }
-            Text(Money.formatInr(month.sentPaise), style = MaterialTheme.typography.displaySmall)
-            Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(summaryLine)
+        }
+        PayFlowToastHost(toasts, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = barInset))
+    }
+}
+
+/** Lets the content above it overlap by [overlap], taking that much off this element's height in the layout. */
+private fun Modifier.overlapAbove(overlap: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val up = overlap.roundToPx()
+    layout(placeable.width, (placeable.height - up).coerceAtLeast(0)) { placeable.place(0, -up) }
+}
+
+private val RingMargin = Spacing.xs
+
+/**
+ * The one primary action, sitting across the header's edge in a notch of the page colour with a breathing ring. It fades into
+ * the bar as the header docks, and then drops below the bar, which stops touches from reaching it.
+ */
+@Composable
+private fun ScanAndPay(header: HomeHeaderState, play: Boolean, onScan: () -> Unit) {
+    val colors = PayFlowTheme.colors
+    val haptics = LocalHaptics.current
+    val press = rememberPressFeedback()
+    val debouncer = remember { ClickDebouncer() }
+    val interaction = remember { MutableInteractionSource() }
+    val label = stringResource(R.string.home_scan_pay)
+    val docked = header.docked
+    val breath = breathing(active = !docked)
+    StaggeredEntrance(
+        index = 0,
+        play = play,
+        modifier = Modifier
+            .fillMaxWidth()
+            .overlapAbove(Sizes.heroAction / 2 + RingMargin)
+            .zIndex(if (docked) 0f else 2f)
+            .graphicsLayer {
+                alpha = HomeHeaderLogic.scanActionAlpha(header.progress)
+                val scale = HomeHeaderLogic.scanActionScale(header.progress)
+                scaleX = scale
+                scaleY = scale
+            },
+    ) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier
+                    .testTag(PayFlowTestTags.HOME_SCAN)
+                    .clip(Radii.mediumShape)
+                    .trackPress(press)
+                    .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+                        if (debouncer.tryAcquire()) {
+                            haptics.light()
+                            onScan()
+                        }
+                    }
+                    .semantics(mergeDescendants = true) { contentDescription = label },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(Modifier.size(Sizes.heroAction + RingMargin * 2), contentAlignment = Alignment.Center) {
+                    // The notch, cut into the header in the page colour.
+                    Spacer(Modifier.matchParentSize().drawBehind { drawCircle(colors.bg) })
+                    Spacer(
+                        Modifier
+                            .matchParentSize()
+                            .graphicsLayer {
+                                val b = breath?.value ?: 0.5f
+                                val scale = RING_SCALE_MIN + (1f - RING_SCALE_MIN) * b
+                                scaleX = scale
+                                scaleY = scale
+                                alpha = if (breath == null) RING_ALPHA_REST else RING_ALPHA_MIN + (1f - RING_ALPHA_MIN) * b
+                            }
+                            .drawWithCache {
+                                val stroke = Stroke(Hairline.width.toPx() * 1.5f)
+                                onDrawBehind { drawCircle(colors.accent, radius = size.minDimension / 2f - stroke.width, style = stroke) }
+                            },
+                    )
+                    Box(
+                        Modifier
+                            .size(Sizes.heroAction)
+                            .containerTransform(SCAN_CONTAINER_KEY)
+                            .pressScale(press)
+                            .clip(Radii.pillShape)
+                            .drawWithCache {
+                                val fill = Brush.verticalGradient(listOf(colors.primaryTop, colors.primaryBottom))
+                                onDrawBehind {
+                                    drawRect(fill)
+                                    drawRect(colors.primaryPressed, alpha = press.progress)
+                                }
+                            }
+                            .metallicSheen(colors.sheen, intensity = colors.sheenStrength, position = { SCAN_SHEEN_REST + SCAN_SHEEN_TRAVEL * press.progress }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Outlined.QrCodeScanner, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(Sizes.iconLarge))
+                    }
+                }
+                Text(
+                    label,
+                    style = PayFlowTheme.type.button,
+                    color = colors.text,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = Spacing.md).padding(bottom = Spacing.xs),
+                )
             }
-            Text(
-                stringResource(R.string.home_all_time, Money.formatInr(allTime.sentPaise), allTime.total),
-                style = MaterialTheme.typography.bodySmall,
-                color = hero.content.copy(alpha = 0.85f),
-                modifier = Modifier.padding(top = 6.dp),
-            )
         }
     }
 }
 
-@Composable
-private fun Pill(text: String) {
-    Surface(color = Color.White.copy(alpha = 0.16f), contentColor = PayFlowTheme.status.hero.content, shape = CircleShape) {
-        Text(text, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-    }
-}
+private const val RING_SCALE_MIN = 0.94f
+private const val RING_ALPHA_MIN = 0.35f
+private const val RING_ALPHA_REST = 0.7f
+private const val SCAN_SHEEN_REST = 0.2f
+private const val SCAN_SHEEN_TRAVEL = 0.5f
 
-private data class QuickAction(val label: Int, val icon: ImageVector, val tag: String, val onClick: () -> Unit)
+private data class QuickAction(val label: Int, val icon: ImageVector, val tag: String, val sandboxOnly: Boolean, val onClick: () -> Unit)
 
-/** Two rows of four, like the action grid of the big UPI apps. */
+/** Scan, History and Security aren't here: the first is the hero above, the others are in the bar below. */
 @Composable
-private fun QuickActions(callbacks: HomeCallbacks) {
+private fun QuickActions(callbacks: HomeCallbacks, sandboxMode: Boolean, play: Boolean) {
     val actions = listOf(
-        QuickAction(R.string.home_action_pay, Icons.Default.Send, "${PayFlowTestTags.HOME_PAY}:tile", callbacks.onPay),
-        QuickAction(R.string.home_action_receive, Icons.Outlined.QrCode2, PayFlowTestTags.HOME_RECEIVE, callbacks.onReceive),
-        QuickAction(R.string.home_action_scan, Icons.Outlined.QrCodeScanner, PayFlowTestTags.HOME_SCAN, callbacks.onScan),
-        QuickAction(R.string.home_action_requests, Icons.Outlined.RequestQuote, PayFlowTestTags.HOME_COLLECT, callbacks.onCollect),
-        QuickAction(R.string.home_action_autopay, Icons.Outlined.EventRepeat, PayFlowTestTags.HOME_MANDATES, callbacks.onMandates),
-        QuickAction(R.string.home_action_checkout, Icons.Outlined.ShoppingBag, PayFlowTestTags.HOME_CHECKOUT, callbacks.onCheckout),
-        QuickAction(R.string.home_action_history, Icons.Outlined.History, PayFlowTestTags.HOME_HISTORY_TILE, callbacks.onViewAll),
-        QuickAction(R.string.home_action_security, Icons.Outlined.Shield, PayFlowTestTags.HOME_SECURITY, callbacks.onSecurity),
+        QuickAction(R.string.home_action_pay, Icons.Default.Send, "${PayFlowTestTags.HOME_PAY}:tile", false, callbacks.onPay),
+        QuickAction(R.string.home_action_receive, Icons.Outlined.QrCode2, PayFlowTestTags.HOME_RECEIVE, false, callbacks.onReceive),
+        QuickAction(R.string.home_action_requests, Icons.Outlined.RequestQuote, PayFlowTestTags.HOME_COLLECT, true, callbacks.onCollect),
+        QuickAction(R.string.home_action_autopay, Icons.Outlined.EventRepeat, PayFlowTestTags.HOME_MANDATES, true, callbacks.onMandates),
     )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        actions.chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { ActionTile(it) } }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Spacing.xs).padding(top = Spacing.md),
+        verticalAlignment = Alignment.Top,
+    ) {
+        actions.forEachIndexed { index, action ->
+            StaggeredEntrance(index + 1, Modifier.weight(1f), play = play) {
+                // In sandbox mode the whole app says so already. In UPI apps mode these two are the ones that still aren't real.
+                QuickActionTile(action, labelSandbox = action.sandboxOnly && !sandboxMode)
+            }
         }
     }
 }
 
-/** Horizontally scrolling avatars of people paid before; a tap opens Pay with the payee prefilled. */
+@Composable
+private fun QuickActionTile(action: QuickAction, labelSandbox: Boolean) {
+    val colors = PayFlowTheme.colors
+    val type = PayFlowTheme.type
+    val haptics = LocalHaptics.current
+    val magnet = rememberMagneticPress()
+    val debouncer = remember { ClickDebouncer() }
+    val interaction = remember { MutableInteractionSource() }
+    val label = stringResource(action.label)
+    val description = if (labelSandbox) stringResource(R.string.home_action_sandbox_description, label) else label
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .testTag(action.tag)
+            .magneticPress(magnet)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+                if (debouncer.tryAcquire()) {
+                    haptics.light()
+                    action.onClick()
+                }
+            }
+            .padding(vertical = Spacing.xs)
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(Sizes.quickAction)
+                .clip(Radii.mediumShape)
+                .drawBehind { drawRect(colors.surface) }
+                .border(Hairline.width, colors.hairline, Radii.mediumShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(action.icon, contentDescription = null, tint = colors.accent, modifier = Modifier.size(Sizes.icon))
+        }
+        Text(
+            label,
+            style = type.label,
+            color = colors.text,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = Spacing.xs),
+        )
+        if (labelSandbox) {
+            Text(stringResource(R.string.home_sandbox_tag), style = type.label, color = colors.textSecondary, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun LockBanner(onSetupPin: () -> Unit) {
+    val colors = PayFlowTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screen, vertical = Spacing.xs)
+            .testTag(PayFlowTestTags.HOME_LOCK_BANNER)
+            .clip(Radii.mediumShape)
+            .drawBehind { drawRect(colors.pending.container) }
+            .padding(start = Spacing.md, end = Spacing.xxs, top = Spacing.xxs, bottom = Spacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(Icons.Outlined.Shield, contentDescription = null, tint = colors.pending.content, modifier = Modifier.size(Sizes.icon))
+        Text(stringResource(R.string.home_lock_banner), style = PayFlowTheme.type.label, color = colors.pending.content, modifier = Modifier.weight(1f))
+        GhostButton(stringResource(R.string.home_lock_setup), onSetupPin, outlined = false, debounceMs = 0L)
+    }
+}
+
+/** People paid before. A tap opens Pay with the payee filled in, straight away: the ripple plays over the transition, not before it. */
 @Composable
 private fun RecentPayeesRow(payees: List<RecentPayee>, onPayee: (RecentPayee) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(horizontal = 2.dp),
-        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.HOME_PAYEES),
-    ) {
-        items(payees, key = { it.vpa }) { payee ->
-            val description = stringResource(R.string.home_payee_description, payee.name, payee.vpa)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .width(68.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .clickable { onPayee(payee) }
-                    .padding(vertical = 4.dp)
-                    .testTag(PayFlowTestTags.homePayee(payee.vpa))
-                    .semantics(mergeDescendants = true) { contentDescription = description },
-            ) {
-                InitialAvatar(payee.name, size = 52.dp)
-                Text(
-                    payee.name.substringBefore(' '),
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
+    Column(Modifier.fillMaxWidth().padding(top = Spacing.xs)) {
+        SectionHeader(stringResource(R.string.home_recent_payees), Modifier.padding(horizontal = Spacing.screen))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = Spacing.sm),
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.HOME_PAYEES),
+        ) {
+            items(payees, key = { it.vpa }, contentType = { "payee" }) { payee -> PayeeItem(payee, onPayee) }
         }
     }
 }
 
 @Composable
-private fun RowScope.ActionTile(action: QuickAction) {
-    val label = stringResource(action.label)
-    Card(
-        onClick = action.onClick,
-        modifier = Modifier.weight(1f).testTag(action.tag).semantics(mergeDescendants = true) { contentDescription = label },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer, shape = CircleShape, modifier = Modifier.size(44.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(action.icon, contentDescription = null, modifier = Modifier.size(22.dp)) }
+private fun PayeeItem(payee: RecentPayee, onPayee: (RecentPayee) -> Unit) {
+    val colors = PayFlowTheme.colors
+    val haptics = LocalHaptics.current
+    val press = rememberPressFeedback()
+    val ripple = rememberAvatarRipple()
+    val interaction = remember { MutableInteractionSource() }
+    val name = remember(payee.name) { DisplayText.safe(payee.name) }
+    val shortName = remember(name, payee.vpa) { name.substringBefore(' ').ifBlank { payee.vpa } }
+    val description = stringResource(R.string.home_payee_description, name, payee.vpa)
+    Column(
+        Modifier
+            .width(Sizes.avatarMedium + Spacing.xl)
+            .testTag(PayFlowTestTags.homePayee(payee.vpa))
+            .trackPress(press)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+                haptics.light()
+                ripple.play()
+                onPayee(payee)
             }
-            Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .padding(vertical = Spacing.xs)
+                .pressScale(press, pressedScale = 0.94f)
+                .drawWithCache {
+                    val stroke = Stroke(Hairline.width.toPx() * 2f)
+                    val reach = Spacing.xs.toPx()
+                    onDrawBehind {
+                        val p = ripple.value
+                        if (p > 0f) drawCircle(colors.accent, radius = size.minDimension / 2f + reach * p, alpha = 1f - p, style = stroke)
+                    }
+                },
+        ) {
+            PayFlowAvatar(name, size = Sizes.avatarMedium)
         }
+        Text(
+            shortName,
+            style = PayFlowTheme.type.label,
+            color = colors.text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = Spacing.xxs),
+        )
     }
 }
 
+private const val FEED_FIRST_INDEX = 7
+
 @Composable
-private fun RecentSection(state: HomeUiState, callbacks: HomeCallbacks) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
-        when (state) {
-            HomeUiState.Loading -> LoadingView(Modifier.height(180.dp))
-            HomeUiState.Empty -> EmptyView(
-                title = stringResource(R.string.home_empty_title),
-                subtitle = stringResource(R.string.home_empty_subtitle),
-                icon = Icons.Outlined.ReceiptLong,
-                fillHeight = false,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            is HomeUiState.Error -> ErrorView(stringResource(R.string.error_generic), callbacks.onRetry, Modifier.height(240.dp))
-            is HomeUiState.Content -> Column {
-                state.recent.forEachIndexed { index, payment ->
-                    PaymentRow(payment, onClick = callbacks.onPaymentClick)
-                    if (index < state.recent.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
+private fun Feed(state: HomeUiState, callbacks: HomeCallbacks, amountsHidden: Boolean, memory: HomeEntranceMemory, play: Boolean) {
+    val overline = (state as? HomeUiState.Content)?.summary?.let {
+        val amount = if (amountsHidden) maskedAmount() else OdometerLogic.text(it.sentPaise, AmountDecimals.WhenNonZero, AmountSign.None)
+        pluralStringResource(R.plurals.home_all_time, it.total, amount, it.total)
+    }
+    StaggeredEntrance(FEED_FIRST_INDEX, play = play) {
+        SectionHeader(
+            stringResource(R.string.home_recent),
+            Modifier.padding(start = Spacing.screen, end = Spacing.xs, top = Spacing.md),
+            overline = overline,
+            actionLabel = if (state is HomeUiState.Content) stringResource(R.string.home_view_all) else null,
+            onAction = callbacks.onViewAll,
+        )
+    }
+    when (state) {
+        HomeUiState.Loading -> SkeletonList(Modifier.fillMaxWidth().testTag(PayFlowTestTags.LOADING), count = HomeViewModel.RECENT_LIMIT)
+        HomeUiState.Empty -> EmptyState(
+            title = stringResource(R.string.home_empty_title),
+            message = stringResource(R.string.home_empty_subtitle),
+            illustration = IllustrationKind.EmptyLedger,
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.EMPTY),
+        )
+        is HomeUiState.Error -> ErrorState(
+            title = stringResource(R.string.error_generic),
+            retryLabel = stringResource(R.string.retry),
+            onRetry = callbacks.onRetry,
+            modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.ERROR),
+        )
+        is HomeUiState.Content -> Column(Modifier.fillMaxWidth()) {
+            state.recent.forEachIndexed { index, payment ->
+                key(payment.id) {
+                    val playRow = remember { memory.firstSight(payment.id) }
+                    StaggeredEntrance(FEED_FIRST_INDEX + 1 + index, play = playRow) {
+                        Column {
+                            FeedRow(payment, amountsHidden, callbacks.onPaymentClick)
+                            if (index < state.recent.lastIndex) HairlineDivider(Modifier.padding(start = Spacing.screen + Sizes.avatar + Spacing.sm, end = Spacing.screen))
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FeedRow(payment: Payment, amountsHidden: Boolean, onClick: (String) -> Unit) {
+    val colors = PayFlowTheme.colors
+    val outgoing = payment.direction == PaymentDirection.OUTGOING
+    val name = remember(payment.payeeName) { DisplayText.safe(payment.payeeName) }
+    val statusLabel = payment.status.label()
+    val direction = stringResource(if (outgoing) R.string.payment_to else R.string.payment_from)
+    val spokenAmount = if (amountsHidden) stringResource(R.string.ds_amount_hidden) else Money.formatInr(payment.amountPaise)
+    val description = stringResource(R.string.payment_row_description, direction, name, spokenAmount, statusLabel)
+    val amountColor = when {
+        payment.status == PaymentStatus.FAILED -> colors.textSecondary
+        !outgoing -> colors.success.strong
+        else -> colors.text
+    }
+    PayFlowListRow(
+        title = name,
+        subtitle = "${payment.createdAt.relativeLabel()} · ${payment.payeeVpa}",
+        leading = { PayFlowAvatar(name) },
+        trailing = {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                AmountText(
+                    paise = if (outgoing) -payment.amountPaise else payment.amountPaise,
+                    color = amountColor,
+                    decimals = AmountDecimals.WhenNonZero,
+                    sign = AmountSign.Always,
+                    hidden = amountsHidden,
+                )
+                val pill: StatusKind? = payment.status.feedPill()
+                if (pill != null) StatusPill(pill, statusLabel, animate = false)
+            }
+        },
+        onClick = { onClick(payment.id) },
+        modifier = Modifier
+            .containerTransform(paymentContainerKey(payment.id))
+            .testTag(PayFlowTestTags.paymentRow(payment.id))
+            .semantics(mergeDescendants = true) { contentDescription = description },
+    )
+}
+
+/** The store runs on the sandbox in both modes, so it says "Demo" whichever mode the app is in. */
+@Composable
+private fun DemoStoreRow(onCheckout: () -> Unit, play: Boolean) {
+    val colors = PayFlowTheme.colors
+    val title = stringResource(R.string.home_demo_store_title)
+    val subtitle = stringResource(R.string.home_demo_store_subtitle)
+    val tag = stringResource(R.string.home_demo_tag)
+    StaggeredEntrance(FEED_FIRST_INDEX + 1, play = play) {
+        Column(Modifier.padding(top = Spacing.xs)) {
+            HairlineDivider()
+            PayFlowListRow(
+                title = title,
+                subtitle = subtitle,
+                leading = {
+                    Box(Modifier.size(Sizes.avatar), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.ShoppingBag, contentDescription = null, tint = colors.accent, modifier = Modifier.size(Sizes.icon))
+                    }
+                },
+                trailing = { StatusPill(StatusKind.Neutral, tag, animate = false) },
+                onClick = onCheckout,
+                modifier = Modifier
+                    .testTag(PayFlowTestTags.HOME_CHECKOUT)
+                    .semantics(mergeDescendants = true) { contentDescription = "$title, $tag" },
+            )
+            HairlineDivider()
+        }
+    }
+}
+
+@Composable
+private fun Footer(sandbox: Boolean) {
+    val colors = PayFlowTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .testTag(PayFlowTestTags.HOME_FOOTER)
+            .padding(horizontal = Spacing.screen)
+            .padding(top = Spacing.md),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Icon(if (sandbox) Icons.Outlined.Science else Icons.Outlined.Info, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(Sizes.iconSmall))
+        Text(stringResource(if (sandbox) R.string.home_sandbox_footer else R.string.home_real_footer), style = PayFlowTheme.type.label, color = colors.textSecondary)
     }
 }

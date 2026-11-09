@@ -45,6 +45,9 @@ class ShellTransitions(private val motion: PayFlowMotion) {
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalNavAnimatedScope = compositionLocalOf<AnimatedContentScope?> { null }
 
+/** The shared-element key of the scanner: Home's Scan & Pay action grows into it. */
+const val SCAN_CONTAINER_KEY = "scan"
+
 /** The shared-element key for one payment: its row and its detail screen carry the same one. */
 fun paymentContainerKey(paymentId: String): String = "payment:$paymentId"
 

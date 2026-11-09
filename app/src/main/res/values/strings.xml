@@ -26,26 +26,49 @@
     </plurals>
 
     <!-- Home -->
-    <string name="home_tagline">UPI payments</string>
     <string name="home_empty_title">No payments yet</string>
     <string name="home_empty_subtitle">Pay someone or scan a QR code to see it here.</string>
     <string name="home_recent">Recent payments</string>
     <string name="home_view_all">View all</string>
     <string name="home_sent_this_month">Sent this month</string>
-    <string name="home_all_time">All time: %1$s across %2$d payments</string>
-    <string name="home_summary_line">%1$d successful · %2$d pending · %3$d failed</string>
-    <string name="home_quick_actions">Quick actions</string>
+    <plurals name="home_all_time">
+        <item quantity="one">All time %1$s · %2$d payment</item>
+        <item quantity="other">All time %1$s · %2$d payments</item>
+    </plurals>
     <string name="home_action_pay">Pay</string>
-    <string name="home_action_scan">Scan QR</string>
     <string name="home_action_requests">Requests</string>
     <string name="home_action_autopay">AutoPay</string>
-    <string name="home_action_checkout">Checkout</string>
-    <string name="home_action_security">Security</string>
     <string name="home_sandbox_footer">Sandbox mode: payments are settled by an in-app fake provider, no real money moves. Switch modes under Security.</string>
     <string name="home_real_footer">UPI apps mode: payments go through the UPI apps installed on this phone. Results are reported by that app; PayFlow has no bank connection to verify them.</string>
     <string name="home_action_receive">Receive</string>
-    <string name="home_action_history">History</string>
     <string name="home_recent_payees">Pay again</string>
+    <string name="home_scan_pay">Scan &amp; Pay</string>
+    <string name="home_hide_amounts">Hide amounts</string>
+    <string name="home_show_amounts">Show amounts</string>
+    <string name="home_hero_caption_sandbox">Sandbox payments. No real money moved.</string>
+    <string name="home_hero_caption_upi">Recorded on this phone. Not a bank balance.</string>
+    <string name="home_hero_none">No payments this month</string>
+    <string name="home_hero_unavailable">Not available</string>
+    <string name="home_count_paid">%1$d paid</string>
+    <string name="home_count_pending">%1$d pending</string>
+    <string name="home_count_failed">%1$d failed</string>
+    <string name="home_sandbox_tag">Sandbox</string>
+    <string name="home_action_sandbox_description">%1$s, sandbox</string>
+    <string name="home_demo_store_title">Demo store</string>
+    <string name="home_demo_store_subtitle">Try checkout in the sandbox</string>
+    <string name="home_demo_tag">Demo</string>
+    <string name="home_refresh_action">Refresh</string>
+    <string name="home_refreshing">Refreshing</string>
+    <string name="home_refresh_nothing">Nothing new to check</string>
+    <plurals name="home_refresh_settled">
+        <item quantity="one">%1$d payment updated</item>
+        <item quantity="other">%1$d payments updated</item>
+    </plurals>
+    <plurals name="home_refresh_waiting">
+        <item quantity="one">Still waiting on %1$d payment</item>
+        <item quantity="other">Still waiting on %1$d payments</item>
+    </plurals>
+    <string name="home_refresh_failed">Couldn\'t refresh. Your list is unchanged.</string>
     <string name="home_payee_description">Pay %1$s again (%2$s)</string>
     <string name="sandbox_badge">Sandbox</string>
     <string name="sandbox_badge_description">Sandbox mode is on: no real money moves</string>
@@ -108,7 +131,6 @@
     <string name="detail_failure_reason">Reason</string>
 
     <!-- Pay (UPI intent) -->
-    <string name="home_pay">Pay</string>
     <string name="pay_title">Pay with UPI</string>
     <string name="pay_vpa">Payee UPI ID</string>
     <string name="pay_payee_name">Payee name</string>

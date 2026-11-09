@@ -29,6 +29,7 @@ object Radii {
     val mediumShape = RoundedCornerShape(medium)
     val largeShape = RoundedCornerShape(large)
     val topLargeShape = RoundedCornerShape(topStart = large, topEnd = large)
+    val bottomLargeShape = RoundedCornerShape(bottomStart = large, bottomEnd = large)
     val pillShape = RoundedCornerShape(percent = 50)
 }
 
@@ -49,6 +50,7 @@ object Sizes {
     val iconLarge = 32.dp
     val avatarSmall = 32.dp
     val avatar = 40.dp
+    val avatarMedium = 56.dp
     val avatarLarge = 64.dp
     val navBarHeight = 64.dp
     val sheetHandleWidth = 40.dp
@@ -63,6 +65,12 @@ object Sizes {
     val switchWidth = 52.dp
     val switchHeight = 32.dp
     val pinKey = 72.dp
+
+    /** The one big round action on a screen, such as Scan & Pay. */
+    val heroAction = 88.dp
+
+    /** The icon well of a quick action. */
+    val quickAction = 56.dp
     val pinDot = 14.dp
 
     /** Moves a Newsreader numeral down to the optical centre of a round key. */
