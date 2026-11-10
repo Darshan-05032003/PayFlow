@@ -281,8 +281,8 @@ are in [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 
 ## Security
 
-- **Screen and input protection**: `FLAG_SECURE` on payment screens and the lock screen; `filterTouchesWhenObscured` on the
-  window to block tapjacking overlays.
+- **Screen and input protection**: `FLAG_SECURE` on every screen (set by the navigation host and re-asserted by the lock,
+  pay, scan, collect and mandate screens); `filterTouchesWhenObscured` on the window to block tapjacking overlays.
 - **App lock**: BiometricPrompt, or a 6-digit PIN hashed with PBKDF2-HmacSHA256 (150,000 iterations, random salt);
   5 wrong attempts lock the app for 30 seconds, doubling up to an hour. The app relocks after 60 seconds in the background.
 - **Encryption at rest**: the PIN record, device binding and Receive profile are AES-GCM encrypted with an Android Keystore
