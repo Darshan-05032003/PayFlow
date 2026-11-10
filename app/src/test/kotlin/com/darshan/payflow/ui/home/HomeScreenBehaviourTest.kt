@@ -381,11 +381,14 @@ class HomeScreenBehaviourTest {
         holder.value = content(sent = 50_000)
         rule.mainClock.advanceTimeByFrame()
         // Every frame from the one the total arrives in: the real total, never ₹0 counting up.
+        val first = rule.onNodeWithTag(PayFlowTestTags.HOME_HERO_AMOUNT).captureToImage().asAndroidBitmap()
         repeat(60) {
             val shown = rule.onNodeWithTag(PayFlowTestTags.HOME_HERO_AMOUNT).fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
             assertThat(shown).containsExactly("₹500")
             rule.mainClock.advanceTimeByFrame()
         }
+        // And drawn in place: no digit rolled.
+        assertThat(rule.onNodeWithTag(PayFlowTestTags.HOME_HERO_AMOUNT).captureToImage().asAndroidBitmap().sameAs(first)).isTrue()
     }
 
     @Test

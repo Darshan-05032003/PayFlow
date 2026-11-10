@@ -83,6 +83,19 @@ class OdometerUiTest {
     }
 
     @Test
+    fun the_first_value_is_drawn_in_place_and_does_not_roll_up_from_zero() {
+        // Found on the emulator: the digits were laid out after the "first composition is over" mark, so every digit of a
+        // freshly shown amount rolled up from 0 ("Payment successful ₹400.00" on the way to ₹500.00).
+        rule.mainClock.autoAdvance = false
+        rule.setDs { Box(Modifier.testTag(TAG)) { AmountOdometer(5_00_00L, decimals = AmountDecimals.Always) } }
+        rule.mainClock.advanceTimeByFrame()
+        val first = rule.onNodeWithTag(TAG).captureToImage().asAndroidBitmap()
+        rule.mainClock.advanceTimeBy(SETTLE_MS)
+        val settled = rule.onNodeWithTag(TAG).captureToImage().asAndroidBitmap()
+        assertThat(first.sameAs(settled)).isTrue()
+    }
+
+    @Test
     fun reduced_motion_lands_on_the_new_value_on_the_next_frame() {
         var amount by mutableLongStateOf(1_000_00L)
         rule.mainClock.autoAdvance = false

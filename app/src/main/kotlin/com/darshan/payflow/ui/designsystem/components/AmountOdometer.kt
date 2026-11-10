@@ -100,10 +100,7 @@ fun AmountOdometer(
     val previous = remember { longArrayOf(paise) }
     val settled = remember { booleanArrayOf(false) }
     val direction = OdometerLogic.direction(previous[0], paise)
-    SideEffect {
-        previous[0] = paise
-        settled[0] = true
-    }
+    SideEffect { previous[0] = paise }
 
     BoxWithConstraints(
         modifier.clearAndSetSemantics {
@@ -151,6 +148,9 @@ fun AmountOdometer(
                 }
             }
         }
+        // The digit cells live in this subcomposition, which runs during layout, after the outer composition's effects. Marking
+        // the odometer settled here, once its first cells exist, is what keeps a freshly shown amount from rolling up from 0.
+        SideEffect { settled[0] = true }
     }
 }
 

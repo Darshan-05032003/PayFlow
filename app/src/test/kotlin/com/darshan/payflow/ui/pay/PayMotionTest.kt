@@ -74,6 +74,7 @@ class PayMotionTest {
             rule.onAllNodesWithText("₹0.00").assertCountEquals(0)
             assertThat(rule.onAllNodesWithText("₹1,250.00").fetchSemanticsNodes()).isNotEmpty()
         }
+        // How the digits are drawn on first appearance (in place, no roll) is OdometerUiTest's first-value test.
     }
 
     @Test
