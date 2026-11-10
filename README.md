@@ -319,10 +319,11 @@ numbers only compare before and after on the same setup. Method and raw tables: 
 | History scroll, jank | 97.3 % | pending |
 | Release APK | 25,265,073 bytes | 25,819,547 bytes (+2.2 %) |
 
-The "after" column is still pending. Macrobenchmark with Perfetto tracing pushed the emulator past the memory cap that
-protects the rest of this laptop, so the after numbers will come from a lighter method (`scripts/light_bench.sh`:
-`am start -W` cold starts and `dumpsys gfxinfo` frame statistics, run on `9c48cc2` and on the redesign in one session).
-Those numbers will sit in their own table, because they are not comparable to the Macrobenchmark column above. The Home
+The "after" column is still pending. On this laptop the emulator runs inside a memory cap that protects the rest of the
+desktop, and both Macrobenchmark (with Perfetto tracing) and a lighter `am start -W` / `dumpsys gfxinfo` script
+(`scripts/light_bench.sh`) pushed it past that cap during repeated cold starts, before the baseline build could be measured
+on the same setup. Numbers will be added only as a same-session before/after pair, in their own table, because they are not
+comparable to the Macrobenchmark column above. The Home
 scroll now measures a different, richer page, so its comparison is labelled as such. Measured on the JVM so far: a
 600-step Home scroll in 6 recompositions, 300 History flings over 10,000 rows with no recomposition, and the release
 Compose compiler metrics in LOAD_TEST_REPORT ("Compose stability").
