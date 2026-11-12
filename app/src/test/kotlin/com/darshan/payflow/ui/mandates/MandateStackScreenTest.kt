@@ -164,4 +164,32 @@ class MandateStackScreenTest {
         rule.onNodeWithTag(PayFlowTestTags.MANDATE_REVOKE_CONFIRM).performClick()
         assertThat(revoked).isEqualTo(1)
     }
+
+    /**
+     * Device finding (emulator, 2026-11-10): swiping back from the second card flew it off to the right first, which uncovered
+     * the third card for about half a second before the first card came back. The previous card must be the front card from
+     * the first frame of the move, and the card after it must never be.
+     */
+    @Test
+    fun goingBackShowsThePreviousCardAtOnceAndNeverTheNextOne() {
+        rule.mainClock.autoAdvance = false
+        show(listOf(mandate("m1", "Lumora"), mandate("m2", "Gym Pass"), mandate("m3", "Streamline")))
+        rule.mainClock.advanceTimeBy(1_000)
+        fun action(label: String) = rule.onNodeWithTag(PayFlowTestTags.MANDATE_STACK).fetchSemanticsNode().config
+            .getOrNull(SemanticsActions.CustomActions).orEmpty().single { it.label == label }
+        rule.runOnIdle { action("Next mandate").action() }
+        rule.mainClock.advanceTimeBy(2_000)
+        rule.onNodeWithContentDescription("Pause AutoPay for Gym Pass").assertExists()
+
+        rule.runOnIdle { action("Previous mandate").action() }
+        rule.mainClock.advanceTimeByFrame() // the move starts on the next frame
+        for (frame in 1..30) {
+            rule.mainClock.advanceTimeByFrame()
+            rule.onNodeWithContentDescription("Pause AutoPay for Lumora").assertExists()
+            rule.onNodeWithContentDescription("Pause AutoPay for Streamline").assertDoesNotExist()
+        }
+        rule.mainClock.advanceTimeBy(2_000)
+        rule.onNodeWithContentDescription("Mandate 1 of 3").assertExists()
+        rule.mainClock.autoAdvance = true
+    }
 }

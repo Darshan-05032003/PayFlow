@@ -346,20 +346,31 @@ private fun MandateStack(
         if (holder.index != front) onFront(holder.index)
     }
 
-    /** [before] is the card that was in front when the gesture or action began. */
+    /** [before] is the card that was in front when the gesture or action began. Rules in [StackSettle]. */
     fun moveTo(target: Int, velocity: Float, before: Int) {
         scope.launch {
-            if (target != before) {
-                val out = if (target > before) -widthPx * FLY_OUT else widthPx * FLY_OUT
-                animate(offset, out, velocity, motion.spec(MotionToken.Snap)) { v, _ -> holder.snapOffset(v); offset = v }
-                holder.goTo(target)
-                onFront(target)
-                rise.snapTo(0f)
-                offset = 0f
-                haptics.tick()
-                rise.animateTo(1f, motion.spec(MotionToken.Bounce))
-            } else {
-                animate(offset, 0f, velocity, motion.spec(MotionToken.Release)) { v, _ -> holder.snapOffset(v); offset = v }
+            when (val settle = StackSettle.of(before, target, widthPx, FLY_OUT)) {
+                is StackSettle.FlyOut -> {
+                    animate(offset, settle.toOffset, velocity, motion.spec(MotionToken.Snap)) { v, _ -> holder.snapOffset(v); offset = v }
+                    holder.goTo(target)
+                    onFront(target)
+                    rise.snapTo(0f)
+                    offset = 0f
+                    haptics.tick()
+                    rise.animateTo(1f, motion.spec(MotionToken.Bounce))
+                }
+                is StackSettle.ReturnFrom -> {
+                    // The previous card is in front from the first frame and slides back in; the old front card sinks behind.
+                    holder.goTo(target)
+                    onFront(target)
+                    rise.snapTo(1f)
+                    holder.snapOffset(settle.fromOffset)
+                    offset = settle.fromOffset
+                    haptics.tick()
+                    animate(offset, 0f, velocity, motion.spec(MotionToken.Snap)) { v, _ -> holder.snapOffset(v); offset = v }
+                }
+                StackSettle.SpringBack ->
+                    animate(offset, 0f, velocity, motion.spec(MotionToken.Release)) { v, _ -> holder.snapOffset(v); offset = v }
             }
         }
     }

@@ -156,3 +156,25 @@ class CardStackHolder(count: Int, private var widthPx: Float) {
         private const val EDGE_RESISTANCE = 0.25f
     }
 }
+
+/**
+ * How the stack settles after a release or a TalkBack action. Forward, the front card flies out on the side it was pushed to
+ * and the next card rises from behind. Backward, the previous card is in front at once and slides back from the side it left
+ * by, while the old front card sinks behind it. (Flying the front card off first uncovered the *next* card for half a second
+ * on the emulator, which read as moving forward.) Offsets are in the stack's reading direction; negative is "towards next".
+ */
+sealed interface StackSettle {
+    data class FlyOut(val toOffset: Float) : StackSettle
+
+    data class ReturnFrom(val fromOffset: Float) : StackSettle
+
+    data object SpringBack : StackSettle
+
+    companion object {
+        fun of(before: Int, target: Int, widthPx: Float, flyOut: Float): StackSettle = when {
+            target > before -> FlyOut(-widthPx * flyOut)
+            target < before -> ReturnFrom(-widthPx * flyOut)
+            else -> SpringBack
+        }
+    }
+}

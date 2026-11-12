@@ -137,4 +137,13 @@ class MandateLogicTest {
         assertThat(StackGeometry.scale(0f)).isEqualTo(1f)
         assertThat(StackGeometry.translationY(0f, 500f, peek)).isEqualTo(0f)
     }
+
+    /** Device finding: going back flew the front card off first, which showed the *next* card for half a second. */
+    @Test
+    fun goingBackBringsThePreviousCardBackFromTheSideItLeftBy() {
+        val width = 300f
+        assertThat(StackSettle.of(before = 0, target = 1, widthPx = width, flyOut = 1.2f)).isEqualTo(StackSettle.FlyOut(-360f))
+        assertThat(StackSettle.of(before = 1, target = 0, widthPx = width, flyOut = 1.2f)).isEqualTo(StackSettle.ReturnFrom(-360f))
+        assertThat(StackSettle.of(before = 2, target = 2, widthPx = width, flyOut = 1.2f)).isEqualTo(StackSettle.SpringBack)
+    }
 }
