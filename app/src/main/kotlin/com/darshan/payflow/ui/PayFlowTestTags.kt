@@ -104,6 +104,7 @@ object PayFlowTestTags {
     const val HOME_PAYEES = "payflow:home:payees"
     const val HOME_HERO = "payflow:home:hero"
     const val HOME_HERO_AMOUNT = "payflow:home:heroAmount"
+    const val HOME_HERO_UNAVAILABLE = "payflow:home:heroUnavailable"
     const val HOME_HIDE_AMOUNTS = "payflow:home:hideAmounts"
     const val HOME_PULL_COIN = "payflow:home:pullCoin"
     const val HOME_FOOTER = "payflow:home:footer"

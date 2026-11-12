@@ -51,7 +51,8 @@
     <string name="home_hero_caption_sandbox">Sandbox payments. No real money moved.</string>
     <string name="home_hero_caption_upi">Recorded on this phone. Not a bank balance.</string>
     <string name="home_hero_none">No payments this month</string>
-    <string name="home_hero_unavailable">Not available</string>
+    <string name="home_hero_unavailable">This month\'s total isn\'t available</string>
+    <string name="home_hero_unavailable_detail">Couldn\'t load this month\'s total.</string>
     <string name="home_count_paid">%1$d paid</string>
     <string name="home_count_pending">%1$d pending</string>
     <string name="home_count_failed">%1$d failed</string>

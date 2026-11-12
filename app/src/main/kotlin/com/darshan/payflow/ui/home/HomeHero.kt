@@ -47,7 +47,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import com.darshan.payflow.ui.designsystem.tokens.Geist
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -246,9 +252,16 @@ private fun HeroAmount(header: HomeHeaderState, content: HeroContent, sentPaise:
                 SkeletonBlock(Modifier.matchParentSize(), Radii.smallShape, base = colors.onHero.copy(alpha = HERO_SKELETON_BASE), highlight = colors.onHero.copy(alpha = HERO_SKELETON_HIGHLIGHT))
             }
         }
+        // A dash where the digits go keeps the shape of a money figure without claiming one; the line below says why.
         HeroContent.Unavailable -> Box(place, contentAlignment = Alignment.CenterStart) {
             AmountOdometer(0, style = type.hero, color = Color.Transparent, modifier = Modifier.clearAndSetSemantics {})
-            Text(stringResource(R.string.home_hero_unavailable), style = type.display, color = colors.onHero)
+            val spoken = stringResource(R.string.home_hero_unavailable)
+            Text(
+                UnknownAmount,
+                style = type.hero,
+                color = colors.onHero,
+                modifier = Modifier.testTag(PayFlowTestTags.HOME_HERO_UNAVAILABLE).clearAndSetSemantics { contentDescription = spoken },
+            )
         }
         is HeroContent.Known -> VeiledAmount(
             paise = sentPaise,
@@ -281,8 +294,7 @@ private fun HeroDetails(header: HomeHeaderState, content: HeroContent, caption: 
                     SkeletonBlock(Modifier.matchParentSize().padding(vertical = Spacing.xxs), Radii.pillShape, base = colors.onHero.copy(alpha = HERO_SKELETON_BASE), highlight = colors.onHero.copy(alpha = HERO_SKELETON_HIGHLIGHT))
                 }
             }
-            // Keeps the line's height: the header stays the same size in every state.
-            HeroContent.Unavailable -> Text("", style = type.body)
+            HeroContent.Unavailable -> Text(stringResource(R.string.home_hero_unavailable_detail), style = type.body, color = colors.onHero)
             is HeroContent.Known -> {
                 val parts = content.month.heroCounts().map { count ->
                     when (count) {
@@ -363,3 +375,9 @@ private fun blurSteps(stepPx: Float, enabled: Boolean, sdkInt: Int = Build.VERSI
     List(BLUR_STEPS) { step ->
         if (step == 0 || !enabled || sdkInt < Build.VERSION_CODES.S) null else BlurEffect(step * stepPx, step * stepPx, TileMode.Decal)
     }
+
+/** ₹ and a dash where the digits go. The dash comes from Geist, like an amount's sign: Newsreader's sits below the figures. */
+private val UnknownAmount = buildAnnotatedString {
+    append('₹')
+    withStyle(SpanStyle(fontFamily = Geist, fontWeight = FontWeight.Normal)) { append('—') }
+}
