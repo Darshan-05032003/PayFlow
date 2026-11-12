@@ -23,9 +23,10 @@ fun EmptyState(
     illustration: IllustrationKind = IllustrationKind.EmptyLedger,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    actionModifier: Modifier = Modifier,
 ) {
     StateColumn(modifier, illustration, title, message, liveRegion = false) {
-        if (actionLabel != null && onAction != null) GhostButton(actionLabel, onAction)
+        if (actionLabel != null && onAction != null) GhostButton(actionLabel, onAction, actionModifier)
     }
 }
 

@@ -87,6 +87,8 @@
     <string name="history_empty_hint">Payments you make will show up here.</string>
     <string name="history_empty_search">No payments match “%1$s”</string>
     <string name="history_empty_search_hint">Try a different payee name or UPI ID.</string>
+    <string name="history_empty_filtered_hint">Your other payments are under All.</string>
+    <string name="history_show_all">Show all payments</string>
     <string name="history_count">%1$d payments</string>
     <string name="history_clear_search">Clear search</string>
     <string name="history_refresh">Refresh</string>

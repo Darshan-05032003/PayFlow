@@ -231,20 +231,39 @@ fun HistoryScreen(
     toasts: ToastHostState = rememberToastHostState(),
 ) {
     val colors = PayFlowTheme.colors
-    val selectedFilter = when (state) {
-        is HistoryUiState.Content -> state.filter
-        is HistoryUiState.Empty -> state.filter
+    // A refresh the user asked for keeps the list in view under the spinner until the new answer arrives.
+    var refreshingInPlace by remember { mutableStateOf(false) }
+    val lastAnswer = remember { arrayOfNulls<HistoryUiState>(1) }
+    val shown = HistoryReload.shown(state, lastAnswer[0], refreshingInPlace)
+    if (state !is HistoryUiState.Loading) lastAnswer[0] = state
+    LaunchedEffect(state is HistoryUiState.Loading) { if (state !is HistoryUiState.Loading) refreshingInPlace = false }
+    val screenCallbacks = remember(callbacks) {
+        callbacks.copy(
+            onRefresh = {
+                refreshingInPlace = true
+                callbacks.onRefresh()
+            },
+        )
+    }
+    val selectedFilter = when (shown) {
+        is HistoryUiState.Content -> shown.filter
+        is HistoryUiState.Empty -> shown.filter
         else -> HistoryFilter.ALL
     }
-    val currentQuery = when (state) {
-        is HistoryUiState.Content -> state.query
-        is HistoryUiState.Empty -> state.query
+    val currentQuery = when (shown) {
+        is HistoryUiState.Content -> shown.query
+        is HistoryUiState.Empty -> shown.query
         else -> ""
     }
     var text by rememberSaveable(currentQuery) { mutableStateOf(currentQuery) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     ScrollToTopOnReselect(ShellRoute.History, listState)
+    val clearSearch = {
+        searchOpen = false
+        text = ""
+        callbacks.onQuery("")
+    }
 
     Box(Modifier.fillMaxSize().background(colors.bg)) {
         Column(Modifier.fillMaxSize()) {
@@ -260,10 +279,10 @@ fun HistoryScreen(
                     }
                 },
                 amountsHidden = amountsHidden,
-                callbacks = callbacks,
+                callbacks = screenCallbacks,
             )
             FilterChips(selectedFilter, callbacks.onFilter)
-            HistoryBody(state, callbacks, amountsHidden, zone, listState)
+            HistoryBody(shown, screenCallbacks, amountsHidden, zone, listState, HistoryReload.spinner(state, refreshingInPlace), clearSearch)
         }
         PayFlowToastHost(toasts, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = LocalBottomBarInset.current))
     }
@@ -389,14 +408,21 @@ private fun FilterChips(selected: HistoryFilter, onFilter: (HistoryFilter) -> Un
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-private fun HistoryBody(state: HistoryUiState, callbacks: HistoryCallbacks, amountsHidden: Boolean, zone: ZoneId, listState: androidx.compose.foundation.lazy.LazyListState) {
+private fun HistoryBody(
+    state: HistoryUiState,
+    callbacks: HistoryCallbacks,
+    amountsHidden: Boolean,
+    zone: ZoneId,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    refreshing: Boolean,
+    onClearSearch: () -> Unit,
+) {
     val colors = PayFlowTheme.colors
     val haptics = LocalHaptics.current
     val density = LocalDensity.current
     val barInset = LocalBottomBarInset.current
     val pull = rememberPullToRefreshState()
     val thresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
-    val refreshing = state is HistoryUiState.Loading
     var openRow by remember { mutableStateOf<String?>(null) }
     // Only the row under the finger, or the last one opened (for the way back), is an end of the container transform. A shared
     // element registers with the shell as it composes, which recomposed the visible rows on every fling when every row had one.
@@ -431,15 +457,27 @@ private fun HistoryBody(state: HistoryUiState, callbacks: HistoryCallbacks, amou
                 onRetry = callbacks.onRetry,
                 modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.ERROR),
             )
-            is HistoryUiState.Empty -> if (state.query.isNotBlank()) {
-                EmptyState(
+            // A search or a filter that finds nothing leads back to everything; an empty history has nowhere to go back to.
+            is HistoryUiState.Empty -> when {
+                state.query.isNotBlank() -> EmptyState(
                     title = stringResource(R.string.history_empty_search, state.query),
                     message = stringResource(R.string.history_empty_search_hint),
                     illustration = IllustrationKind.NoResults,
+                    actionLabel = stringResource(R.string.history_clear_search),
+                    onAction = onClearSearch,
+                    actionModifier = Modifier.testTag(PayFlowTestTags.HISTORY_EMPTY_ACTION),
                     modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.EMPTY),
                 )
-            } else {
-                EmptyState(
+                state.filter != HistoryFilter.ALL -> EmptyState(
+                    title = state.filter.emptyTitle(),
+                    message = stringResource(R.string.history_empty_filtered_hint),
+                    illustration = IllustrationKind.EmptyLedger,
+                    actionLabel = stringResource(R.string.history_show_all),
+                    onAction = { callbacks.onFilter(HistoryFilter.ALL) },
+                    actionModifier = Modifier.testTag(PayFlowTestTags.HISTORY_EMPTY_ACTION),
+                    modifier = Modifier.fillMaxSize().testTag(PayFlowTestTags.EMPTY),
+                )
+                else -> EmptyState(
                     title = state.filter.emptyTitle(),
                     message = stringResource(R.string.history_empty_hint),
                     illustration = IllustrationKind.EmptyLedger,

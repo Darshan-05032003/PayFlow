@@ -134,3 +134,14 @@ class RowSwipeHolder(private val trayPx: Float) {
 object SearchMorph {
     fun expanded(userOpened: Boolean, query: String): Boolean = userOpened || query.isNotEmpty()
 }
+
+/**
+ * What History shows while it reloads. A refresh the user asked for in place (pull, or the refresh button) keeps the last
+ * answer on screen under the spinner; the first load and a retry from an error show the skeleton alone, with no spinner on top.
+ */
+object HistoryReload {
+    fun shown(state: HistoryUiState, previous: HistoryUiState?, inPlace: Boolean): HistoryUiState =
+        if (state is HistoryUiState.Loading && inPlace && (previous is HistoryUiState.Content || previous is HistoryUiState.Empty)) previous else state
+
+    fun spinner(state: HistoryUiState, inPlace: Boolean): Boolean = state is HistoryUiState.Loading && inPlace
+}
