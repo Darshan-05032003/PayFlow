@@ -524,3 +524,47 @@ To keep these benchmarks working as the UI changes:
   order through processing → waiting → success, landing in History. LeakCanary: one object retained for a moment, then
   "All retained objects have been garbage collected": 0 retained. Recordings: `docs/media/history-sheet.webp` (83 KB),
   `autopay-fling.webp` (127 KB), `checkout-sheet.webp` (120 KB).
+
+## UI Feature: Enhancement pass (startup path, History flings)
+- Scenario and scale:
+  - Startup path on the JVM: what the splash waits for, counted with a counting crypto box and store (`StartupLockPathTest`, `AppLockViewModelTest`): Keystore-equivalent decrypts and store reads before the lock leaves Checking, for a locked cold start and for one with no PIN; plus the real Hilt graph and activity (`StartupGateTest`).
+  - History flings on the JVM: 10,000 rows, 10 warm-up flings then 60 measured, wall time, bytes allocated on the main thread (`ThreadMXBean`) and recomposition cycles, with History on its own, inside the shell's shared-element layout with every row a transform end (as before), and inside it with no row taking part (`HistoryFlingCostStressTest`).
+  - The odometer's fit at 1.0×, 1.3× and 2.0× in five slot widths with the largest amount (₹99,99,99,999.99), on the real fonts.
+- Results (numbers, before vs after):
+
+  | Startup path (JVM) | Before | After |
+  |---|---:|---:|
+  | Decrypts before a locked app shows its lock | 4 | 1 (0 if the prefetch already ran) |
+  | Store reads before a locked app shows its lock | 4 | 2 |
+  | Decrypts / store reads with no PIN | 0 / 2 | 0 / 1 |
+  | Lock ViewModel created | at the first composition | in `onCreate`, final state at once when prefetched |
+  | Compositions of the app before the first frame | Checking placeholder, then the app | the app (when the answer is in) |
+  | A relock while open | waits for IO for the lock's details | lands with no IO (details in memory) |
+
+  | History, 60 flings over 10,000 rows (JVM) | Recomposition cycles | Allocated per fling |
+  |---|---:|---:|
+  | On its own, before | 0 | 4.9 MB |
+  | In the shell, every row a transform end (before) | 1,373 | 6.1 MB |
+  | In the shell, after (only the row under the finger) | 59 | 5.6 MB |
+  | In the shell's layout, no row taking part | 2 | 5.6 MB |
+
+  Wall time per fling moved between 27 and 68 ms with the order the variants ran in (JIT warm-up), so it isn't used as a result; cycles and allocations are stable run to run. The full `stressTest` run (70 tests) passed; `history-scroll-10k` now sees 3 cycles over 300 swipes (the finger-down hand-over) where it saw 0.
+  - Odometer: at 1.3× in the catalog's 168dp slot the old fit needed 384 px of 336; at 2.0× in 300dp, 628 px of 600. After: every case fits or reaches the 0.4 floor scale.
+- What broke:
+  - The splash waited on a chain that started late: the lock's ViewModel was first touched by the first composition, read the store twice and decrypted the PIN record four times, then hopped back to the main thread behind that composition and recomposed the whole app.
+  - Every History row registered a shared element with the shell as it scrolled in, which recomposed rows on most frames of a fling.
+- Failure flow (step by step):
+  1. Cold start: `Application.onCreate` → `MainActivity.onCreate` → `setContent` → `onStart`, `onResume` → first traversal → first composition creates `AppLockViewModel`.
+  2. Its coroutine reads the secure store for presence (decrypt), again (decrypt), and for a locked app the attempts (decrypt) and lockout (decrypt).
+  3. Meanwhile the splash's pre-draw check returns false every frame; the main thread composes the Checking placeholder.
+  4. The answer hops back to the main thread, the whole app composes a second time, and only then is the first frame drawn: `am start -W` counts all of it.
+- Fix applied / recommendation:
+  - `StartupPrefetch` in `PayFlowApp.onCreate`; presence without decryption; attempts and lockout cached and kept in step by every write; ViewModel created in `onCreate` and final at once when the answer is in. Home and the lock now `ReportDrawn`, and `light_bench.sh` records time to full display beside TotalTime.
+  - History rows: the transform end moves to the row under the finger.
+  - Recommendation: generate the Baseline Profile and measure both builds on a phone; profile the first composition of Home, which is now the main remaining cost before the first frame.
+- Device re-measure (emulator, one boot, 2026-11-12): not a result. `light_bench.sh` with `COLD_RUNS=4 ROUNDS=0` on the new
+  benchmark build finished 3 cold starts (TotalTime 1,706 / 1,752 / 1,586 ms; time to full display 2,638 / 2,155 / 2,482 ms)
+  before the emulator's scope was OOM-killed at its 5.9 GB cap about a minute after boot, during the fourth. Those runs came
+  from a guest at its memory limit, with no same-boot run of the earlier build, so they are not compared with the 1,409 ms
+  median from 2026-11-10. The cap was not changed. Startup and History frames still need a phone run (both builds,
+  `light_bench.sh` now records time to full display too).

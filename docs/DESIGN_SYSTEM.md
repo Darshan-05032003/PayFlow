@@ -72,15 +72,15 @@ All in `ui/designsystem/components/` unless noted.
 | `PayFlowIconButton` | `Buttons.kt` | 48dp target, `tonal`, required `contentDescription` |
 | `BrandLoader` | `BrandLoader.kt` | Replaces every stock spinner. Holds still under reduced motion |
 | `PayFlowTextField` | `Inputs.kt` | Empty, filled, focused glow, error with shake and reject haptic, disabled, read-only, helper, leading and trailing slots |
-| `AmountOdometer`, `AmountText` | `AmountOdometer.kt` | Rolling or static amount, Indian grouping up to ₹99,99,99,999.99, Geist sign, auto-shrink, `hidden` on both. Rules in `OdometerLogic.kt` |
+| `AmountOdometer`, `AmountText` | `AmountOdometer.kt` | Rolling or static amount, Indian grouping up to ₹99,99,99,999.99, Geist sign, auto-shrink (measured at each step, so every digit fits at any text size), `hidden` on both. Rules in `OdometerLogic.kt` |
 | `PayFlowAvatar` | `Avatar.kt` | Tone from name, `ring`, `badge` (verified, count, dot) |
 | `StatusPill`, `DrawnCheckmark`, `DrawnCross` | `StatusPill.kt` | Success draws a check, failed a cross with a small shake, refund's arrow turns backwards, pending breathes. Set `animate = false` in lists |
 | `PayFlowBottomSheet` | `BottomSheet.kt` | Spring entrance, drag with fling, works from inside scrollable content, `dismissible = false` locks it. Drawn in the screen's own window so `FLAG_SECURE` still covers it |
 | `SkeletonBlock`, `SkeletonLine`, `SkeletonCircle`, `SkeletonRow`, `SkeletonList`, `SkeletonGroup` | `Skeleton.kt` | One shared shimmer per group. `SkeletonBlock` takes `base` and `highlight` for surfaces the default tones don't suit, such as the graphite hero |
 | `PayFlowToastHost`, `PayFlowToast`, `rememberToastHostState` | `Toast.kt` | Info, success, pending, failed. Bounded queue, repeats collapse, tap to dismiss |
-| `EmptyState`, `ErrorState`, `Illustration` | `StateViews.kt`, `Illustrations.kt` | Eight code-drawn drawings: `EmptyLedger`, `NoResults`, `Offline`, `ErrorReceipt`, `NoMandates`, `NoRequests`, `CameraOff`, `Locked` |
+| `EmptyState`, `ErrorState`, `Illustration` | `StateViews.kt`, `Illustrations.kt` | Eight code-drawn drawings: `EmptyLedger`, `NoResults`, `Offline`, `ErrorReceipt`, `NoMandates`, `NoRequests`, `CameraOff`, `Locked`. An empty state that is only empty because of a filter or search offers the way back as its action |
 | `PayFlowBottomNav`, `rememberBottomNavState`, `NavGlyphs` | `BottomNav.kt` | Floating dock, sliding pill, morphing icons. Rules in `BottomNavLogic` |
-| `SectionHeader`, `PayFlowTopBar`, `PayFlowListRow`, `PayFlowSurface`, `HairlineDivider` | `Surfaces.kt` | Structure and depth. `SurfaceLevel`: flat, card, raised, hero |
+| `SectionHeader`, `PayFlowTopBar`, `PayFlowListRow`, `PayFlowSurface`, `HairlineDivider` | `Surfaces.kt` | Structure and depth. `SurfaceLevel`: flat, card, raised, hero. `PayFlowListRow(subtitleMaxLines)`: 1 for record lists, more for settings rows whose subtitle explains something |
 | `PayFlowChoiceChip`, `PayFlowSwitch` | `Selection.kt` | Filter and quick-amount chips, settings toggles |
 | `PayFlowSearchField` | `SearchField.kt` | Pill search for a header: glyph, text, close button with the owner's meaning, focus glow, no label |
 

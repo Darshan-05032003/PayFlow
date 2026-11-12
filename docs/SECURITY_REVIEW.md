@@ -552,3 +552,27 @@ Severity scale: Critical / High / Medium / Low.
   - Pills, buttons and the Security verdict bar on a hero now use the dark palette. The verdict bar's light-theme tones (for example `#855B00` for "needs you") sat near 2:1 against graphite, under the 3:1 a status graphic needs; the dark tones clear it. Pills carry their own container, so their text contrast was never at risk.
 - Scope for improvement:
   - LeakCanary's own leak notifications need a device run (row 7b). Its heap dumps stay on the debug device and never reach a release build.
+
+## UI Feature: Enhancement pass (startup path, History transforms, states and large text)
+- Attacks tried:
+  - The faster cold start, attacked as a lock bypass: can the first frame, or any frame, show the app while a PIN is set? Cases: a fresh process with a PIN; the prefetch finished, not finished, or failed; a second activity in a process that was unlocked earlier, coming back after the grace period; the lock landing while the app is open.
+  - "Is a PIN set?" answered from the record's presence, not its contents: a record that can't be decrypted (a damaged file, a lost Keystore key), and a store that throws.
+  - The prefetch running in every process start, including every plain Robolectric test: does it decrypt anything, log anything, or leave the lock in a state the ViewModel would trust?
+  - The lock's attempts and lockout now kept in memory: can the in-memory copy drift from the store (a wrong-PIN count that resets, a lockout that ends early)?
+  - History's row → sheet transform now given to one row at a time: can a quick tap, a TalkBack activation or a swipe open the wrong payment or skip anything?
+  - Empty-state actions: can "Show all payments" or "Clear search" do anything but change what the list shows?
+  - The fully-drawn report from the lock screen: does it say anything about the lock's state to another app?
+- What broke:
+  - Low (found while changing it): an unreadable PIN record used to read as "no PIN", so the app opened with no lock at all. Anyone able to damage that file could also delete it, so this was never a bypass an attacker didn't already have.
+  - Nothing else. The ordering that keeps the app hidden is unchanged: `AppLock` reads "unlocked" until its first read, so nothing may listen to it before then, and the ViewModel only starts listening early when that read has already happened in this process.
+- Fixed now:
+  - An unreadable record now shows the lock. Since nothing can verify against it, the first attempt drops it and the app says no PIN is set (`a pin record that can't be decrypted still locks the app`).
+  - Tests for every case above: `a lock answered before the screen asks shows the lock from the first state, never the app`; `a pin answered early but details unknown holds on checking, never the app`; `an early unlocked answer still gives way to a relock before anything suspends` (no IO has run when the lock lands); `when the lock's details are not known yet, the app still goes before they load`; `a failing store leaves the lock unanswered, never open`; and `StartupGateTest` on the real Hilt graph and activity (Locked, Checking or Unlocked by the time `onCreate` returns, never the app with a PIN set).
+  - The prefetch never decrypts to learn presence; with a PIN it decrypts once for the attempts and lockout, as the lock screen did anyway (`the prefetch answers the lock before any screen asks, with one decrypt`). It holds only those two numbers and the presence flag, never the record or its hash.
+  - The in-memory attempts and lockout are written by the same code that writes the store, inside the same mutex; a second manager over the same store reads the same values (`the lock's details cost one decrypt and stay in step with every write`). Brute-force numbers are unchanged: `pin-bruteforce-1000` still sees 3 wrong answers and 997 lockouts after its warm-up attempt (five PBKDF2 runs in all), and the lockout refuses the rest before hashing.
+  - History: navigation is immediate and opens the tapped row's own id; only the animation depends on the finger. A click with no finger opens with the cross-fade. Swipe trays still work over the new finger-down hook, which travels with the row (two tray tests caught it covering the tray when placed before the row's layer).
+  - Empty-state actions call the same `onFilter(ALL)` and `onQuery("")` as the chips and the search field.
+  - `ReportDrawn` only tells the system when the first full screen is up, the same signal every app's launch timing uses.
+- Scope for improvement:
+  - The lock's presence flag is the record's key in the encrypted preferences file. It is as strong as that file's integrity; a server-side or hardware-bound check is out of scope for a sandbox app.
+  - Not checked on a device: the prefetch with the real Keystore and DataStore (no emulator headroom for a startup trace).
