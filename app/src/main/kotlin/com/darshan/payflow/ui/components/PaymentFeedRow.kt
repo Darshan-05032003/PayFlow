@@ -43,6 +43,9 @@ fun PaymentStatus.feedPill(): StatusKind? = when (this) {
  * hears one sentence with the status, pill or not. The row is one end of the container transform into the payment's detail.
  *
  * [timeLabel] is whatever reads best where the row sits: "2 h ago" on Home, "10:38 PM" under a day header.
+ *
+ * [containerKey] makes the row one end of the container transform into the payment's detail. Null leaves it out: a long list
+ * gives it only to the row being opened, because every shared element registers with the shell as it scrolls in.
  */
 @Composable
 fun PaymentFeedRow(
@@ -51,6 +54,7 @@ fun PaymentFeedRow(
     timeLabel: String,
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    containerKey: String? = paymentContainerKey(payment.id),
 ) {
     val colors = PayFlowTheme.colors
     val outgoing = payment.direction == PaymentDirection.OUTGOING
@@ -83,7 +87,7 @@ fun PaymentFeedRow(
         },
         onClick = { onClick(payment.id) },
         modifier = modifier
-            .containerTransform(paymentContainerKey(payment.id))
+            .then(if (containerKey != null) Modifier.containerTransform(containerKey) else Modifier)
             .testTag(PayFlowTestTags.paymentRow(payment.id))
             .semantics(mergeDescendants = true) { contentDescription = description },
     )

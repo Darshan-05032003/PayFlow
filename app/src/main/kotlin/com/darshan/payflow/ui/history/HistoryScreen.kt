@@ -6,6 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +58,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
@@ -112,6 +116,7 @@ import com.darshan.payflow.ui.designsystem.tokens.Spacing
 import com.darshan.payflow.ui.navigation.LocalBottomBarInset
 import com.darshan.payflow.ui.navigation.ScrollToTopOnReselect
 import com.darshan.payflow.ui.navigation.ShellRoute
+import com.darshan.payflow.ui.navigation.paymentContainerKey
 import com.darshan.payflow.ui.theme.PayFlowTheme
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -393,6 +398,17 @@ private fun HistoryBody(state: HistoryUiState, callbacks: HistoryCallbacks, amou
     val thresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
     val refreshing = state is HistoryUiState.Loading
     var openRow by remember { mutableStateOf<String?>(null) }
+    // Only the row under the finger, or the last one opened (for the way back), is an end of the container transform. A shared
+    // element registers with the shell as it composes, which recomposed the visible rows on every fling when every row had one.
+    // A tap's finger lands at least a frame before its click, which is what the transform needs to find its pair. A click with
+    // no finger (TalkBack, a keyboard) opens with the plain cross-fade.
+    var transformRow by rememberSaveable { mutableStateOf<String?>(null) }
+    val openPayment: (String) -> Unit = remember(callbacks) {
+        { id ->
+            transformRow = id
+            callbacks.onPaymentClick(id)
+        }
+    }
     LaunchedEffect(pull) {
         var previous = 0f
         androidx.compose.runtime.snapshotFlow { pull.distanceFraction }.collect { current ->
@@ -446,7 +462,7 @@ private fun HistoryBody(state: HistoryUiState, callbacks: HistoryCallbacks, amou
                     when (entry) {
                         is HistoryEntry.Day -> stickyHeader(key = entry.key, contentType = entry.contentType) { DayHeader(entry, amountsHidden) }
                         is HistoryEntry.Row -> item(key = entry.key, contentType = entry.contentType) {
-                            SwipeRow(entry, amountsHidden, zone, openRow, { openRow = it }, callbacks)
+                            SwipeRow(entry, amountsHidden, zone, openRow, { openRow = it }, callbacks, entry.payment.id == transformRow, { transformRow = it }, openPayment)
                         }
                     }
                 }
@@ -469,7 +485,6 @@ private fun HistoryBody(state: HistoryUiState, callbacks: HistoryCallbacks, amou
 }
 
 private const val SKELETON_ROWS = 8
-
 @Composable
 private fun DayHeader(day: HistoryEntry.Day, amountsHidden: Boolean) {
     val colors = PayFlowTheme.colors
@@ -508,6 +523,9 @@ private fun SwipeRow(
     openRow: String?,
     onOpenRow: (String?) -> Unit,
     callbacks: HistoryCallbacks,
+    transformEnd: Boolean,
+    onFingerDown: (String) -> Unit,
+    onOpen: (String) -> Unit,
 ) {
     val payment = entry.payment
     val colors = PayFlowTheme.colors
@@ -567,6 +585,13 @@ private fun SwipeRow(
             Modifier
                 .graphicsLayer { translationX = offset * direction }
                 .background(colors.bg)
+                // After the slide's layer, so it moves with the row and never covers the tray it uncovers.
+                .pointerInput(payment.id) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        onFingerDown(payment.id)
+                    }
+                }
                 .draggable(
                     drag,
                     Orientation.Horizontal,
@@ -580,7 +605,8 @@ private fun SwipeRow(
                     payment = payment,
                     amountsHidden = amountsHidden,
                     timeLabel = time,
-                    onClick = { id -> if (offset != 0f) settle(RowSwipeTarget.Closed) else callbacks.onPaymentClick(id) },
+                    onClick = { id -> if (offset != 0f) settle(RowSwipeTarget.Closed) else onOpen(id) },
+                    containerKey = if (transformEnd) paymentContainerKey(payment.id) else null,
                     modifier = Modifier.semantics {
                         customActions = actions.mapIndexed { i, action -> CustomAccessibilityAction(labels[i]) { runAction(action); true } }
                     },
