@@ -24,7 +24,7 @@ rounds="${ROUNDS:-3}"
 flings="${FLINGS:-3}"
 history_tag="payflow:home:history"
 
-pgrep -f '^[^ ]*java .*GradleWrapperMain' >/dev/null && { echo "light_bench: a Gradle build is running" >&2; exit 1; }
+[ -n "$(systemctl --user list-units --type=scope --state=active 'ui-gradle-*' --no-legend 2>/dev/null)" ] && { echo "light_bench: a Gradle build is running" >&2; exit 1; }
 [ "$("${adb[@]}" get-state 2>/dev/null)" = device ] || { echo "light_bench: emulator-5554 is not up" >&2; exit 1; }
 mkdir -p "$results"
 
