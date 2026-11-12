@@ -115,6 +115,7 @@ object PayFlowTestTags {
     const val HISTORY_HIDE_AMOUNTS = "payflow:history:hideAmounts"
     const val HISTORY_PULL = "payflow:history:pull"
     const val HISTORY_EMPTY_ACTION = "payflow:history:empty_action"
+    const val CHECKOUT_VIEW_PAYMENT = "payflow:checkout:view_payment"
     fun historyDay(date: String) = "payflow:history:day:$date"
     fun historyAction(paymentId: String, action: String) = "payflow:history:action:$paymentId:$action"
     const val DETAIL_SHEET = "payflow:detail:sheet"

@@ -256,7 +256,7 @@ private fun Outcome(outcome: CheckoutOutcome?, callbacks: CheckoutCallbacks) {
                     GhostButton(
                         stringResource(R.string.pay_view_payment),
                         { callbacks.onOpenPayment(payment.id) },
-                        outlined = false,
+                        modifier = Modifier.fillMaxWidth().testTag(PayFlowTestTags.CHECKOUT_VIEW_PAYMENT),
                         tone = GhostTone.Accent,
                     )
                 }

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -86,6 +87,20 @@ class CheckoutScreenTest {
         rule.onNodeWithText("Declined by the bank (ZA)").assertExists()
         rule.onNodeWithText("View payment", substring = true).performScrollTo().performClick()
         assertThat(opened).isEqualTo("ck-1")
+    }
+
+    /** Like Copy reference on the payment sheet: a secondary action sits on its card's gutter, not pushed in by its own padding. */
+    @Test fun viewPaymentSitsOnTheOutcomeCardsGutter() = assertViewPaymentOnGutter(1f)
+    @Test fun viewPaymentSitsOnTheOutcomeCardsGutterAtLargeText() = assertViewPaymentOnGutter(1.3f)
+    @Test fun viewPaymentSitsOnTheOutcomeCardsGutterAtDoubleText() = assertViewPaymentOnGutter(2f)
+
+    private fun assertViewPaymentOnGutter(fontScale: Float) {
+        val payment = testPayment("ck-1", status = PaymentStatus.SUCCESS, amountPaise = 49_900)
+        rule.setDs(fontScale = fontScale) { CheckoutScreen(CheckoutUiState(lastOutcome = CheckoutOutcome.Recorded(payment)), CheckoutCallbacks()) }
+        val button = rule.onNodeWithTag(PayFlowTestTags.CHECKOUT_VIEW_PAYMENT).performScrollTo().getBoundsInRoot()
+        val title = rule.onNodeWithText("Payment successful").getBoundsInRoot()
+        assertThat(button.left).isEqualTo(title.left)
+        assertThat((button.right - button.left).value).isGreaterThan((title.right - title.left).value)
     }
 
     /** CheckoutKit has no theming API; it reads the ambient Material theme, so PayFlow's tokens go in through these slots. */
