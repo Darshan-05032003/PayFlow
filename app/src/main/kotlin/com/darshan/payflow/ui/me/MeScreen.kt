@@ -190,6 +190,7 @@ private fun LinkRow(icon: ImageVector, title: String, subtitle: String, tag: Str
     PayFlowListRow(
         title = title,
         subtitle = subtitle,
+        subtitleMaxLines = Int.MAX_VALUE,
         modifier = Modifier.testTag(tag),
         leading = {
             Box(Modifier.size(Sizes.avatar).background(colors.accentTint, Radii.pillShape), contentAlignment = Alignment.Center) {

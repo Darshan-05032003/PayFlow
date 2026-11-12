@@ -12,7 +12,10 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.unit.Density
 import com.darshan.payflow.ui.designsystem.effects.Haptics
 import com.darshan.payflow.ui.theme.PayFlowTheme
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 
 /** Sets themed content with the options design-system tests vary: font scale, reduced motion, theme, fake haptics. */
 fun ComposeContentTestRule.setDs(
@@ -55,3 +58,18 @@ fun SemanticsNodeInteraction.assertInside(parent: SemanticsNodeInteraction) {
     assertThat(inner.bottom).isAtMost(outer.bottom + slack)
 }
 
+
+/**
+ * Fails if this text node's layout is cut: lines past a cap, or an ellipsis. What "readable at
+ * large font sizes" means for text that must stay whole.
+ */
+fun SemanticsNodeInteraction.assertTextWhole() {
+    val node = fetchSemanticsNode()
+    val layouts = mutableListOf<TextLayoutResult>()
+    node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+    val layout = layouts.single()
+    val label = layout.layoutInput.text.text
+    // Not didOverflowWidth: wrap-content text is laid out at the full width and reads as "overflowing" when it is narrower.
+    assertWithMessage("\"$label\" is cut at its line cap").that(layout.didOverflowHeight || layout.multiParagraph.didExceedMaxLines).isFalse()
+    for (line in 0 until layout.lineCount) assertWithMessage("\"$label\" is ellipsized on line $line").that(layout.isLineEllipsized(line)).isFalse()
+}

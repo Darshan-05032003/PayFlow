@@ -150,7 +150,8 @@ fun PayFlowToast(message: String, tone: ToastTone, modifier: Modifier = Modifier
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         ToastGlyph(tone)
-        Text(message, style = PayFlowTheme.type.bodyStrong, color = colors.onToast, maxLines = 3, modifier = Modifier.weight(1f))
+        // No line cap: a cap cut the end off long messages at large font sizes, and the end is usually what to do next.
+        Text(message, style = PayFlowTheme.type.bodyStrong, color = colors.onToast, modifier = Modifier.weight(1f))
     }
 }
 

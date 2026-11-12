@@ -173,6 +173,9 @@ fun PayFlowTopBar(
  * The list row: leading slot, title and subtitle, trailing slot, at least 72dp tall. Everything in it reads as one TalkBack
  * item. Title and subtitle pass through [DisplayText.safe]. Cheap enough for 10,000-row lists; give the lazy item a `key` and
  * `contentType`.
+ *
+ * [subtitleMaxLines] is 1 for lists of records, where rows keep one rhythm and a long UPI ID may ellipsize. A settings row
+ * whose subtitle explains something sets it higher, so large text wraps instead of cutting the explanation.
  */
 @Composable
 fun PayFlowListRow(
@@ -182,6 +185,7 @@ fun PayFlowListRow(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    subtitleMaxLines: Int = 1,
 ) {
     val colors = PayFlowTheme.colors
     val type = PayFlowTheme.type
@@ -213,7 +217,7 @@ fun PayFlowListRow(
         leading?.invoke()
         Column(Modifier.weight(1f)) {
             Text(DisplayText.safe(title), style = type.bodyStrong, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(DisplayText.safe(subtitle), style = type.label, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(DisplayText.safe(subtitle), style = type.label, color = colors.textSecondary, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis)
         }
         trailing?.invoke()
     }
