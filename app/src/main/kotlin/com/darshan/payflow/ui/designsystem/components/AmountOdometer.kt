@@ -71,6 +71,17 @@ private fun naturalWidth(measurer: TextMeasurer, slots: List<OdometerSlot>, styl
         }
     }.toFloat()
 
+private fun TextStyle.scaledBy(scale: Float): TextStyle =
+    if (scale == 1f) this else copy(fontSize = fontSize * scale, lineHeight = lineHeight * scale)
+
+private fun TextStyle.signStyle(): TextStyle = copy(fontFamily = Geist, fontWeight = FontWeight.Normal)
+
+/** The width the odometer's cells and separators take at [scale]: what the row really needs, rounding included. */
+internal fun odometerWidth(measurer: TextMeasurer, slots: List<OdometerSlot>, style: TextStyle, scale: Float): Float {
+    val scaled = style.scaledBy(scale)
+    return naturalWidth(measurer, slots, scaled, scaled.signStyle(), buildAtlas(measurer, scaled))
+}
+
 /**
  * The amount display: each digit rolls to its new value in the direction the amount moved.
  *
@@ -109,15 +120,13 @@ fun AmountOdometer(
         },
     ) {
         val available = if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat() else Float.MAX_VALUE
-        val baseSign = style.copy(fontFamily = Geist, fontWeight = FontWeight.Normal)
         val baseAtlas = remember(style, measurer) { buildAtlas(measurer, style) }
-        val width = remember(slots, style, measurer) { naturalWidth(measurer, slots, style, baseSign, baseAtlas) }
-        val scale = OdometerLogic.fitScale(width, available, minScale)
-        val density = LocalDensity.current
-        val scaledStyle = remember(style, scale) {
-            if (scale == 1f) style else style.copy(fontSize = style.fontSize * scale, lineHeight = style.lineHeight * scale)
+        val scale = remember(slots, style, measurer, available, minScale) {
+            OdometerLogic.fitScale(available, minScale) { s -> odometerWidth(measurer, slots, style, s) }
         }
-        val signStyle = remember(scaledStyle) { scaledStyle.copy(fontFamily = Geist, fontWeight = FontWeight.Normal) }
+        val density = LocalDensity.current
+        val scaledStyle = remember(style, scale) { style.scaledBy(scale) }
+        val signStyle = remember(scaledStyle) { scaledStyle.signStyle() }
         val atlas = remember(scaledStyle, measurer) { if (scale == 1f) baseAtlas else buildAtlas(measurer, scaledStyle) }
         val cellSize = with(density) { Modifier.size(atlas.cellWidth.toDp(), atlas.cellHeight.toDp()) }
 

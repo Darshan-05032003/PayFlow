@@ -392,3 +392,11 @@ Re-recorded baselines (intended changes only, one class at a time): Home, Histor
 - **The row → sheet transform can't be judged on this emulator.** Software rendering dropped the middle frames: History faded for about 330 ms and the sheet then appeared almost full size. Start and end states are right; the motion needs a phone's GPU.
 - **Numbers are measured with `am start -W` and `dumpsys gfxinfo`, one half per fresh boot.** Macrobenchmark with Perfetto and even ten back-to-back cold starts outgrew the emulator's memory cap; four cold starts per boot and frame rounds in their own boots fitted. The cap was not changed.
 - **The redesign's cold start is slower and is reported as it is** (median 631 → 1,409 ms on the emulator). The splash deliberately waits for the theme and the lock state; whether that wait or the larger first composition dominates was not profiled here. A Baseline Profile and a phone run are the next steps, and `light_bench.sh` can now measure with the profile (`COMPILE=speed-profile`).
+
+## Enhancement pass (row 16, 2026-11-12)
+A second design-director pass over all 202 baselines, light and dark, plus the two known performance gaps. Findings, ranked
+by what a user would feel, and what was done with each.
+
+| # | Finding | Decision |
+|---|---|---|
+| 1 | At 1.3× text the catalog's narrow-slot odometer read ₹99,99,99,999.9: the last paise digit fell outside the slot. The fit guessed the scaled width from the full-size width, but each digit cell rounds up to whole pixels and glyphs don't scale linearly, so at 1.3× the "fitting" scale still needed 384 px of a 336 px slot. A clipped amount is a wrong amount. | **Done.** `OdometerLogic.fitScale(available, floor, widthAt)` measures the real cells at each candidate step and steps down until they fit. Tested on the real fonts at 1.0×, 1.3× and 2.0× in five slot widths. |

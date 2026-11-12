@@ -7,6 +7,7 @@ import com.darshan.payflow.ui.designsystem.components.OdometerLogic
 import com.darshan.payflow.ui.designsystem.components.OdometerSlot
 import com.darshan.payflow.ui.designsystem.components.RollDirection
 import com.google.common.truth.Truth.assertThat
+import kotlin.math.ceil
 import org.junit.Test
 
 class OdometerLogicTest {
@@ -144,6 +145,19 @@ class OdometerLogicTest {
         assertThat(scale).isAtMost(0.75f)
         assertThat(400f * scale).isAtMost(300f)
         assertThat(((scale / OdometerLogic.SCALE_STEP) % 1f)).isWithin(0.001f).of(0f)
+    }
+
+    @Test
+    fun the_chosen_scale_fits_when_cells_round_up_to_whole_pixels() {
+        // Eleven digit cells and four separators, each rounded up to whole pixels at the scaled size, as the odometer lays
+        // them out: width is not proportional to the scale.
+        val widthAt = { s: Float -> 11 * ceil(30.4f * s) + 4 * ceil(9.3f * s) }
+        for (available in 150..400) {
+            val scale = OdometerLogic.fitScale(available.toFloat(), 0.4f, widthAt)
+            if (scale > 0.4f) assertThat(widthAt(scale)).isAtMost(available.toFloat())
+            assertThat(((scale / OdometerLogic.SCALE_STEP) % 1f).let { minOf(it, 1f - it) }).isWithin(0.001f).of(0f)
+        }
+        assertThat(OdometerLogic.fitScale(1_000f, 0.4f, widthAt)).isEqualTo(1f)
     }
 
     @Test

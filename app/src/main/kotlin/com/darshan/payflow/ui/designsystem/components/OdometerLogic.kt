@@ -2,6 +2,7 @@ package com.darshan.payflow.ui.designsystem.components
 
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 enum class AmountDecimals { Always, WhenNonZero, Never }
 
@@ -132,6 +133,21 @@ object OdometerLogic {
         if (naturalWidth <= available) return 1f
         if (available <= 0f) return floorScale
         val steps = floor(available / naturalWidth / SCALE_STEP + 1e-4f).toInt()
+        return (steps * SCALE_STEP).coerceIn(floorScale, 1f)
+    }
+
+    /**
+     * Font scale at which the text, measured by [widthAt] at that scale, fits [available]. Text width is not linear in the
+     * scale (each digit cell rounds up to whole pixels), so a guess from the full-size width alone can leave the last digit
+     * outside the slot.
+     */
+    fun fitScale(available: Float, floorScale: Float, widthAt: (Float) -> Float): Float {
+        val first = fitScale(widthAt(1f), available, floorScale)
+        if (first == 1f) return 1f
+        // Steps are counted as integers so the scale stays an exact multiple of the step.
+        var steps = (first / SCALE_STEP).roundToInt()
+        val floorSteps = ceil(floorScale / SCALE_STEP - 1e-4f).toInt()
+        while (steps > floorSteps && widthAt(steps * SCALE_STEP) > available) steps--
         return (steps * SCALE_STEP).coerceIn(floorScale, 1f)
     }
 }

@@ -30,6 +30,12 @@ import com.darshan.payflow.ui.designsystem.components.AmountSign
 import com.darshan.payflow.ui.designsystem.components.AmountText
 import com.darshan.payflow.ui.designsystem.components.OdometerLogic
 import com.google.common.truth.Truth.assertThat
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import com.darshan.payflow.ui.designsystem.components.odometerWidth
+import com.darshan.payflow.ui.theme.PayFlowTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.Density
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -168,6 +174,30 @@ class OdometerUiTest {
     }
 
     @Test
+    fun every_digit_of_the_largest_amount_fits_a_narrow_slot_at_large_text() {
+        // The catalog's narrow slot showed ₹99,99,99,999.9 at 1.3×: the last paise digit fell outside the slot.
+        val results = mutableListOf<String>()
+        rule.setDs {
+            val base = LocalDensity.current
+            val slots = OdometerLogic.slots(OdometerLogic.MAX_PAISE, AmountDecimals.Always, AmountSign.NegativeOnly)
+            for (fontScale in listOf(1f, 1.3f, 2f)) {
+                CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale)) {
+                    val measurer = rememberTextMeasurer()
+                    val style = PayFlowTheme.type.hero
+                    for (slotDp in listOf(120, 168, 200, 240, 300)) {
+                        val available = with(base) { slotDp.dp.roundToPx().toFloat() }
+                        val scale = OdometerLogic.fitScale(available, MIN_SCALE) { s -> odometerWidth(measurer, slots, style, s) }
+                        val needed = odometerWidth(measurer, slots, style, scale)
+                        if (scale > MIN_SCALE && needed > available) results += "${fontScale}x in ${slotDp}dp: needs $needed px of $available at $scale"
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        assertThat(results).isEmpty()
+    }
+
+    @Test
     fun the_largest_amount_fits_a_full_width_phone_at_normal_scale_without_shrinking_much() {
         rule.setDs { Box(Modifier.width(371.dp)) { AmountOdometer(OdometerLogic.MAX_PAISE, Modifier.testTag(TAG), decimals = AmountDecimals.Always) } }
         rule.onNodeWithTag(TAG).assertWidthIsAtLeast(200.dp)
@@ -189,5 +219,6 @@ class OdometerUiTest {
 
         /** A burst at most: never one per frame. */
         const val ALLOWED_CYCLES = 3L
+        const val MIN_SCALE = 0.4f
     }
 }
