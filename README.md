@@ -277,8 +277,9 @@ on the JVM.
   release compiler metrics went from 26 to 7 (`./gradlew :app:compileReleaseKotlin -PcomposeReports=true`).
 
 On a software-rendered emulator (2 GB guest; `am start -W` over 4 cold starts, `dumpsys gfxinfo` over 2 fling rounds per
-screen) the redesign's median cold start went from 631 ms to 1,409 ms (the splash now waits for the theme and lock state)
-and History's P90 frame time from 31 ms to 50 ms. These are small emulator samples, not phone figures; method, raw numbers
+screen) the redesign's median cold start went from 631 ms to 1,409 ms and History's P90 frame time from 31 ms to 50 ms. The
+likely cause of the startup change, not yet profiled, is that the splash is now held until the theme and lock state are
+read, which `am start -W` counts; time to full display has not been compared. These are small emulator samples, not phone figures; method, raw numbers
 and what was not run are in [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 
 ## Security
