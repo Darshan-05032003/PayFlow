@@ -1,6 +1,7 @@
 package com.darshan.payflow.ui.home
 
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.ReportDrawn
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -221,6 +222,8 @@ fun HomeScreen(
     val density = LocalDensity.current
     val barInset = LocalBottomBarInset.current
     val sandbox = LocalPaymentMode.current == PaymentMode.SANDBOX
+    // Time to full display ends when the first answer is on screen (payments, none, or the error), never on the skeleton.
+    if (state !is HomeUiState.Loading) ReportDrawn()
     ScrollToTopOnReselect(ShellRoute.Home, scroll)
 
     val header = remember(scroll) { HomeHeaderState(scroll) }

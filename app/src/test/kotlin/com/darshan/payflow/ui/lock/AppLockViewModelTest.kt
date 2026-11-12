@@ -5,6 +5,8 @@ import com.darshan.payflow.core.DispatcherProvider
 import com.darshan.payflow.data.security.AppLock
 import com.darshan.payflow.data.security.BiometricAvailability
 import com.darshan.payflow.data.security.BiometricResult
+import com.darshan.payflow.data.security.CountingCryptoBox
+import com.darshan.payflow.data.security.CountingStore
 import com.darshan.payflow.data.security.InMemorySecureStore
 import com.darshan.payflow.data.security.PinManager
 import com.darshan.payflow.testutil.FIXED_INSTANT
@@ -16,7 +18,9 @@ import com.darshan.payflow.ui.designsystem.effects.HapticEvent
 import com.darshan.payflow.ui.designsystem.effects.UiEffect
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -183,9 +187,113 @@ class AppLockViewModelTest {
         assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = true))
         appLock.lock()
         runCurrent()
-        assertThat(vm.uiState.value).isEqualTo(LockUiState.Checking)
+        // The lock's details are already in memory, so the lock lands with no IO at all: nothing was drained.
+        assertThat(parkedIo.hasWork()).isFalse()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
         settle()
         assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `when the lock's details are not known yet, the app still goes before they load`() = runTest(dispatcher) {
+        pins.set("493027")
+        val parkedIo = ParkedDispatcher()
+        val provider = object : DispatcherProvider {
+            override val io: CoroutineDispatcher get() = parkedIo
+            override val default: CoroutineDispatcher get() = dispatcher
+            override val main: CoroutineDispatcher get() = dispatcher
+        }
+        // A manager with nothing in memory: its details need a read.
+        val coldPins = PinManager(store, clock, iterations = 1_000)
+        val coldLock = AppLock(coldPins, clock)
+        val vm = AppLockViewModel(coldLock, coldPins, biometric, provider, clock)
+        runCurrent()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Checking)
+        parkedIo.drain(); runCurrent()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Checking)
+        do { parkedIo.drain(); advanceUntilIdle() } while (parkedIo.hasWork())
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `a lock answered before the screen asks shows the lock from the first state, never the app`() = runTest(dispatcher) {
+        PinManager(store, clock, iterations = 1_000).set("493027") // set in an earlier process
+        // What StartupPrefetch does in Application.onCreate.
+        appLock.refresh()
+        pins.lockStatus()
+        val vm = vm()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+        vm.uiState.test {
+            assertThat(awaitItem()).isInstanceOf(LockUiState.Locked::class.java)
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `a pin answered early but details unknown holds on checking, never the app`() = runTest(dispatcher) {
+        PinManager(store, clock, iterations = 1_000).set("493027")
+        appLock.refresh()
+        val vm = vm()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Checking)
+        advanceUntilIdle()
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `no pin answered early opens the app from the first state`() = runTest(dispatcher) {
+        appLock.refresh()
+        val vm = vm()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = false))
+        advanceUntilIdle()
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = false))
+    }
+
+    @Test
+    fun `an early unlocked answer still gives way to a relock before anything suspends`() = runTest(dispatcher) {
+        // A new activity in a process that was unlocked earlier, coming back after the grace period: onStart relocks.
+        pins.set("493027")
+        appLock.refresh()
+        appLock.unlock()
+        val parkedIo = ParkedDispatcher()
+        val provider = object : DispatcherProvider {
+            override val io: CoroutineDispatcher get() = parkedIo
+            override val default: CoroutineDispatcher get() = dispatcher
+            override val main: CoroutineDispatcher get() = dispatcher
+        }
+        val vm = AppLockViewModel(appLock, pins, biometric, provider, clock)
+        assertThat(vm.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = true))
+        runCurrent()
+        appLock.onBackground()
+        now = now.plusSeconds(AppLock.GRACE_SECONDS + 1)
+        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { appLock.onForeground() }
+        runCurrent()
+        // No IO has run: the collector was listening from the start, and the details came from memory.
+        assertThat(vm.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+    }
+
+    @Test
+    fun `a locked cold start decrypts once, a start with no pin decrypts nothing`() = runTest(dispatcher) {
+        val box = CountingCryptoBox()
+        val counted = CountingStore(InMemorySecureStore(box))
+        PinManager(counted, clock, iterations = 1_000).set("493027")
+        box.reset(); counted.reset()
+        val lockedPins = PinManager(counted, clock, iterations = 1_000)
+        val locked = AppLockViewModel(AppLock(lockedPins, clock), lockedPins, biometric, TestDispatcherProvider(dispatcher), clock)
+        advanceUntilIdle()
+        assertThat(locked.uiState.value).isInstanceOf(LockUiState.Locked::class.java)
+        // Was four: presence twice, attempts and lockout each decrypted the record.
+        assertThat(box.decrypts.get()).isEqualTo(1)
+        assertThat(counted.reads.get()).isEqualTo(2)
+
+        val emptyBox = CountingCryptoBox()
+        val empty = CountingStore(InMemorySecureStore(emptyBox))
+        val openPins = PinManager(empty, clock, iterations = 1_000)
+        val open = AppLockViewModel(AppLock(openPins, clock), openPins, biometric, TestDispatcherProvider(dispatcher), clock)
+        advanceUntilIdle()
+        assertThat(open.uiState.value).isEqualTo(LockUiState.Unlocked(pinConfigured = false))
+        assertThat(emptyBox.decrypts.get()).isEqualTo(0)
+        assertThat(empty.reads.get()).isEqualTo(1)
     }
 
     @Test

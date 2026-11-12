@@ -45,6 +45,9 @@ data class PinRecord(
     val lockoutUntilMillis: Long = 0,
 )
 
+/** The lock's bookkeeping, without anything secret: what the lock screen shows before a PIN is typed. */
+data class LockStatus(val remainingAttempts: Int, val lockoutUntilMillis: Long)
+
 /**
  * App PIN hashed with PBKDF2-HmacSHA256 (random 16-byte salt, ≥ 100k iterations, constant-time compare) and a lockout that
  * grows with every round of [MAX_ATTEMPTS] failures (30 s, 60 s, … capped at one hour). Locked-out attempts are refused before
@@ -69,7 +72,26 @@ class PinManager(
      */
     val changes: StateFlow<Long> = _changes.asStateFlow()
 
-    suspend fun isSet(): Boolean = load() != null
+    /**
+     * Whether a PIN record exists, known once the store has answered and kept in step by every write here (this class is the
+     * only writer of [KEY]). Presence needs no decryption, so a cold start learns it without a Keystore operation. An
+     * unreadable record still counts: the gate fails closed.
+     */
+    @Volatile private var presence: Boolean? = null
+
+    /** The lock's attempts and lockout, decrypted once and then updated by every write. */
+    @Volatile private var status: LockStatus? = null
+
+    suspend fun isSet(): Boolean = presence ?: store.contains(KEY).also { presence = it }
+
+    /** The answer [isSet] would give, if it is already known, without suspending. */
+    fun knownIsSet(): Boolean? = presence
+
+    /** Attempts left and the lockout end. One decrypt the first time; from memory afterwards. */
+    suspend fun lockStatus(): LockStatus = status ?: statusOf(load()).also { status = it }
+
+    /** [lockStatus], if it is already known. */
+    fun knownLockStatus(): LockStatus? = status
 
     suspend fun set(pin: String) {
         require(validateNewPin(pin) == PinRule.Ok) { "invalid pin" }
@@ -81,7 +103,7 @@ class PinManager(
     }
 
     suspend fun verify(pin: String): PinVerification = mutex.withLock {
-        val record = load() ?: return PinVerification.NotSet
+        val record = load() ?: return notSet()
         val now = clock.millis()
         if (record.lockoutUntilMillis > now) return PinVerification.LockedOut(record.lockoutUntilMillis)
         val candidate = hash(pin, record.salt, record.iterations)
@@ -107,19 +129,45 @@ class PinManager(
     }
 
     suspend fun clear() {
-        mutex.withLock { store.remove(KEY) }
+        mutex.withLock { removeRecord() }
         _changes.update { it + 1 }
     }
 
-    suspend fun lockoutRemainingMillis(): Long = (load()?.lockoutUntilMillis ?: 0L).minus(clock.millis()).coerceAtLeast(0)
+    suspend fun lockoutRemainingMillis(): Long = lockStatus().lockoutUntilMillis.minus(clock.millis()).coerceAtLeast(0)
 
-    suspend fun remainingAttempts(): Int = MAX_ATTEMPTS - (load()?.failures ?: 0)
+    suspend fun remainingAttempts(): Int = lockStatus().remainingAttempts
+
+    /**
+     * Nothing to verify against. A record that exists but can't be decrypted (a lost key, a damaged file) is dropped here, so
+     * the app says plainly that no PIN is set instead of asking for one forever.
+     */
+    private suspend fun notSet(): PinVerification {
+        if (store.contains(KEY)) {
+            removeRecord()
+            _changes.update { it + 1 }
+        } else {
+            presence = false
+        }
+        return PinVerification.NotSet
+    }
+
+    private suspend fun removeRecord() {
+        store.remove(KEY)
+        presence = false
+        status = statusOf(null)
+    }
 
     /** For tests and diagnostics: the stored parameters (never the PIN). */
     suspend fun debugRecord(): PinRecord? = load()
 
     private suspend fun load(): PinRecord? = store.get(KEY)?.let { runCatching { json.decodeFromString<PinRecord>(it) }.getOrNull() }
-    private suspend fun save(record: PinRecord) = store.put(KEY, json.encodeToString(record))
+    private suspend fun save(record: PinRecord) {
+        store.put(KEY, json.encodeToString(record))
+        presence = true
+        status = statusOf(record)
+    }
+
+    private fun statusOf(record: PinRecord?) = LockStatus(MAX_ATTEMPTS - (record?.failures ?: 0), record?.lockoutUntilMillis ?: 0L)
 
     private fun hash(pin: String, salt: ByteArray, iterations: Int): ByteArray {
         val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, HASH_BITS)

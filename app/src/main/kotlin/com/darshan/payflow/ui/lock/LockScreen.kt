@@ -1,6 +1,7 @@
 package com.darshan.payflow.ui.lock
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.ReportDrawn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Image
@@ -116,6 +117,8 @@ fun LockScreen(
     interactive: Boolean = true,
 ) {
     SecureWindow()
+    // A locked app's first full screen is its lock.
+    if (state is LockUiState.Locked || state is LockUiState.Setup) ReportDrawn()
     val colors = PayFlowTheme.colors
     Box(modifier.fillMaxSize().drawBehind { drawRect(colors.bg) }, contentAlignment = Alignment.Center) {
         when (state) {

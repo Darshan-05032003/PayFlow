@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.first
 /** Small encrypted key-value store for secrets (PIN record, device binding). Values are never stored in clear. */
 interface SecureStore {
     suspend fun get(key: String): String?
+
+    /** Whether a value is stored under [key], without decrypting it. The key name is not secret; the value is. */
+    suspend fun contains(key: String): Boolean = get(key) != null
     suspend fun put(key: String, value: String)
     suspend fun remove(key: String)
 }
@@ -20,6 +23,8 @@ class EncryptedSecureStore(private val prefs: DataStore<Preferences>, private va
         val raw = prefs.data.first()[stringPreferencesKey(key)] ?: return null
         return runCatching { box.decryptString(raw, aad = key.toByteArray()) }.getOrNull() // tampered/foreign → treated as missing
     }
+
+    override suspend fun contains(key: String): Boolean = prefs.data.first().contains(stringPreferencesKey(key))
 
     override suspend fun put(key: String, value: String) {
         val cipher = box.encryptString(value, aad = key.toByteArray())
@@ -35,6 +40,7 @@ class EncryptedSecureStore(private val prefs: DataStore<Preferences>, private va
 class InMemorySecureStore(private val box: CryptoBox = InMemoryCryptoBox()) : SecureStore {
     private val map = ConcurrentHashMap<String, String>()
     override suspend fun get(key: String): String? = map[key]?.let { runCatching { box.decryptString(it, key.toByteArray()) }.getOrNull() }
+    override suspend fun contains(key: String): Boolean = map.containsKey(key)
     override suspend fun put(key: String, value: String) { map[key] = box.encryptString(value, key.toByteArray()) }
     override suspend fun remove(key: String) { map.remove(key) }
     fun getAll(): Map<String, String> = map.toMap()

@@ -4,6 +4,8 @@
 #
 #   scripts/light_bench.sh <app-benchmark.apk> <results-dir>
 #
+# startup_full.txt holds the time to full display per run (the app's reportFullyDrawn, from logcat; "-" when a build
+# doesn't report it, as builds before the row-16 enhancement pass don't).
 # Per build: fresh install, the benchmark seed broadcast (200 settled payments), dex reset to `verify` (no AOT code, like
 # Macrobenchmark's CompilationMode.None), one discarded launch, then COLD_RUNS cold starts (force-stop + am start -W).
 # Frames: ROUNDS rounds per screen; each round is a cold launch, gfxinfo reset, FLINGS flings down and FLINGS up.
@@ -55,18 +57,30 @@ x=$((width / 2)); low=$((height * 3 / 4)); high=$((height / 4))
 cold_launch() { # prints TotalTime
     "${adb[@]}" shell am force-stop "$pkg"
     sleep 1
+    "${adb[@]}" logcat -c
     "${adb[@]}" shell am start -W -n "$activity" | tr -d '\r' | awk -F': ' '/TotalTime/{print $2}'
+}
+
+fully_drawn() { # prints the last launch's time to full display in ms (reportFullyDrawn), or "-" if the app didn't report
+    local line ms
+    line="$("${adb[@]}" logcat -d -s ActivityTaskManager:I | tr -d '\r' | grep -F "Fully drawn $pkg" | tail -1)"
+    ms="$(printf '%s' "$line" | grep -oE '\+([0-9]+s)?[0-9]+ms' | tail -1 | tr -d '+')"
+    if [ -z "$ms" ]; then echo "-"; return; fi
+    case "$ms" in *s*ms) echo $(( ${ms%%s*} * 1000 + $(printf '%s' "${ms#*s}" | tr -d 'ms') )) ;; *) printf '%s\n' "${ms%ms}" ;; esac
 }
 
 cold_launch >/dev/null # first launch creates the database and caches; not measured
 sleep 3
 if [ "${SKIP_STARTUP:-0}" != 1 ]; then
     : >"$results/startup.txt"
+    : >"$results/startup_full.txt"
     for i in $(seq 1 "$cold_runs"); do
         t="$(cold_launch)"
-        echo "$t" >>"$results/startup.txt"
-        echo "cold start $i: $t ms"
         sleep 2
+        full="$(fully_drawn)"
+        echo "$t" >>"$results/startup.txt"
+        echo "$full" >>"$results/startup_full.txt"
+        echo "cold start $i: $t ms (fully drawn: $full ms)"
     done
 fi
 

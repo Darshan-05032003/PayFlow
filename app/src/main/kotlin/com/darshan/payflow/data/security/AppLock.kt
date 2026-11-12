@@ -25,12 +25,23 @@ class AppLock @Inject constructor(private val pins: PinManager, private val cloc
     /** Assume a PIN until the store has said otherwise: the wrong guess here shows a lock for a moment, never the app. */
     private var pinMayExist = true
 
-    /** Re-evaluates on start: locked if a PIN exists and this session has not been unlocked yet. */
-    suspend fun refresh() {
+    /** True once [refresh] has had the store's answer in this process. Until then [isLocked]'s `false` means nothing. */
+    @Volatile private var resolved = false
+
+    /** Re-evaluates on start: locked if a PIN exists and this session has not been unlocked yet. Returns whether one exists. */
+    suspend fun refresh(): Boolean {
         val pinSet = pins.isSet()
         pinMayExist = pinSet
         if (!pinSet) _isLocked.value = false else if (!unlockedOnce) _isLocked.value = true
+        resolved = true
+        return pinSet
     }
+
+    /**
+     * Whether the app is locked, if the store has answered in this process; null until then. A screen created after the answer
+     * can start in its final state instead of waiting; one created before it must wait for [refresh].
+     */
+    fun resolvedLockState(): Boolean? = if (resolved) _isLocked.value else null
 
     fun unlock() {
         unlockedOnce = true

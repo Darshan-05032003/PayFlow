@@ -7,6 +7,7 @@ import com.darshan.payflow.data.security.AppLock
 import com.darshan.payflow.data.security.BiometricAuthenticator
 import com.darshan.payflow.data.security.BiometricAvailability
 import com.darshan.payflow.data.security.BiometricResult
+import com.darshan.payflow.data.security.LockStatus
 import com.darshan.payflow.data.security.PinManager
 import com.darshan.payflow.data.security.PinRule
 import com.darshan.payflow.data.security.PinVerification
@@ -76,10 +77,16 @@ class AppLockViewModel @Inject constructor(
     private var rejections = 0
 
     init {
+        // Answered before this screen existed (StartupPrefetch, or an earlier activity in this process): start in the final
+        // state, so the first frame is the right one with no wait and no second composition. Not known yet: Checking, which
+        // holds the splash until the store answers below.
+        initialState()?.let { _uiState.value = it }
         viewModelScope.launch {
-            withContext(dispatchers.io) { appLock.refresh() }
-            pinConfigured = withContext(dispatchers.io) { pins.isSet() }
-            _uiState.value = if (appLock.isLocked.value) lockedState() else LockUiState.Unlocked(pinConfigured)
+            if (_uiState.value is LockUiState.Checking) {
+                // AppLock reads "unlocked" until its first refresh, so nothing may listen to it before this answer.
+                pinConfigured = withContext(dispatchers.io) { appLock.refresh() }
+                _uiState.value = if (appLock.isLocked.value) lockedState() else LockUiState.Unlocked(pinConfigured)
+            }
             appLock.isLocked.collect { locked ->
                 val current = _uiState.value
                 if (locked && current !is LockUiState.Locked) {
@@ -107,10 +114,23 @@ class AppLockViewModel @Inject constructor(
         }
     }
 
-    private suspend fun lockedState(error: LockError? = null, biometricMessage: String? = null): LockUiState.Locked = LockUiState.Locked(
+    /** The state an already-answered lock gives, or null when anything it needs is still unknown. */
+    private fun initialState(): LockUiState? {
+        val locked = appLock.resolvedLockState() ?: return null
+        val pinSet = pins.knownIsSet() ?: return null
+        pinConfigured = pinSet
+        if (!locked) return LockUiState.Unlocked(pinSet)
+        return lockedState(pins.knownLockStatus() ?: return null)
+    }
+
+    /** Suspends only when the lock's details are not in memory yet; once read they are, so a relock lands at once. */
+    private suspend fun lockedState(error: LockError? = null, biometricMessage: String? = null): LockUiState.Locked =
+        lockedState(pins.knownLockStatus() ?: withContext(dispatchers.io) { pins.lockStatus() }, error, biometricMessage)
+
+    private fun lockedState(status: LockStatus, error: LockError? = null, biometricMessage: String? = null) = LockUiState.Locked(
         enteredDigits = digits.length,
-        remainingAttempts = withContext(dispatchers.io) { pins.remainingAttempts() },
-        lockoutRemainingMillis = withContext(dispatchers.io) { pins.lockoutRemainingMillis() },
+        remainingAttempts = status.remainingAttempts,
+        lockoutRemainingMillis = (status.lockoutUntilMillis - clock.millis()).coerceAtLeast(0),
         biometricAvailable = biometric.availability() == BiometricAvailability.AVAILABLE,
         biometricMessage = biometricMessage,
         error = error,
@@ -273,7 +293,4 @@ class AppLockViewModel @Inject constructor(
             }
         }
     }
-
-    @Suppress("unused")
-    private fun nowMillis() = clock.millis()
 }

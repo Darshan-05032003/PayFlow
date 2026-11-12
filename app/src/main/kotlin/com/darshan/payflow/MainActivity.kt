@@ -57,7 +57,9 @@ class MainActivity : FragmentActivity() {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         // Injected fields exist from here on. The first frame waits for the stored theme and the lock's answer, so neither a
-        // wrong theme nor a moment of the app can show first.
+        // wrong theme nor a moment of the app can show first. The lock's ViewModel is made now rather than by the first
+        // composition: if StartupPrefetch has answered it starts final, and if not, its own read starts here.
+        lockViewModel.uiState
         splash.holdUntilReadyThenHandOff(
             themeLoaded = { uiPreferences.loaded.value },
             lockResolved = { lockViewModel.uiState.value !is LockUiState.Checking },
