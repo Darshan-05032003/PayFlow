@@ -7,6 +7,9 @@
 # Per build: fresh install, the benchmark seed broadcast (200 settled payments), dex reset to `verify` (no AOT code, like
 # Macrobenchmark's CompilationMode.None), one discarded launch, then COLD_RUNS cold starts (force-stop + am start -W).
 # Frames: ROUNDS rounds per screen; each round is a cold launch, gfxinfo reset, FLINGS flings down and FLINGS up.
+# SKIP_STARTUP=1 measures frames only; SCREENS="history" picks screens; ROUNDS=0 measures startup only (one half per boot
+# when memory is tight: COLD_RUNS=4 then frames in a fresh boot kept a capped 2 GB guest alive).
+# COMPILE=speed-profile installs the APK's Baseline Profile and compiles with it instead of resetting to verify.
 # Emulator only (emulator-5554), adb only: no Gradle may run while the emulator is up.
 # Emulator numbers with software rendering: compare before and after from one session, never against a phone or against
 # Macrobenchmark tables.
@@ -32,7 +35,16 @@ done
 "${adb[@]}" install -r -t "$apk" >/dev/null
 seed="$("${adb[@]}" shell am broadcast --include-stopped-packages -n "$pkg/.benchmark.SeedDataReceiver" | tr -d '\r')"
 case "$seed" in *seeded=*) ;; *) echo "light_bench: seeding failed: $seed" >&2; exit 1 ;; esac
-"${adb[@]}" shell cmd package compile -f -m verify "$pkg" >/dev/null
+if [ "${COMPILE:-verify}" = speed-profile ]; then
+    # Like Macrobenchmark's CompilationMode.Partial: the APK's Baseline Profile is installed by ProfileInstaller, then AOT.
+    "${adb[@]}" shell am start -W -n "$("${adb[@]}" shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$pkg" | tr -d '\r' | tail -1)" >/dev/null
+    sleep 3
+    "${adb[@]}" shell am broadcast -a androidx.profileinstaller.action.INSTALL_PROFILE "$pkg/androidx.profileinstaller.ProfileInstallReceiver" | tr -d '\r' | tail -1
+    "${adb[@]}" shell am force-stop "$pkg"
+    "${adb[@]}" shell cmd package compile -f -m speed-profile "$pkg" >/dev/null
+else
+    "${adb[@]}" shell cmd package compile -f -m verify "$pkg" >/dev/null
+fi
 activity="$("${adb[@]}" shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$pkg" | tr -d '\r' | tail -1)"
 echo "activity $activity" | tee "$results/meta.txt"
 
@@ -48,13 +60,15 @@ cold_launch() { # prints TotalTime
 
 cold_launch >/dev/null # first launch creates the database and caches; not measured
 sleep 3
-: >"$results/startup.txt"
-for i in $(seq 1 "$cold_runs"); do
-    t="$(cold_launch)"
-    echo "$t" >>"$results/startup.txt"
-    echo "cold start $i: $t ms"
-    sleep 2
-done
+if [ "${SKIP_STARTUP:-0}" != 1 ]; then
+    : >"$results/startup.txt"
+    for i in $(seq 1 "$cold_runs"); do
+        t="$(cold_launch)"
+        echo "$t" >>"$results/startup.txt"
+        echo "cold start $i: $t ms"
+        sleep 2
+    done
+fi
 
 tap_tag() { # <test tag>: taps the node whose resource-id is the tag (EXPOSE_TEST_TAGS)
     "${adb[@]}" shell uiautomator dump /sdcard/light_bench.xml >/dev/null 2>&1
@@ -66,7 +80,7 @@ tap_tag() { # <test tag>: taps the node whose resource-id is the tag (EXPOSE_TES
     "${adb[@]}" shell input tap $((($1 + $3) / 2)) $((($2 + $4) / 2))
 }
 
-for screen in home history; do
+for screen in ${SCREENS:-home history}; do
     for round in $(seq 1 "$rounds"); do
         cold_launch >/dev/null
         sleep 3
@@ -84,9 +98,11 @@ done
 python3 - "$results" <<'EOF' | tee "$results/summary.md"
 import pathlib, re, statistics, sys
 d = pathlib.Path(sys.argv[1])
-times = [int(t) for t in (d / "startup.txt").read_text().split()]
-print("| Cold start (am start -W TotalTime, ms) | min | median | max | runs |\n|---|---|---|---|---|")
-print(f"| cold | {min(times)} | {statistics.median(times):.0f} | {max(times)} | {len(times)} |\n")
+startup = d / "startup.txt"
+if startup.exists() and startup.read_text().split():
+    times = [int(t) for t in startup.read_text().split()]
+    print("| Cold start (am start -W TotalTime, ms) | min | median | max | runs |\n|---|---|---|---|---|")
+    print(f"| cold | {min(times)} | {statistics.median(times):.0f} | {max(times)} | {len(times)} |\n")
 print("| Screen | frames | janky % | P50 ms | P90 ms | P95 ms | P99 ms | rounds |\n|---|---|---|---|---|---|---|---|")
 def first(pattern, text):
     m = re.search(pattern, text)
