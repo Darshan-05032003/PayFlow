@@ -468,3 +468,59 @@ To keep these benchmarks working as the UI changes:
   - Second attempt, with `light_bench.sh` on a fresh boot: the cap stopped the emulator again after 5 of 10 cold starts of the redesigned build (TotalTime 1,579 / 1,479 / 1,272 / 1,188 / 1,226 ms, first launch after install discarded), before any frame round and before the `9c48cc2` build ran. Repeated cold starts under software rendering grow the emulator's memory on their own, without tracing. Five runs of one build with nothing to compare against are not a result, so no before/after table is published.
   - Next step: one build per boot with fewer cold starts (`COLD_RUNS=4`) and the frame rounds in a separate boot, on both builds, or the same script on a real device with `adb -s <serial>`.
 - Also from this session (device findings fixed, see DECISIONS): amounts no longer count up from ₹0 on first appearance (root cause in `AmountOdometer`: it marked itself settled before its digit cells were laid out); the status bar's icons follow the unlock reveal; the note no longer sits under the keypad. FLAG_SECURE: the app's card in recents is blank (normal debug build). LeakCanary 2.14 (debug build): no retained-object report in logcat after a short walk through Home, History, Me, Security and Pay; a short walk, not a soak test.
+
+## Device session (2026-11-10)
+- Scenario and scale:
+  - Emulator: `Pixel_7` AVD, API 37, 2 GB guest, 2 vCPUs, software rendering (`-gpu guest`, llvmpipe), inside a 5.8–6.1 GB
+    kernel memory cap that protects the desktop it shares the laptop with. Every number below is an emulator number.
+  - Builds: after = the redesign at `44e32e3` (app code as of `26a50ba`, rebuilt for this session); before = `9c48cc2`, the
+    last commit before the redesign, built from a git worktree. Both are the release-like `benchmark` build type (R8 on,
+    debug-signed, not debuggable) with the benchmark seed: 200 settled payments written through `PaymentRepository`.
+  - Method: `scripts/light_bench.sh` (no Macrobenchmark, no Perfetto). Fresh install, seed, dex reset to `verify` (no AOT
+    code, the state Macrobenchmark calls `CompilationMode.None`), one discarded launch, then cold starts (force-stop +
+    `am start -W`, TotalTime). Frames: per round a cold launch, `dumpsys gfxinfo` reset, 3 flings down and 3 up.
+  - Sample sizes: 4 cold starts per build; 2 frame rounds per screen per build. Each half ran on its own fresh boot
+    (startup; Home frames; History frames), because repeated cold starts grow the emulator towards its cap.
+- Results (numbers, before vs after):
+
+  | Cold start, `am start -W` TotalTime (ms) | runs (in order) | min | median | max |
+  |---|---|---|---|---|
+  | before `9c48cc2` | 557, 623, 639, 642 | 557 | 631 | 642 |
+  | after `44e32e3` | 1,452, 1,426, 1,338, 1,392 | 1,338 | 1,409 | 1,452 |
+
+  | Frames (gfxinfo, 2 rounds) | frames | janky % | P50 ms | P90 ms | P95 ms | P99 ms |
+  |---|---|---|---|---|---|---|
+  | Home, before | 301 | 31.2 | 36 | 50 | 65 | 150 |
+  | Home, after (a different page now) | 740 | 20.3 | 33 | 55 | 63 | 150 |
+  | History, before | 521 | 3.8 | 26 | 31 | 32 | 32 |
+  | History, after | 998 | 14.0 | 34 | 50 | 59 | 75 |
+
+  Percentiles are the median over rounds of gfxinfo's per-round percentile; janky % is janky frames over all frames.
+  Per-round raw counts (frames / janky): Home before 161/48, 140/46; Home after 366/65, 374/85; History before 259/11,
+  262/9; History after 502/68, 496/72.
+- What the numbers say:
+  - Cold start roughly doubled. The likeliest reason (not profiled on this device): the redesigned splash is held on screen
+    until the theme and the lock state have been read (`SplashPolicy.keepOnScreen`, capped at 2.5 s) so a payments app never
+    flashes the wrong theme or unlocked content, and `am start -W` counts a held splash until the first real frame. The
+    new shell also composes more on the first frame. No Baseline Profile is shipped yet (see below), and this method strips
+    AOT code from both builds anyway.
+  - History renders twice as many frames over the same flings (rows animate in; the sticky month headers and the floating
+    bar redraw) and its tail got slower: P90 31 → 50 ms. Home is a different page now, so its row compares two designs,
+    not one page before and after.
+  - Software rendering puts every frame on the CPU; a phone's GPU changes these numbers. Compare only within this table.
+- What was not run, and why:
+  - Macrobenchmark (startup, scroll): not run. On every boot the emulator's anonymous memory sat at 5.0–5.9 GB of a
+    6.1 GB cap after five launches; Perfetto tracing on top of that was OOM-killed in the earlier session (see above).
+  - Baseline Profile: not generated. On 2026-11-12 the first emulator start was refused (about 6 GB free, it needs 8.2 GB);
+    in the second boot, after SplitSmart's generator had run, PayFlow's generator was stopped when the emulator hit its
+    6.1 GB cap (`oom-kill` in the emulator's scope; the desktop was unaffected). `light_bench.sh` gained
+    `COMPILE=speed-profile` so a profile's effect can be measured the same way once one exists.
+  - One emulator boot (looks and recordings for both apps) was OOM-killed by its cap after about 27 minutes of UI work and a
+    dozen screen recordings (cap 5.8 GB, `oom-kill` in the emulator's own scope; the desktop was unaffected). Its
+    recordings had already been pulled.
+- Device looks this session (screenshot-mode debug, sandbox mode switched on first): History row → payment sheet and
+  predictive back (the system back arrow shows, the sheet shrinks, History shows through); the AutoPay stack (found and
+  fixed: going back uncovered the next card, see DECISIONS); CheckoutKit's sheet over the receded store, a ₹499 sandbox
+  order through processing → waiting → success, landing in History. LeakCanary: one object retained for a moment, then
+  "All retained objects have been garbage collected": 0 retained. Recordings: `docs/media/history-sheet.webp` (83 KB),
+  `autopay-fling.webp` (127 KB), `checkout-sheet.webp` (120 KB).

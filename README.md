@@ -276,8 +276,10 @@ on the JVM.
 - **Compose stability**: `app/compose_stability.conf` marks `java.time` types stable; unstable composable parameters in the
   release compiler metrics went from 26 to 7 (`./gradlew :app:compileReleaseKotlin -PcomposeReports=true`).
 
-Device numbers after the UI overhaul have not been measured yet. Earlier software-rendered emulator figures and the method
-are in [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
+On a software-rendered emulator (2 GB guest; `am start -W` over 4 cold starts, `dumpsys gfxinfo` over 2 fling rounds per
+screen) the redesign's median cold start went from 631 ms to 1,409 ms (the splash now waits for the theme and lock state)
+and History's P90 frame time from 31 ms to 50 ms. These are small emulator samples, not phone figures; method, raw numbers
+and what was not run are in [`docs/LOAD_TEST_REPORT.md`](docs/LOAD_TEST_REPORT.md).
 
 ## Security
 
